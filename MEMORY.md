@@ -22,7 +22,8 @@ Format: `[owner] TaskID status (in progress | in review | done | blocked: reason
 - (none yet)
 
 ### P
-- (none yet)
+- [P] T0.3 in review, branch t0.3-fixtures
+- [P] T0.5 in review (recommendation logged as D-IAC, K to confirm), branch t0.3-fixtures
 
 ### Blocked / waiting on the other dev
 - (none)
