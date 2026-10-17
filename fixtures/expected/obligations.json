@@ -61,15 +61,15 @@
     "high": [
       "subscription_kestrel cancel_by (5 days)",
       "subscription_kestrel trial_end (7 days)",
+      "insurance_auto renews (9 days)",
       "lease notice_by (11 days)",
       "subscription_fernwood cancel_by (12 days)"
     ],
     "possible": [
-      "insurance_auto renews (9 days)",
       "subscription_fernwood charge (13 days)",
       "warranty_dishwasher expires (22 days)"
     ],
-    "rule": "SPEC 5: high within 7 days, or notice_by and cancel_by within 14 days; otherwise within 30 days",
-    "openIssue": "Demo moment 3 needs 'your car insurance renews in 9 days' as the proactive sentence, but under SPEC 5 a 9 day renewal is not high, so nothing would be injected. Needs a decision from K: widen the rule for renews, or anchor the demo so a high alert exists."
+    "rule": "D-015 / SPEC 5: high within 14 days for expires, renews, notice_by and cancel_by; high within 7 days for charge, service_due, trial_end and claim_by; otherwise possible within 30 days",
+    "resolved": "Q-006 part 1: the 9 day insurance renewal is high under D-015, so moment 3 can speak it."
   }
 }

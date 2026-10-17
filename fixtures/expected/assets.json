@@ -40,20 +40,21 @@
     "linkedDoc": "insurance_auto"
   },
   {
-    "id": "A-carseat-adapter",
-    "name": "Joolz Aer2 car seat adapters",
+    "id": "A-baby-bottles",
+    "name": "Boon NURSH baby bottles",
     "aliases": [
-      "car seat adapter",
-      "stroller adapter"
+      "baby bottles",
+      "bottles",
+      "Boon bottles"
     ],
     "category": "child_safety",
-    "brand": "Joolz",
+    "brand": "Boon",
     "modelNumber": null,
-    "upc": null,
+    "upc": "669028116546",
     "serialLast4": null,
     "purchaseDate": "2026-02-14",
-    "location": "hall closet",
+    "location": "kitchen",
     "linkedDoc": null,
-    "_fixtureNotes": "Matches CPSC 26568 truthfully. The CPSC record has no UPC and an empty Model field; the only identifier is a printed prefix NL311. The purchase date is invented but falls inside the recall sales window (June 2025 to May 2026)."
+    "_fixtureNotes": "Matches CPSC 26530 truthfully (D-016): Boon NURSH 8 oz Reusable Baby Bottles 3-Pack, pink tie dye, UPC 669028116546, sold at Walmart November 2025 to May 2026. The match is on the structured UPC. The record's Model field is empty; item number B11654 appears only in Description. The purchase date is invented but inside the sales window."
   }
 ]

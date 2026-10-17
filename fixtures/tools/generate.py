@@ -339,10 +339,10 @@ OBLIGATIONS = {
         {"from": "warranty_dishwasher", "type": "expires", "dueDate": "2026-11-12", "daysFromAnchor": 22, "rule": "start 2025-11-12 plus 12 months"},
         {"from": "lease", "type": "expires", "dueDate": "2026-12-31", "daysFromAnchor": 71, "note": "outside the 30 day alert window"},
     ],
-    "severity": {"high": ["subscription_kestrel cancel_by (5 days)", "subscription_kestrel trial_end (7 days)", "lease notice_by (11 days)", "subscription_fernwood cancel_by (12 days)"],
-                 "possible": ["insurance_auto renews (9 days)", "subscription_fernwood charge (13 days)", "warranty_dishwasher expires (22 days)"],
-                 "rule": "SPEC 5: high within 7 days, or notice_by and cancel_by within 14 days; otherwise within 30 days",
-                 "openIssue": "Demo moment 3 needs 'your car insurance renews in 9 days' as the proactive sentence, but under SPEC 5 a 9 day renewal is not high, so nothing would be injected. Needs a decision from K: widen the rule for renews, or anchor the demo so a high alert exists."},
+    "severity": {"high": ["subscription_kestrel cancel_by (5 days)", "subscription_kestrel trial_end (7 days)", "insurance_auto renews (9 days)", "lease notice_by (11 days)", "subscription_fernwood cancel_by (12 days)"],
+                 "possible": ["subscription_fernwood charge (13 days)", "warranty_dishwasher expires (22 days)"],
+                 "rule": "D-015 / SPEC 5: high within 14 days for expires, renews, notice_by and cancel_by; high within 7 days for charge, service_due, trial_end and claim_by; otherwise possible within 30 days",
+                 "resolved": "Q-006 part 1: the 9 day insurance renewal is high under D-015, so moment 3 can speak it."},
 }
 
 ASSETS = [
@@ -353,22 +353,23 @@ ASSETS = [
      "brand": "Honda", "modelNumber": None, "upc": None, "serialLast4": None, "purchaseDate": None, "location": "garage",
      "vehicle": {"make": "Honda", "model": "CR-V", "modelYear": 2021, "nhtsaMake": "HONDA", "nhtsaModel": "CR-V"},
      "linkedDoc": "insurance_auto"},
-    {"id": "A-carseat-adapter", "name": "Joolz Aer2 car seat adapters", "aliases": ["car seat adapter", "stroller adapter"],
-     "category": "child_safety", "brand": "Joolz", "modelNumber": None, "upc": None, "serialLast4": None,
-     "purchaseDate": "2026-02-14", "location": "hall closet", "linkedDoc": None,
-     "_fixtureNotes": "Matches CPSC 26568 truthfully. The CPSC record has no UPC and an empty Model field; the only identifier is a printed prefix NL311. The purchase date is invented but falls inside the recall sales window (June 2025 to May 2026)."},
+    {"id": "A-baby-bottles", "name": "Boon NURSH baby bottles", "aliases": ["baby bottles", "bottles", "Boon bottles"],
+     "category": "child_safety", "brand": "Boon", "modelNumber": None, "upc": "669028116546", "serialLast4": None,
+     "purchaseDate": "2026-02-14", "location": "kitchen", "linkedDoc": None,
+     "_fixtureNotes": "Matches CPSC 26530 truthfully (D-016): Boon NURSH 8 oz Reusable Baby Bottles 3-Pack, pink tie dye, UPC 669028116546, sold at Walmart November 2025 to May 2026. The match is on the structured UPC. The record's Model field is empty; item number B11654 appears only in Description. The purchase date is invented but inside the sales window."},
 ]
 
 RECALL_MATCHES = {
-    "cpsc": [{"asset": "A-carseat-adapter", "recallNumber": "26568", "file": "recalls/cpsc/recall_26568_joolz_aer2_adapter.json",
-              "expectedConfidence": "possible",
-              "why": "Brand plus product-name overlap only. The record has no UPC and no Model value, so INTENT principle 2 forbids high. Upgrade to high only if the user adds the NL311 identifier as a model number."},
-             {"asset": "A-carseat-adapter", "recallNumber": "26569", "file": "recalls/cpsc/recall_26569_title_mismatch_record.json",
+    "cpsc": [{"asset": "A-baby-bottles", "recallNumber": "26530", "file": "recalls/cpsc/recall_26530_boon_nursh_bottles.json",
+              "expectedConfidence": "high",
+              "why": "Deterministic evidence: the asset UPC 669028116546 equals ProductUPCs[0].UPC in the record (INTENT principle 2). The matching rule is unchanged."},
+             {"asset": None, "recallNumber": "26569", "file": "recalls/cpsc/recall_26569_title_mismatch_record.json",
               "expectedConfidence": "no_match",
-              "why": "Real CPSC data error: Title says Joolz but the record is CooCooBaby baby loungers. Matching on Title alone would raise a false alert. Match on Products[].Name and Description too."}],
+              "why": "Standalone negative control, no seeded asset. Real CPSC data error: Title says Joolz Aer2 car seat adapters but the record is CooCooBaby baby loungers. A matcher that trusts Title would raise a false alert. Match on Products[].Name and Description too."}],
     "nhtsa": [{"asset": "A-car", "file": "recalls/nhtsa/recallsByVehicle_HONDA_CR-V_2021.json", "expectedConfidence": "high",
-               "wording": "may affect your car", "campaigns": ["26V332000", "24V064000", "23V858000", "21V900000"],
-               "newest": "26V332000", "why": "Canonical HONDA / CR-V / 2021 match. Not VIN specific, so always say may affect."}],
+               "wording": "may affect your car", "demoCampaign": "26V332000",
+               "campaigns": ["26V332000", "24V064000", "23V858000", "21V900000"],
+               "why": "Canonical HONDA / CR-V / 2021 match. Not VIN specific, so always say may affect. Demo campaign is 26V332000."}],
 }
 
 
