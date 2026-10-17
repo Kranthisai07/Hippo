@@ -176,7 +176,7 @@ Pure functions from confirmed fields and today's date to obligations. Covers:
 - **Service:** `service_due` = last EVENT + interval.
 
 **Rules:**
-- Alerts for confirmed obligations within 30 days. High severity within 7 days, or for `notice_by` and `cancel_by` within 14 days.
+- Alerts for confirmed obligations within 30 days. High severity within 14 days for `expires`, `renews`, `notice_by` and `cancel_by`; within 7 days for `charge`, `service_due`, `trial_end` and `claim_by` (D-015).
 - Unconfirmed obligations show in the web app as "needs confirmation" and never alert.
 
 Unit tests: at least 40 cases, including month-end rollover, leap years, business-day notice, an already-passed notice window, and a subscription with a trial.
