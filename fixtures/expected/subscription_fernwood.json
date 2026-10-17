@@ -1,0 +1,64 @@
+{
+  "file": "docs/subscription_fernwood.pdf",
+  "docType": "subscription",
+  "pages": 1,
+  "fields": {
+    "vendor": {
+      "value": "Fernwood Streaming",
+      "sourceRef": {
+        "page": 1,
+        "quote": "Fernwood Streaming"
+      }
+    },
+    "plan": {
+      "value": "Standard",
+      "sourceRef": {
+        "page": 1,
+        "quote": "Plan: Standard"
+      }
+    },
+    "amount": {
+      "value": 15.99,
+      "sourceRef": {
+        "page": 1,
+        "quote": "Price: $15.99 per month"
+      }
+    },
+    "cycle": {
+      "value": "monthly",
+      "sourceRef": {
+        "page": 1,
+        "quote": "Billing cycle: monthly"
+      }
+    },
+    "nextChargeDate": {
+      "value": "2026-11-03",
+      "sourceRef": {
+        "page": 1,
+        "quote": "Next charge date: November 3, 2026"
+      }
+    },
+    "trialEndDate": null,
+    "cancelNoticeDays": {
+      "value": 1,
+      "sourceRef": {
+        "page": 1,
+        "quote": "Cancel at least 1 day before your next charge date"
+      }
+    },
+    "cancelMethod": {
+      "value": "Account > Membership > Cancel membership",
+      "sourceRef": {
+        "page": 1,
+        "quote": "How to cancel: Account > Membership > Cancel membership."
+      }
+    },
+    "accountEmailHint": {
+      "value": "a***@example.com",
+      "sourceRef": {
+        "page": 1,
+        "quote": "Account email: a***@example.com"
+      }
+    }
+  }
+}

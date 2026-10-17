@@ -1,0 +1,117 @@
+{
+  "file": "docs/lease.pdf",
+  "docType": "lease",
+  "pages": 4,
+  "fields": {
+    "landlord": {
+      "value": "Maple Court Apartments LLC",
+      "sourceRef": {
+        "page": 1,
+        "quote": "Landlord: Maple Court Apartments LLC"
+      }
+    },
+    "address": {
+      "value": "1200 Maple Court Way, Unit 4B, Springfield",
+      "sourceRef": {
+        "page": 1,
+        "quote": "Premises: 1200 Maple Court Way, Unit 4B, Springfield"
+      }
+    },
+    "startDate": {
+      "value": "2026-01-01",
+      "sourceRef": {
+        "page": 1,
+        "quote": "Lease term: January 1, 2026 through December 31, 2026 (12 months)."
+      }
+    },
+    "endDate": {
+      "value": "2026-12-31",
+      "sourceRef": {
+        "page": 1,
+        "quote": "Lease term: January 1, 2026 through December 31, 2026 (12 months)."
+      }
+    },
+    "rentAmount": {
+      "value": 1850.0,
+      "sourceRef": {
+        "page": 1,
+        "quote": "Monthly rent: $1,850.00, due on the 1st day of each month."
+      }
+    },
+    "rentDueDay": {
+      "value": 1,
+      "sourceRef": {
+        "page": 1,
+        "quote": "Monthly rent: $1,850.00, due on the 1st day of each month."
+      }
+    },
+    "lateFeeRule": {
+      "value": "$75.00 late fee if rent is not received by the 5th day of the month",
+      "sourceRef": {
+        "page": 1,
+        "quote": "Late fee: If rent is not received by the 5th day of the month, Tenant will pay a late fee of $75.00."
+      }
+    },
+    "noticeDaysToVacate": {
+      "value": 60,
+      "sourceRef": {
+        "page": 4,
+        "quote": "Tenant must give Landlord written notice of intent to vacate at least sixty (60) days before the end of the lease term."
+      }
+    },
+    "renewalTerms": {
+      "value": "Without notice, the lease renews month-to-month at $1,950.00",
+      "sourceRef": {
+        "page": 4,
+        "quote": "If Tenant does not give this notice, the lease renews on a month-to-month basis at a monthly rent of $1,950.00."
+      }
+    },
+    "earlyTerminationTerms": {
+      "value": "60 days written notice plus a fee equal to two months' rent",
+      "sourceRef": {
+        "page": 4,
+        "quote": "Tenant may end this lease before the end of the term by giving sixty (60) days written notice and paying an early termination fee equal to two (2) months' rent."
+      }
+    },
+    "securityDeposit": {
+      "value": 1850.0,
+      "sourceRef": {
+        "page": 2,
+        "quote": "Tenant has paid a security deposit of $1,850.00."
+      }
+    },
+    "maintenanceResponsibilities": [
+      {
+        "value": "Landlord: plumbing, heating, cooling, roof, building exterior",
+        "sourceRef": {
+          "page": 3,
+          "quote": "Landlord is responsible for the plumbing, heating, and cooling systems, the roof, and the exterior of the building."
+        }
+      },
+      {
+        "value": "Tenant: light bulbs, smoke detector batteries, keeping the unit clean",
+        "sourceRef": {
+          "page": 3,
+          "quote": "Tenant is responsible for replacing light bulbs and smoke detector batteries and keeping the unit clean."
+        }
+      }
+    ],
+    "contact": {
+      "phone": {
+        "value": "1-800-555-0119",
+        "sourceRef": {
+          "page": 1,
+          "quote": "Maple Court Management Office, 1-800-555-0119, office@maple-court.example"
+        }
+      },
+      "email": {
+        "value": "office@maple-court.example",
+        "sourceRef": {
+          "page": 1,
+          "quote": "Maple Court Management Office, 1-800-555-0119, office@maple-court.example"
+        }
+      },
+      "url": null
+    }
+  }
+}

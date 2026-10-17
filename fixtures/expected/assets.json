@@ -1,0 +1,59 @@
+[
+  {
+    "id": "A-dishwasher",
+    "name": "Dishwasher",
+    "aliases": [
+      "dish washer",
+      "kitchen dishwasher"
+    ],
+    "category": "appliance",
+    "brand": "Northwind",
+    "modelNumber": "NW-DW500",
+    "upc": null,
+    "serialLast4": "7731",
+    "purchaseDate": "2025-11-12",
+    "location": "kitchen",
+    "linkedDoc": "warranty_dishwasher"
+  },
+  {
+    "id": "A-car",
+    "name": "Car",
+    "aliases": [
+      "Honda",
+      "CR-V",
+      "my car"
+    ],
+    "category": "vehicle",
+    "brand": "Honda",
+    "modelNumber": null,
+    "upc": null,
+    "serialLast4": null,
+    "purchaseDate": null,
+    "location": "garage",
+    "vehicle": {
+      "make": "Honda",
+      "model": "CR-V",
+      "modelYear": 2021,
+      "nhtsaMake": "HONDA",
+      "nhtsaModel": "CR-V"
+    },
+    "linkedDoc": "insurance_auto"
+  },
+  {
+    "id": "A-carseat-adapter",
+    "name": "Joolz Aer2 car seat adapters",
+    "aliases": [
+      "car seat adapter",
+      "stroller adapter"
+    ],
+    "category": "child_safety",
+    "brand": "Joolz",
+    "modelNumber": null,
+    "upc": null,
+    "serialLast4": null,
+    "purchaseDate": "2026-02-14",
+    "location": "hall closet",
+    "linkedDoc": null,
+    "_fixtureNotes": "Matches CPSC 26568 truthfully. The CPSC record has no UPC and an empty Model field; the only identifier is a printed prefix NL311. The purchase date is invented but falls inside the recall sales window (June 2025 to May 2026)."
+  }
+]
