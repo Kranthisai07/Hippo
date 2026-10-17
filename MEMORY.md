@@ -59,6 +59,7 @@ Format: `D-nnn | date | [owner] | decision | why | supersedes`
 - D-ALEXA | pending | | Live add-on vs Local Inspector as primary demo surface | After T0.1 | none
 - D-IAC | pending | | CDK vs SAM; SPA hosting | T0.5 | none
 - D-NAME | pending | | Final product name ("Homefile" is a working name; check for collisions) | Before README | none
+- D-IAC | 2026-10-16 | [K]+claude | IaC: CDK (TypeScript), not SAM. SPA hosting: served by the api Lambda (static assets bundled, Cache-Control set), not S3 + CloudFront. Proposed, K to confirm. | CDK keeps one language and one toolchain with the monorepo and covers Lambda, Function URL, S3 + KMS, DynamoDB, EventBridge, SES, SSM in typed code; SAM is YAML and splits us across two. Same-Lambda SPA means one origin (cookie and OAuth stay simple), one deploy, and no extra hop on the 500 ms /mcp path; revisit if the SPA bundle passes about 2 MB or the Lambda response limit bites. CloudFront OAC in front of a Function URL is unverified, so not relied on | supersedes D-IAC (pending)
 
 ---
 
@@ -80,6 +81,14 @@ The entries below are known from research on 2026-10-16. Re-verify each in Phase
 - G-005 | 2026-10-16 | [K] | Alexa+ access | Another entrant reports the toolkit CLI comes from a private registry | Local Inspector fallback; confirm in T0.1
 - G-006 | 2026-10-16 | [K] | Alexa+ | Client lifecycle docs mention elicitation and UI resources, but no notifications, server-initiated messages, or file uploads | Next-invocation alerts plus email; web upload
 - G-007 | 2026-10-16 | [K] | NHTSA | `recallsByVehicle` needs NHTSA's own make and model spellings and is keyed by make, model, year (not VIN) | Canonicalize via `products/vehicle/models`; say "may affect"
+- G-008 | 2026-10-16 | [K]+claude | CPSC | Record 26569 has Title "Joolz Recalls Aer2 Car Seat Adapters..." but is a CooCooBaby baby lounger recall | Match on Products[].Name and Description, never Title alone. Fixture: recalls/cpsc/recall_26569_title_mismatch_record.json
+  friction: recall matching / Title reflects the product / Title belongs to a different recall / major / validate Title against Products[].Name server side
+- G-009 | 2026-10-16 | [K]+claude | CPSC | Joolz recall 26568 has empty ProductUPCs and empty Model; the only identifier is "NL311" in free text. Across the 80 child product recalls my 6 keyword searches found for the last 12 months, only 1 (TOMY Boon bottle) listed a UPC and none listed a Model | Joolz asset can only be "possible" under INTENT principle 2; see Q-006
+  friction: recall radar / UPC or model on child product recalls / both empty / major / expose identifiers as structured fields
+- G-010 | 2026-10-16 | [K]+claude | NHTSA | recallsByVehicle ReportReceivedDate is DD/MM/YYYY (21/05/2026), not ISO | Parse explicitly in obligation-kit
+  friction: NHTSA client / ISO date / day-first string / minor / document the format or return ISO
+- G-011 | 2026-10-16 | [K]+claude | NHTSA | recallsByVehicle with model=CRV returns Count 0 and no error; correct spelling is CR-V. The models endpoint returns duplicate rows | Canonicalize via products/vehicle/models and dedupe; extends G-007
+  friction: NHTSA client / error or fuzzy match on a near miss / silent zero results / major / return a message on unknown model
 
 ---
 
@@ -92,3 +101,4 @@ Format: `Q-nnn | asked by | question | answer when known`
 - Q-003 | [K] | Does Streamable HTTP in stateless JSON mode run cleanly on Lambda behind a Function URL? | T0.2
 - Q-004 | [K] | Which Bedrock model in our region accepts PDF document input and gives reliable JSON? | T0.2
 - Q-005 | [K] | Partner's name and initial for this file | K to fill
+- Q-006 | [K]+claude | Two demo conflicts. (1) SPEC 5 makes a 9 day insurance renewal "possible", but the proactive injection only fires on unannounced high alerts, so moment 3 would not speak. Widen the rule for renews, or change the injection? (2) The recall seed (Joolz adapter) cannot reach "high" with no UPC or model, so the Recall card would say "possible". Accept that, or let the user add NL311 as a model number? | K to decide
