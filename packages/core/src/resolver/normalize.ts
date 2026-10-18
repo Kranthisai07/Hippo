@@ -3,9 +3,10 @@
 const STOP = new Set([
   "my", "the", "a", "an", "our", "your", "of", "for", "to", "is", "in", "on", "at", "and", "please",
   "about", "with", "this", "that", "it", "i", "what", "whats", "does", "do", "are", "am", "have",
-  // Question and problem words, so "my dishwasher is leaking" resolves to the dishwasher. "can" stays: trash can is an asset.
-  "say", "says", "tell", "me", "you", "how", "when", "show", "know", "any", "there",
-  "leak", "leaks", "leaking", "broken", "broke", "stopped", "working", "work", "fix", "repair", "covered", "cover",
+  // Question and problem words, so "my dishwasher is leaking" resolves to the dishwasher. Only words that are never
+  // part of a name: "work", "cover" and "show" are left out (Work laptop, Pool cover), and so is "can" (trash can).
+  "say", "says", "tell", "me", "you", "how", "when", "know", "any", "there",
+  "leak", "leaks", "leaking", "broken", "broke", "stopped", "fix", "repair",
 ]);
 
 /** Multi-word and variant spellings folded to one canonical token. Applied before tokenizing. Order matters. */

@@ -110,6 +110,38 @@ describe("resolveAsset: matching", () => {
   });
 });
 
+describe("resolveAsset: words that are part of a name", () => {
+  const laptops: AssetLike[] = [
+    { id: "work", name: "Work laptop" },
+    { id: "home", name: "Personal laptop" },
+  ];
+  it("keeps work, cover and show in the words", () => {
+    expect(tokens("work laptop")).toEqual(["work", "laptop"]);
+    expect(tokens("Pool cover")).toEqual(["pool", "cover"]);
+    expect(tokens("show projector")).toEqual(["show", "projector"]);
+  });
+  it("asks which laptop when the user just says laptop", () => {
+    const r = resolveAsset("my laptop", laptops);
+    expect(r.status).toBe("ambiguous");
+    expect(ids(r)).toEqual(["home", "work"]);
+  });
+  it("finds each laptop by its full name", () => {
+    expect(id(resolveAsset("work laptop", laptops))).toBe("work");
+    expect(id(resolveAsset("personal laptop", laptops))).toBe("home");
+  });
+  it("tells a pool cover from the pool", () => {
+    const pool: AssetLike[] = [
+      { id: "pool", name: "Pool" },
+      { id: "cover", name: "Pool cover" },
+    ];
+    expect(id(resolveAsset("pool cover", pool))).toBe("cover");
+    expect(id(resolveAsset("pool", pool))).toBe("pool");
+  });
+  it("still strips problem words so a whole sentence finds the dishwasher", () => {
+    expect(id(resolveAsset("my dishwasher is leaking", home))).toBe("dw");
+  });
+});
+
 describe("resolveAsset: never guess", () => {
   it("is ambiguous for two water filters", () => {
     const r = resolveAsset("water filter", home);
