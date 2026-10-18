@@ -39,6 +39,7 @@ function dayNumber(iso: string): number | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
   if (!m) return null;
   const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  if (y < 1000) return null; // Date.UTC maps years 0-99 to the 1900s
   const t = Date.UTC(y, mo - 1, d);
   const back = new Date(t);
   if (back.getUTCMonth() !== mo - 1 || back.getUTCDate() !== d) return null;
@@ -48,7 +49,11 @@ function dayNumber(iso: string): number | null {
 function validateAppUrl(raw: string): string {
   const bad = () => new Error(`appUrl must be an https:// URL (or http://localhost for dev), got: ${JSON.stringify(raw)}`);
   const s = typeof raw === "string" ? raw.trim() : "";
-  if (!s || !/^[^\s<>"'\\`]+$/.test(s)) throw bad();
+  // Printable ASCII only: no controls, zero width, spaces, dash look-alikes. Also no quotes, angle brackets, backslash, backtick.
+  // shortcut: internationalized hosts must be given as punycode, upgrade if a household ever needs a non-ASCII domain.
+  if (!/^[\x21-\x7e]+$/.test(s) || /["'<>\\`]/.test(s)) throw bad();
+  // new URL() forgives "https:evil.com" and "https:///x", so insist on a real "scheme://host".
+  if (!/^https?:\/\/[^/?#]/i.test(s)) throw bad();
   let u: URL;
   try {
     u = new URL(s);
@@ -56,19 +61,29 @@ function validateAppUrl(raw: string): string {
     throw bad();
   }
   if (u.username || u.password || !u.hostname) throw bad();
-  if (u.protocol === "https:" || (u.protocol === "http:" && u.hostname === "localhost")) return s;
-  throw bad();
+  if (!(u.protocol === "https:" || (u.protocol === "http:" && u.hostname === "localhost"))) throw bad();
+  // A long number in a link is a smell (it could be an account number).
+  if (/\d{5}/.test(u.pathname + u.search + u.hash)) throw bad();
+  return u.href;
 }
 
-/** Strips controls, links and dashes, masks long digit runs, then truncates. Masking comes before truncation so a cut can never expose digits. */
+/**
+ * Strips controls, links and dashes, masks long digit runs, then truncates. Masking comes before truncation so a cut can never expose digits.
+ * Digit rule: 5 or more digits, split only by separators (spaces, hyphens, dots, commas, slashes, underscores), count as one number
+ * and become "****" plus the last 4. Fail safe on purpose: "1 2 3 4 5" and "Dec 5, 2026" are masked too, and so are ISO dates.
+ */
 function clean(raw: string | undefined): string {
   let s = String(raw ?? "")
-    .replace(/\p{Cc}/gu, " ")
-    .replace(/\p{Cf}/gu, "")
-    .replace(/[\u2012-\u2015\u2212]/g, "-")
-    .replace(/(?:\b[a-z][a-z0-9+.-]*:\/\/|\b(?:javascript|data|vbscript):|\bwww\.)\S*/gi, "[link removed]")
-    // Digits split by single spaces or hyphens count as one number. This also masks things like "2026-10-18" in untrusted text, on purpose.
-    .replace(/\p{Nd}(?:[ -]?\p{Nd}){4,}/gu, (run) => `****${[...run.replace(/[^\p{Nd}]/gu, "")].slice(-4).join("")}`)
+    .normalize("NFKC") // superscripts and full width digits become plain digits, look-alike dashes and dots become ASCII
+    .replace(/\p{M}/gu, "")
+    .replace(/[\p{Z}\p{Cc}\p{Cf}]/gu, " ")
+    .replace(/[\p{Pd}\u2212]/gu, "-")
+    .replace(/[^\s@]+@[^\s@]+/g, "[link removed]")
+    .replace(/(?:\b[a-z][a-z0-9+.-]*:\/\/|\b(?:javascript|data|vbscript|mailto|tel):|\bwww\.)\S*/gi, "[link removed]")
+    .replace(/(?<![^\s(\[])\/\/\S*/g, "[link removed]")
+    // A bare domain with a letters-only TLD of 2+ characters, and anything after it. "Dec. 5" and "e.g. this" survive.
+    .replace(/\b[a-z0-9][a-z0-9-]*(?:\.[a-z0-9-]+)*\.\p{L}{2,}\b(?:[/?#]\S*)?/giu, "[link removed]")
+    .replace(/\p{Nd}(?:[ .,/_-]*\p{Nd}){4,}/gu, (run) => `****${[...run.replace(/[^\p{Nd}]/gu, "")].slice(-4).join("")}`)
     .replace(/\s+/g, " ")
     .trim();
   const chars = [...s];
@@ -80,15 +95,18 @@ const esc = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 
 function dueLine(due: string | null | undefined, today: number): string | null {
-  const d = due ? dayNumber(due) : null;
-  if (d === null) return null;
-  const [, mo, day] = due!.split("-");
-  const when = `${MONTHS[Number(mo) - 1]} ${Number(day)}`;
+  if (!due) return null;
+  const d = dayNumber(due);
+  if (d === null) return "Date unclear";
+  const [y, mo, day] = due.split("-").map(Number) as [number, number, number];
   const diff = d - today;
   if (diff === 0) return "Due today";
   if (diff === 1) return "Due tomorrow";
+  // Show the year whenever it differs from this year, so "Was due Jan 1" is never ambiguous.
+  const when = `${MONTHS[mo - 1]} ${day}${y === new Date(today * 86_400_000).getUTCFullYear() ? "" : `, ${y}`}`;
   if (diff < 0) return `Was due ${when}`;
-  return `Due ${when}, ${diff} days from now`;
+  // Past a year out a day count is just a big number, so print the date only.
+  return diff > 365 ? `Due ${when}` : `Due ${when}, ${diff} days from now`;
 }
 
 function eligible(a: DigestAlert): boolean {
@@ -133,9 +151,10 @@ export function buildDigest(input: DigestInput): Digest | null {
     return { label: clean(a.label) || "Untitled", lines };
   });
 
-  const n = picked.length;
-  const subject = `Homefile: ${n} ${n === 1 ? "thing needs" : "things need"} you this week`;
-  const moreLine = more > 0 ? `and ${more} more in the app` : null;
+  const n = shown.length;
+  // Counts in the subject and the "more" line are capped so a huge alert pile never prints a long number.
+  const subject = more > 0 ? "Homefile: Several things need you" : `Homefile: ${n} ${n === 1 ? "thing needs" : "things need"} you`;
+  const moreLine = more > 0 ? `and ${more > 99 ? "many" : more} more in the app` : null;
 
   const text = [
     ...items.map((i) => [`- ${i.label}`, ...i.lines.map((l) => `  ${l}`)].join("\n")),
