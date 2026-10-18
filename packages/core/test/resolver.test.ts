@@ -185,6 +185,84 @@ describe("resolveAsset: never guess", () => {
   });
 });
 
+describe("resolveAsset: a name that merely contains the words is a question, not an answer", () => {
+  const as = (...names: string[]): AssetLike[] => names.map((name, i) => ({ id: `a${i}`, name }));
+  it("does not answer 'fridge' with the fridge water filter", () => {
+    const r = resolveAsset("fridge", [
+      { id: "fridge", name: "Samsung RF28", category: "fridge" },
+      { id: "filter", name: "Fridge water filter" },
+    ]);
+    expect(id(r)).toBe("fridge");
+  });
+  it("asks about the TV stand instead of calling it a TV", () => {
+    const r = resolveAsset("tv", as("TV stand"));
+    expect(r.status).toBe("ambiguous");
+    expect(ids(r)).toEqual(["a0"]);
+  });
+  it.each([
+    ["my car", "Car seat"],
+    ["phone", "Phone charger"],
+    ["dryer", "Dryer vent"],
+  ])("asks about the %s look-alike %s", (query, name) => {
+    expect(resolveAsset(query, as(name)).status).toBe("ambiguous");
+  });
+  it("still finds a shortened name when the head word is said", () => {
+    expect(id(resolveAsset("filter", as("Water filter")))).toBe("a0");
+    expect(id(resolveAsset("dishwasher", as("Kitchen dishwasher")))).toBe("a0");
+  });
+  it("treats a model number as not the head: iPhone 15 is a phone", () => {
+    expect(id(resolveAsset("phone", as("iPhone 15")))).toBe("a0");
+  });
+  it("matches by category or brand when the name is a model number", () => {
+    expect(id(resolveAsset("dishwasher", [{ id: "dw", name: "Bosch SHX878", category: "dishwasher" }]))).toBe("dw");
+    expect(id(resolveAsset("samsung fridge", [{ id: "f", name: "RF28", brand: "Samsung", category: "fridge" }]))).toBe("f");
+    expect(id(resolveAsset("kitchen dishwasher", [{ id: "dw", name: "SHX878", category: "dishwasher", location: "kitchen" }]))).toBe("dw");
+  });
+  it("is ruled out by one different word", () => {
+    expect(resolveAsset("upstairs bathroom fan", as("Downstairs bathroom fan")).status).toBe("none");
+  });
+  it("is ruled out by a different number", () => {
+    expect(resolveAsset("bedroom 2 tv", as("Bedroom 1 TV", "Living room TV")).status).toBe("none");
+    expect(id(resolveAsset("bedroom 1 tv", as("Bedroom 1 TV", "Living room TV")))).toBe("a0");
+  });
+  it("asks which lamp when both end in lamp, and finds each by full name", () => {
+    const lamps = as("Work lamp", "Desk lamp");
+    expect(resolveAsset("lamp", lamps).status).toBe("ambiguous");
+    expect(id(resolveAsset("work lamp", lamps))).toBe("a0");
+    expect(resolveAsset("work lamp", as("Desk lamp")).status).toBe("none");
+  });
+  it("finds an asset whose whole name is a stopword-like word", () => {
+    expect(id(resolveAsset("work", as("Work")))).toBe("a0");
+  });
+  it("finds a projector called Show projector", () => {
+    expect(resolveAsset("projector", as("Show projector", "Home projector")).status).toBe("ambiguous");
+    expect(id(resolveAsset("show projector", as("Show projector", "Home projector")))).toBe("a0");
+  });
+  it("gives the same candidates whatever the input order", () => {
+    const lamps = ["1", "2", "3", "4", "5"].map((n): AssetLike => ({ id: `l${n}`, name: `Lamp ${n}` }));
+    const fwd = resolveAsset("lamp", lamps);
+    const rev = resolveAsset("lamp", [...lamps].reverse());
+    expect(fwd).toEqual(rev);
+    expect(ids(fwd).length).toBe(3);
+  });
+  it("finds a hyphenated name from a spoken phrase and the other way round", () => {
+    expect(id(resolveAsset("tv room speaker", as("TV-room speaker", "Bedroom speaker")))).toBe("a0");
+    expect(id(resolveAsset("tv-room speaker", as("TV room speaker", "Bedroom speaker")))).toBe("a0");
+  });
+  it("keeps model names like CR-V and F-150 joined", () => {
+    expect(id(resolveAsset("f150", [{ id: "t", name: "Truck", aliases: ["F-150"] }]))).toBe("t");
+    expect(id(resolveAsset("f-150", [{ id: "t", name: "Truck", aliases: ["F150"] }]))).toBe("t");
+  });
+  it("matches accents both ways", () => {
+    expect(id(resolveAsset("cafe machine", as("Café machine")))).toBe("a0");
+    expect(id(resolveAsset("café machine", as("Cafe machine")))).toBe("a0");
+  });
+  it("matches an accent in the middle of a word, which must not split it in two", () => {
+    expect(id(resolveAsset("creme brulee torch", as("Crème brûlée torch")))).toBe("a0");
+    expect(tokens("naïve")).toEqual(["naive"]);
+  });
+});
+
 const agreements: AgreementLike[] = [
   { id: "w1", kind: "warranty", party: "Northwind Appliances", title: "Dishwasher warranty", assetIds: ["dw"] },
   { id: "i1", kind: "insurance", party: "Harbor Mutual Insurance", title: "Auto policy", assetIds: ["car"] },

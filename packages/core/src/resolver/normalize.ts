@@ -37,11 +37,13 @@ function stem(t: string): string {
 }
 
 export function tokens(text: string): string[] {
-  // A short piece beside a hyphen is a model name (CR-V, F-150), so join it. dish-washer and water-filter stay apart.
+  // Join a model name like CR-V or F-150 (short piece, hyphen, one letter or digits). tv-room and water-filter stay apart.
   let s = text
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "") // cafe matches Café
     .toLowerCase()
     .replace(/['’]/g, "")
-    .replace(/\b([a-z]{1,2})-([a-z0-9]{1,4})\b/g, "$1$2")
+    .replace(/\b([a-z]{1,2})-(\d{1,4}|[a-z])\b/g, "$1$2")
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
   for (const [re, to] of PHRASES) s = s.replace(re, to);

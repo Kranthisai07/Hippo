@@ -10,6 +10,7 @@ export interface AssetLike {
   location?: string;
 }
 
+// Same five values as obligation-kit's AgreementKind. Merge them into one definition in the T1.1 contracts.
 export type AgreementKind = "warranty" | "insurance" | "lease" | "subscription" | "service_plan";
 
 export interface AgreementLike {
@@ -21,66 +22,69 @@ export interface AgreementLike {
   assetIds?: string[];
 }
 
-/** Never guess: more than one plausible answer is "ambiguous" with at most 3 candidates to ask about. */
+/** Never guess: a match is one sure answer. Anything less sure is "ambiguous" with at most 3 things to ask about. */
 export type Resolution<T> =
-  | { status: "match"; item: T; score: number }
+  | { status: "match"; item: T }
   | { status: "ambiguous"; candidates: T[] }
   | { status: "none" };
 
 const MAX_OPTIONS = 3;
-/** More than half the words must match, so one shared word ("kitchen island" vs "Kitchen water filter") is not enough. */
-const MIN_SCORE = 0.6;
-/** Candidates this close to the best score count as a tie. */
-const TIE_MARGIN = 0.15;
 
-const WEIGHT = { name: 1, alias: 0.9, brand: 0.6, category: 0.4, location: 0.3 } as const;
-
-type Field = keyof typeof WEIGHT;
-type FieldTokens = [Field, Set<string>][];
-
-const assetFields = (a: AssetLike): FieldTokens => [
-  ["name", new Set(tokens(a.name))],
-  ...(a.aliases ?? []).map((x): [Field, Set<string>] => ["alias", new Set(tokens(x))]),
-  ["brand", new Set(tokens(a.brand ?? ""))],
-  ["category", new Set(tokens(a.category ?? ""))],
-  ["location", new Set(tokens(a.location ?? ""))],
-];
-
-/** Share of query tokens found, each weighted by the best field that holds it. */
-function coverage(query: string[], fields: FieldTokens): number {
-  if (query.length === 0) return 0;
-  let sum = 0;
-  for (const q of query) {
-    let best = 0;
-    for (const [f, set] of fields) if (set.has(q)) best = Math.max(best, WEIGHT[f]);
-    sum += best;
-  }
-  return sum / query.length;
+interface Entry<T> {
+  item: T;
+  key: string;
+  id: string;
+  /** Says what the thing IS, not just what it is near. */
+  strong: boolean;
+  /** The query is exactly one of its names. */
+  exact: boolean;
 }
 
-const sameSet = (a: string[], b: Set<string>): boolean => a.length === b.size && a.every((t) => b.has(t));
+const order = <T>(a: Entry<T>, b: Entry<T>): number => a.key.localeCompare(b.key) || a.id.localeCompare(b.id);
 
-function pick<T>(scored: { item: T; score: number; exact?: boolean }[]): Resolution<T> {
-  const ranked = scored.filter((s) => s.score >= MIN_SCORE).sort((a, b) => b.score - a.score);
-  const top = ranked[0];
-  if (!top) return { status: "none" };
-  const tied = ranked.filter((s) => top.score - s.score <= TIE_MARGIN);
-  if (tied.length === 1) return { status: "match", item: top.item, score: top.score };
-  // One asset named exactly what the user said beats looser matches that merely contain those words.
-  const exact = tied.filter((s) => s.exact);
-  const only = exact.length === 1 ? exact[0] : undefined;
-  if (only) return { status: "match", item: only.item, score: only.score };
-  return { status: "ambiguous", candidates: tied.slice(0, MAX_OPTIONS).map((s) => s.item) };
+/**
+ * One strong candidate, or one exact name among several, is a match. Several strong ones are asked about.
+ * With no strong one, candidates that merely contain the words are offered as a question, never as an answer
+ * ("tv" with only a "TV stand" asks "do you mean the TV stand?").
+ */
+function decide<T>(entries: Entry<T>[]): Resolution<T> {
+  const strong = entries.filter((e) => e.strong).sort(order);
+  const exact = strong.filter((e) => e.exact);
+  const sure = strong.length === 1 ? strong[0] : exact.length === 1 ? exact[0] : undefined;
+  if (sure) return { status: "match", item: sure.item };
+  const asks = strong.length ? strong : [...entries].sort(order);
+  return asks.length ? { status: "ambiguous", candidates: asks.slice(0, MAX_OPTIONS).map((e) => e.item) } : { status: "none" };
+}
+
+/** The last word of a name that is not a model number: Fridge water filter is a filter, iPhone 15 is a phone. */
+const headOf = (words: string[]): string | undefined => [...words].reverse().find((w) => !/\d/.test(w)) ?? words.at(-1);
+
+interface Words {
+  /** Every word the asset can be found by. */
+  all: Set<string>;
+  /** The words that say what it is: head of the name and of each alias, brand, category. */
+  heads: Set<string>;
+  names: Set<string>[];
+}
+
+function assetWords(a: AssetLike): Words {
+  const names = [tokens(a.name), ...(a.aliases ?? []).map(tokens)];
+  const brand = tokens(a.brand ?? "");
+  const category = tokens(a.category ?? "");
+  const heads = new Set([...names.map(headOf).filter((w): w is string => !!w), ...brand, ...category]);
+  return { all: new Set([...names.flat(), ...brand, ...category, ...tokens(a.location ?? "")]), heads, names: names.map((n) => new Set(n)) };
 }
 
 export function resolveAsset(query: string, assets: AssetLike[]): Resolution<AssetLike> {
   const q = tokens(query);
   if (q.length === 0) return { status: "none" };
-  return pick(
-    assets.map((item) => {
-      const fields = assetFields(item);
-      const exact = fields.some(([f, set]) => (f === "name" || f === "alias") && sameSet(q, set));
-      return { item, score: exact ? 1 : coverage(q, fields), exact };
+  return decide(
+    assets.flatMap((item) => {
+      const w = assetWords(item);
+      // Every word the user said must be explained, so one different word ("upstairs" vs "Downstairs") rules it out.
+      if (!q.every((t) => w.all.has(t))) return [];
+      const exact = w.names.some((n) => n.size === q.length && q.every((t) => n.has(t)));
+      return [{ item, key: item.name, id: item.id, strong: q.some((t) => w.heads.has(t)), exact }];
     }),
   );
 }
@@ -103,6 +107,8 @@ function detectKind(q: string[]): { kind: AgreementKind | null; rest: string[] }
   return { kind: null, rest: q };
 }
 
+const labelOf = (a: AgreementLike): string => `${a.party ?? ""} ${a.title ?? ""}`.trim();
+
 /** Finds an agreement from phrases like "car insurance", "my lease" or "the Northwind warranty". */
 export function resolveAgreement(
   query: string,
@@ -113,25 +119,20 @@ export function resolveAgreement(
   if (q.length === 0) return { status: "none" };
   const { kind, rest } = detectKind(q);
   const pool = kind ? agreements.filter((a) => a.kind === kind) : agreements;
-  if (pool.length === 0) return { status: "none" };
-
-  if (rest.length === 0) {
-    // Only a kind word ("my lease"): fine when there is one, otherwise ask.
-    if (pool.length === 1 && pool[0]) return { status: "match", item: pool[0], score: 1 };
-    return { status: "ambiguous", candidates: pool.slice(0, MAX_OPTIONS) };
-  }
 
   const byId = new Map(assets.map((a) => [a.id, a]));
-  return pick(
-    pool.map((item) => {
-      const fields: FieldTokens = [
-        ["name", new Set(tokens(`${item.party ?? ""} ${item.title ?? ""}`))],
+  return decide(
+    pool.flatMap((item) => {
+      // Only a kind word ("my lease") says nothing more, so every agreement of that kind is a candidate.
+      const found = new Set([
+        ...tokens(labelOf(item)),
         ...(item.assetIds ?? []).flatMap((id) => {
           const asset = byId.get(id);
-          return asset ? assetFields(asset) : [];
+          return asset ? [...assetWords(asset).all] : [];
         }),
-      ];
-      return { item, score: coverage(rest, fields) };
+      ]);
+      if (!rest.every((t) => found.has(t))) return [];
+      return [{ item, key: labelOf(item), id: item.id, strong: true, exact: false }];
     }),
   );
 }
