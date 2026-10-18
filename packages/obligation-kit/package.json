@@ -1,0 +1,18 @@
+{
+  "name": "obligation-kit",
+  "version": "0.0.0",
+  "description": "Deterministic deadline engine for household obligations (warranties, insurance, leases, subscriptions, service).",
+  "license": "MIT",
+  "type": "module",
+  "main": "src/index.ts",
+  "private": true,
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  }
+}
