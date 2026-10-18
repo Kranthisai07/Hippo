@@ -158,13 +158,23 @@ def page_texts(name):
     return [p.extract_text() for p in PdfReader(str(DOCS / name)).pages]
 
 
+def load_font(name, size):
+    """Arial where it exists, else a common system font, else Pillow's built-in (the photo then differs from the committed one)."""
+    for d in ("C:/Windows/Fonts/", "/Library/Fonts/", "/System/Library/Fonts/Supplemental/", "/usr/share/fonts/truetype/msttcorefonts/", "/usr/share/fonts/truetype/dejavu/"):
+        for n in (name, "DejaVuSans-Bold.ttf" if "bd" in name else "DejaVuSans.ttf"):
+            try:
+                return ImageFont.truetype(d + n, size)
+            except OSError:
+                pass
+    return ImageFont.load_default(size)
+
+
 def make_photo(name, lines):
     """Phone-photo look: skew, uneven shadow, noise, slight blur, JPEG."""
     random.seed(7)
     paper = Image.new("RGB", (1100, 1450), (248, 246, 240))
     d = ImageDraw.Draw(paper)
-    font = ImageFont.truetype("C:/Windows/Fonts/arial.ttf", 30)
-    bold = ImageFont.truetype("C:/Windows/Fonts/arialbd.ttf", 34)
+    font, bold = load_font("arial.ttf", 30), load_font("arialbd.ttf", 34)
     y = 90
     for style, text in lines:
         f = bold if style.startswith("h") else font
