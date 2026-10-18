@@ -22,7 +22,8 @@ describe("quoteOnPage: folding", () => {
   });
   it("ignores hyphenation and punctuation", () => {
     expect(quoteOnPage("improperly connected supply", "improperly con-\nnected supply or drain")).toBe(true);
-    expect(quoteOnPage("call 18005550142", page1)).toBe(true);
+    expect(quoteOnPage("call 1-800-555-0142", page1)).toBe(true);
+    expect(quoteOnPage("call 18005550142", page1)).toBe(false); // merging digit groups is a different number as written
   });
   it("ignores smart quotes and dashes", () => {
     expect(quoteOnPage("Tenant’s two months’ rent", "Tenant's two months' rent")).toBe(true);
@@ -54,6 +55,66 @@ describe("quoteOnPage: strict on text layer pages", () => {
   });
   it("accepts the shortest allowed quote", () => {
     expect(quoteOnPage("days", page1)).toBe(true);
+  });
+});
+
+describe("quoteOnPage: numbers keep their boundaries (text layer pages)", () => {
+  it.each([
+    ["Renew by 12/3/2024", "Renew by 1/23/2024"],
+    ["$10,00 per claim", "$1,000 per claim"],
+    ["Pay 1.5 dollars", "Pay 15 dollars"],
+    ["Deductible: $1,000", "Deductible: $10,000 per claim"],
+    ["30 days", "notice of 130 days"],
+    ["30 days", "notice of 1,030 days"],
+    ["30 days", "notice of 30,000 days"],
+    ["¼ percent", "14 percent"],
+    ["rent is 1850 due", "rent is 18 50 due"],
+  ])("rejects %j on a page that says %j", (quote, text) => {
+    expect(quoteOnPage(quote, text)).toBe(false);
+  });
+  it.each([
+    ["Renew by 12/3/2024", "Renew by 12/3/2024."],
+    ["$1,000 per claim", "Deductible: $1,000 per claim"],
+    ["30 days", "within 30\ndays of"],
+    ["30days", "within 30 days of"],
+    ["1-800-555-0142", "Call 1-800-555-0142 now"],
+    ["Section 4", "Section\n4. How"],
+  ])("still accepts %j on a page that says %j", (quote, text) => {
+    expect(quoteOnPage(quote, text)).toBe(true);
+  });
+  it("does not let OCR tolerance blur a number boundary", () => {
+    const page = { text: "You must report a defect within thirty 1,030 days of discovering it", ocr: true };
+    expect(quoteOnPage("You must report a defect within thirty 30 days of discovering it", page)).toBe(false);
+  });
+  it("does not forgive a number split in two on an OCR page, even when only the edges differ", () => {
+    const page = { text: "You must report a defect within 3 0 days of discovering it", ocr: true };
+    expect(quoteOnPage("You must report a defect within 30 days of discovering it", page)).toBe(false);
+  });
+  it("treats non-ASCII digits as digits on OCR pages", () => {
+    const page = { text: "You must report a defect within ٣٠ days of discovering it", ocr: true };
+    expect(quoteOnPage("You must report a defect within ٣١ days of discovering it", page)).toBe(false);
+  });
+});
+
+describe("verifySourceRefs: only the checked claim survives, and bad input fails closed", () => {
+  it("returns just value and sourceRef, so extra claims beside a good quote are dropped", () => {
+    const r = verify({ a: { value: "x", sourceRef: { page: 1, quote: "How to make a claim" }, note: "FAKE claim", extra: { value: "FAKE", sourceRef: { page: 1, quote: "nope nope" } } } });
+    expect(r.fields).toEqual({ a: { value: "x", sourceRef: { page: 1, quote: "How to make a claim" } } });
+  });
+  it("does not carry a fabricated source on a null value", () => {
+    expect(verify({ a: { value: null, sourceRef: { page: 1, quote: "made up quote here" } } }).fields).toEqual({ a: { value: null } });
+  });
+  it("rejects every quote on a page with no text, or a missing page, instead of throwing", () => {
+    const f = { a: leaf(1, 1, "How to make a claim") };
+    expect(verify(f, [null as unknown as PageText]).rejected.map((e) => e.reason)).toEqual(["quote_not_found"]);
+    expect(verify(f, [{} as unknown as PageText]).rejected.map((e) => e.reason)).toEqual(["quote_not_found"]);
+  });
+  it("does not stall on a huge OCR page: fuzzy matching is capped", () => {
+    const big = "lorem ipsum dolor sit amet ".repeat(40000); // about 1 MB
+    const t = performance.now();
+    const r = verify({ a: leaf(1, 1, "a two hundred character quote that is nowhere on this very large page ".repeat(3).slice(0, 200)) }, [{ text: big, ocr: true }]);
+    expect(r.rejected.length).toBe(1);
+    expect(performance.now() - t).toBeLessThan(1000);
   });
 });
 
@@ -123,7 +184,7 @@ describe("verifySourceRefs", () => {
   });
   it("keeps a null value without needing a source", () => {
     const r = verify({ endDate: { value: null }, other: { value: null, sourceRef: null } });
-    expect(r.fields).toEqual({ endDate: { value: null }, other: { value: null, sourceRef: null } });
+    expect(r.fields).toEqual({ endDate: { value: null }, other: { value: null } });
     expect(r.rejected).toEqual([]);
   });
   it("removes failed array items and keeps the good ones in order", () => {
