@@ -70,12 +70,12 @@ describe("extractPages errors and images", () => {
     const jpg = bytes(0xff, 0xd8, 0xff, 0xe0, 0, 0x10);
     const heic = bytes(0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70, 0x68, 0x65, 0x69, 0x63, 0, 0, 0, 0);
     for (const b of [png, jpg, heic]) {
-      expect(await extractPages(b)).toEqual({ kind: "image", pages: [{ number: 1, text: "", needsOcr: true }] });
+      expect(await extractPages(b)).toEqual({ kind: "image", pages: [{ number: 1, text: "", needsOcr: true, ocrDone: false }] });
     }
   });
   it("does not treat a non image ftyp brand as an image", async () => {
     const mp4 = bytes(0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6f, 0x6d, 0, 0, 0, 0);
-    expect(await codeOf(extractPages(mp4))).toBe("not_pdf");
+    expect(await codeOf(extractPages(mp4))).toBe("unsupported");
   });
 });
 
@@ -130,6 +130,6 @@ describe("fixtures", () => {
 
   it("the photo is an image needing OCR", async () => {
     const r = await extractPages(new Uint8Array(readFileSync(new URL("docs/warranty_dishwasher_photo.jpg", root))));
-    expect(r).toEqual({ kind: "image", pages: [{ number: 1, text: "", needsOcr: true }] });
+    expect(r).toEqual({ kind: "image", pages: [{ number: 1, text: "", needsOcr: true, ocrDone: false }] });
   });
 });
