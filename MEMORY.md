@@ -24,6 +24,7 @@ Format: `[owner] TaskID status (in progress | in review | done | blocked: reason
 ### P
 - [P] T0.3 in review, branch t0.3-fixtures
 - [P] T0.5 in review (recommendation logged as D-IAC, K to confirm), branch t0.3-fixtures
+- [P] T1.3 in review, branch t1.3-deadline-engine (133 tests)
 
 ### Blocked / waiting on the other dev
 - (none)
@@ -64,6 +65,7 @@ Format: `D-nnn | date | [owner] | decision | why | supersedes`
 - D-015 | 2026-10-16 | [K]+claude | `expires` and `renews` obligations are high within 14 days, same as `notice_by` and `cancel_by`; `charge` and `service_due` stay at 7 days. `trial_end` and `claim_by` keep the 7 day rule (assumption, not stated). SPEC section 5 and fixtures/expected/obligations.json updated. Answers Q-006 part 1 | The 9 day insurance renewal must be high so moment 3 can speak it, since proactive injection only fires on high alerts | none
 - D-016 | 2026-10-16 | [K]+claude | Demo CPSC recall is 26530, Boon NURSH 8 oz Reusable Baby Bottles (TOMY), UPC 669028116546, replacing Joolz 26568. Seeded asset A-baby-bottles carries that UPC, so the matcher yields high; the matching rule is not loosened. Answers Q-006 part 2. INTENT, SPEC and D-013 still say "car seat"; the demo recall is now a baby bottle | Joolz 26568 has no UPC or Model, so it could only be possible. Scan of 594 CPSC recalls from the last 12 months found 18 with a Model or UPC, and 26530 is the only child product among them; no car seat qualified | refines D-013
 - D-IAC | 2026-10-16 | [K]+claude | Confirmed: CDK (TypeScript) for IaC; SPA served by the api Lambda | K approved the 2026-10-16 recommendation | supersedes D-IAC (pending)
+- D-017 | 2026-10-17 | [K]+claude | T1.3 deadline engine built in packages/obligation-kit before T0.4 (scaffold) and T1.1 (contracts) merged. It takes plain field-value objects named as in SPEC section 4 (no zod, no repository types) and returns obligations with `confirmed` and `severity`. Severity windows live in one table (severity.ts HIGH_WITHIN_DAYS). Standalone npm setup (vitest, typescript) to be replaced by the pnpm workspace when K's T0.4 lands | User chose to start T1.3 now rather than wait; thin inputs mean T1.1 can adopt or rename with no logic change | none
 
 ---
 
