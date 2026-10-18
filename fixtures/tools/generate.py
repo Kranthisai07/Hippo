@@ -14,7 +14,7 @@ from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import inch
-from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer
+from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate
 
 ROOT = Path(__file__).resolve().parents[1]
 DOCS, EXP = ROOT / "docs", ROOT / "expected"
@@ -423,6 +423,14 @@ def main():
         (EXP / f"{stem}.json").write_text(json.dumps(doc, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     for name, obj in (("obligations", OBLIGATIONS), ("assets", ASSETS), ("recall_matches", RECALL_MATCHES)):
         (EXP / f"{name}.json").write_text(json.dumps(obj, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    # Page text each document is drawn from, so tests can check quotes without a PDF library. Not read back from the
+    # PDFs: a library upgrade must not change committed files. The photo's text is what OCR should return.
+    (EXP / "pages").mkdir(exist_ok=True)
+    for stem, pages, ocr in (("warranty_dishwasher", WARRANTY, False), ("insurance_auto", INSURANCE, False),
+                             ("lease", LEASE, False), ("subscription_fernwood", FERNWOOD, False),
+                             ("subscription_kestrel", KESTREL, False), ("warranty_dishwasher_photo", [WARRANTY[2]], True)):
+        obj = {"ocr": ocr, "pages": ["\n".join(t for _, t in page) for page in pages]}
+        (EXP / "pages" / f"{stem}.json").write_text(json.dumps(obj, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     if errors:
         print("\n".join(errors)); sys.exit(1)
     print("ok: all sourceRef quotes verified on their cited pages")

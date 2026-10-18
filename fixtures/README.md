@@ -31,6 +31,7 @@ Judgment calls for the schema owner (T1.1): the warranty `startDate` is the purc
 | `obligations.json` | Deadlines the engine must derive once all fields are confirmed, with days from the anchor and expected severity. Severity follows D-015: the 9 day insurance renewal is `high`. |
 | `assets.json` | Seed household: dishwasher, the Honda CR-V (with canonical NHTSA spellings), and the Boon NURSH baby bottles (UPC 669028116546). |
 | `recall_matches.json` | Expected confidence for each recall against the seeded assets. |
+| `pages/<document>.json` | `{ocr, pages[]}`: the text each document was drawn from, one string per page. Tests use it to check every expected quote against its cited page without a PDF library. Written by `generate.py`, not read back from the PDFs, so a library upgrade cannot change it. The photo's entry is the text OCR should return. |
 
 ## Recalls (`recalls/`)
 
