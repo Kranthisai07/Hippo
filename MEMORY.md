@@ -25,7 +25,8 @@ Format: `[owner] TaskID status (in progress | in review | done | blocked: reason
 - [P] T0.3 in review, branch t0.3-fixtures
 - [P] T0.5 in review (recommendation logged as D-IAC, K to confirm), branch t0.3-fixtures
 - [P] T1.3 done, merged in PR #3
-- [P] T1.4 in review, branch pramod (84 tests, audit fixes applied)
+- [P] T1.4 done, merged in PR #4
+- [P] T2.2 (quote check part) and T2.5 (asset linking part) in progress, branch pramod
 
 ### Blocked / waiting on the other dev
 - (none)
