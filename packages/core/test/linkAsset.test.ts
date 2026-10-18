@@ -126,6 +126,55 @@ describe("linkAssetHint: nothing to go on", () => {
   });
 });
 
+describe("linkAssetHint: text the key must not flatten", () => {
+  it("does not ignore a brand written in another script", () => {
+    const l = linkAssetHint({ brand: "サムスン", model: "XYZ123" }, [{ id: "lg", name: "TV", brand: "LG", modelNumber: "XYZ123" }]);
+    expect(l.status).toBe("propose");
+  });
+  it("does not match two models that differ only in non-Latin letters", () => {
+    const l = linkAssetHint({ model: "ΑΒΓ-100" }, [{ id: "a", name: "Lamp", modelNumber: "ΔΕΖ-100" }]);
+    expect(l.status).toBe("propose");
+  });
+  it("does not throw on a numeric model", () => {
+    expect(matchId(linkAssetHint({ model: 500 as unknown as string }, [{ id: "n", name: "Fan", modelNumber: "500" }]))).toBe("n");
+  });
+  it("finds the asset when the hint's model repeats the brand", () => {
+    const owned: AssetRecord = { id: "a", name: "Dishwasher", brand: "Acme", modelNumber: "DW500" };
+    expect(matchId(linkAssetHint({ brand: "Acme", model: "Acme DW500" }, [owned]))).toBe("a");
+  });
+  it("does not write the brand twice in a proposal", () => {
+    expect(linkAssetHint({ brand: "Acme", model: "Acme DW500" }, [])).toEqual({
+      status: "propose",
+      draft: { name: "Acme DW500", brand: "Acme", modelNumber: "DW500" },
+    });
+  });
+});
+
+describe("linkAssetHint: an exact serial beats a unit with no serial", () => {
+  const x: AssetRecord = { ...dw, id: "x", serialLast4: "2345" };
+  const y: AssetRecord = { ...dw, id: "y", serialLast4: null };
+  it("picks the unit whose serial matches over one that has none", () => {
+    expect(matchId(linkAssetHint({ model: "NW-DW500", serial: "2345" }, [y, x]))).toBe("x");
+  });
+  it("still treats a stated serial that matches nobody as the unit with no serial", () => {
+    expect(matchId(linkAssetHint({ model: "NW-DW500", serial: "9999" }, [x, y]))).toBe("y");
+  });
+});
+
+describe("linkVehicleHint: a year must be a real year", () => {
+  const rav: AssetRecord = { id: "r", name: "Car", vehicle: { make: "Toyota", model: "RAV4", modelYear: 2020 } };
+  it.each([Number.NaN, Number.POSITIVE_INFINITY, 20200, 2020.5, 0, -2020])("treats %s as no year, so it asks about the owned car", (year) => {
+    expect(askIds(linkVehicleHint({ make: "Toyota", model: "RAV4", year }, [rav]))).toEqual(["r"]);
+  });
+  it("drafts a car without a year when the year is nonsense", () => {
+    const l = linkVehicleHint({ make: "Toyota", model: "RAV4", year: Number.NaN }, []);
+    expect(l.status === "propose" && l.draft).toEqual({ name: "Toyota RAV4", category: "vehicle", vehicle: { make: "Toyota", model: "RAV4" } });
+  });
+  it("still treats a sane year as a year", () => {
+    expect(matchId(linkVehicleHint({ make: "Toyota", model: "RAV4", year: 2020 }, [rav]))).toBe("r");
+  });
+});
+
 describe("linkVehicleHint", () => {
   it("links the seeded Honda from the insurance fixture's own hint", () => {
     const hint = unwrap(load("insurance_auto").fields.coveredAssetHints[0]);

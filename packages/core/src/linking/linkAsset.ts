@@ -43,19 +43,35 @@ const MAX_OPTIONS = 3;
 /** A model number shorter than this ("A1") says too little to tell two products apart. */
 const MIN_MODEL = 3;
 
-/** Letters and digits only, lowercase, accents dropped: NW-DW500 and nw dw 500 are the same model. */
-const key = (s: string | null | undefined): string =>
-  (s ?? "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+/**
+ * Letters and digits of any script, lowercase, accents dropped: NW-DW500 and nw dw 500 are the same model. A brand in
+ * another script keeps its letters, so it still counts as a brand. Numbers are accepted because models come from JSON.
+ */
+const key = (s: unknown): string => {
+  const text = typeof s === "string" ? s : typeof s === "number" ? String(s) : "";
+  return text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+};
 
-const last4 = (s: string | null | undefined): string => key(s).slice(-4);
-const clean = (s: string | null | undefined): string | undefined => s?.trim() || undefined;
+const last4 = (s: unknown): string => key(s).slice(-4);
+const clean = (s: unknown): string | undefined => (typeof s === "string" ? s.trim() || undefined : typeof s === "number" ? String(s) : undefined);
+
+/** A model written with the brand in front ("Acme DW500" for brand Acme) is the model DW500. */
+const modelKey = (model: unknown, brand: unknown): string => {
+  const m = key(model);
+  const b = key(brand);
+  return b && m.startsWith(b) && m.length - b.length >= MIN_MODEL ? m.slice(b.length) : m;
+};
 
 const byName = (a: AssetRecord, b: AssetRecord): number => a.name.localeCompare(b.name) || a.id.localeCompare(b.id);
 const ask = (found: AssetRecord[]): Link => ({ status: "ambiguous", candidates: [...found].sort(byName).slice(0, MAX_OPTIONS) });
 
 function draftFor(hint: AssetHint): Link {
   const brand = clean(hint.brand);
-  const modelNumber = clean(hint.model);
+  const written = clean(hint.model);
+  const modelNumber =
+    brand && written && written.toLowerCase().startsWith(brand.toLowerCase()) && modelKey(written, brand) !== key(written)
+      ? written.slice(brand.length).trim()
+      : written;
   const serial = last4(hint.serial);
   const name = [brand, modelNumber].filter(Boolean).join(" ");
   const draft: AssetDraft = { name };
@@ -71,8 +87,8 @@ function draftFor(hint: AssetHint): Link {
  * is never a match: it can only be a question. No evidence at all means the document describes something new.
  */
 export function linkAssetHint(hint: AssetHint, assets: AssetRecord[]): Link {
-  const model = key(hint.model);
   const brand = key(hint.brand);
+  const model = modelKey(hint.model, hint.brand);
   const serial = last4(hint.serial);
   const hasModel = model.length >= MIN_MODEL;
   if (!hasModel && !brand) return { status: "none" };
@@ -81,9 +97,12 @@ export function linkAssetHint(hint: AssetHint, assets: AssetRecord[]): Link {
   const sameUnit = (a: AssetRecord) => !(serial.length === 4 && a.serialLast4 && last4(a.serialLast4) !== serial);
 
   if (hasModel) {
-    const same = assets.filter((a) => key(a.modelNumber) === model && sameBrand(a) && sameUnit(a));
-    if (same.length === 1 && same[0]) return { status: "match", asset: same[0] };
-    if (same.length > 1) return ask(same);
+    const same = assets.filter((a) => modelKey(a.modelNumber, a.brand) === model && sameBrand(a) && sameUnit(a));
+    // A unit whose serial matches beats one that merely has no serial recorded.
+    const exact = serial.length === 4 ? same.filter((a) => a.serialLast4 && last4(a.serialLast4) === serial) : [];
+    const pool = exact.length ? exact : same;
+    if (pool.length === 1 && pool[0]) return { status: "match", asset: pool[0] };
+    if (pool.length > 1) return ask(pool);
     // The household may have this brand without a model recorded (added by voice). That could be the same thing.
     const unknownModel = assets.filter((a) => brand && key(a.brand) === brand && !key(a.modelNumber));
     return unknownModel.length ? ask(unknownModel) : draftFor(hint);
@@ -101,7 +120,8 @@ export function linkVehicleHint(hint: VehicleHint, assets: AssetRecord[]): Link 
   const make = key(hint.make);
   const model = key(hint.model);
   if (!make || !model) return { status: "none" };
-  const year = typeof hint.year === "number" ? hint.year : null;
+  // Anything that is not a plausible model year (NaN, 20200, 0) is no year at all, so it can only lead to a question.
+  const year = typeof hint.year === "number" && Number.isInteger(hint.year) && hint.year >= 1886 && hint.year <= 2100 ? hint.year : null;
 
   const cars = assets.filter(
     (a) =>
