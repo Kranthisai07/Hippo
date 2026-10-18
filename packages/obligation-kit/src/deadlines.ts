@@ -176,8 +176,10 @@ export function computeObligations(agreement: AgreementInput, today: string): Ob
     const trial = date(f, "trialEndDate");
     const notice = count(f, "cancelNoticeDays");
     const charge = next ? rollForward(next, f.cycle, today) : null;
-    // A trial that ends on its first charge day is one event, so trial_end covers it and charge is not repeated.
-    if (next && charge && charge.date !== trial) {
+    // A trial that ends on its first charge day is one event, so a confirmed trial_end covers it and charge is not
+    // repeated. If the trial end is not confirmed it cannot alert, so the confirmed charge is kept.
+    const trialCovers = trial && (status.trialEndDate === "confirmed" || status.trialEndDate === "edited");
+    if (next && charge && !(trialCovers && charge.date === trial)) {
       push("charge", charge.date, charge.rolled ? ["nextChargeDate", "cycle"] : ["nextChargeDate"]);
     }
     if (trial) push("trial_end", trial, ["trialEndDate"]);

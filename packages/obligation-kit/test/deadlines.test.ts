@@ -294,6 +294,13 @@ describe("trial that ends on its first charge day (one event, not two alerts)", 
     const obs = run(mk("subscription", { ...trial, nextChargeDate: "2026-10-30" }));
     expect(obs.map((o) => o.type)).toEqual(["cancel_by", "trial_end", "charge"]);
   });
+  it("keeps a confirmed charge when the trial end is not confirmed, so it can still alert", () => {
+    const obs = run(mk("subscription", trial, { trialEndDate: "extracted" }));
+    const charge = one(obs, "charge");
+    expect(charge.confirmed).toBe(true);
+    expect(charge.severity).toBe("high");
+    expect(one(obs, "trial_end").severity).toBeNull();
+  });
   it("keeps the charge once the trial is over", () => {
     const obs = run(mk("subscription", { nextChargeDate: "2026-11-03", trialEndDate: "2026-10-01", cycle: "monthly" }));
     expect(obs.some((o) => o.type === "charge")).toBe(true);
