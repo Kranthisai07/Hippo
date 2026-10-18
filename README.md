@@ -4,7 +4,7 @@ Homefile turns the paperwork a household never reads twice (warranties, insuranc
 
 "Homefile" is a working name. The repo is called Hippo.
 
-> **Status: early build, Alexa+ hackathon.** Today the repo contains the demo fixtures, the deadline engine, the asset resolver, the source quote check and asset linking, with 344 passing tests. The MCP server, ingestion pipeline, web app and AWS deploy are planned and not written yet. [What exists today](#what-exists-today) is the honest list.
+> **Status: early build, Alexa+ hackathon.** Today the repo contains the demo fixtures, the deadline engine, the asset resolver, the source quote check and asset linking, with 381 passing tests. The MCP server, ingestion pipeline, web app and AWS deploy are planned and not written yet. [What exists today](#what-exists-today) is the honest list.
 
 ## Why
 
@@ -50,9 +50,9 @@ Full detail is in [INTENT.md](INTENT.md) (why and principles) and [SPEC.md](SPEC
 | Hand-written expected extractions with page numbers and source quotes | Done, every quote checked against its page by `generate.py` |
 | Real recall data: CPSC 26530 (baby bottles, matched by UPC) and NHTSA campaigns for a 2021 Honda CR-V | Done, raw API responses saved |
 | Deadline engine (`packages/obligation-kit`) | Done, 160 tests |
-| Source quote check (`packages/obligation-kit`): drops any extracted field whose quote is not on the page it cites | Done, 49 tests |
+| Source quote check (`packages/obligation-kit`): drops any extracted field whose quote is not on the page it cites | Done, 71 tests |
 | Asset and agreement resolver (`packages/core`): turns "my fridge" into one asset, or asks | Done, 89 tests |
-| Asset linking (`packages/core`): matches a document's brand, model and serial, or a vehicle, to an owned asset, or proposes a new one | Done, 46 tests |
+| Asset linking (`packages/core`): matches a document's brand, model and serial, or a vehicle, to an owned asset, or proposes a new one | Done, 61 tests |
 | CI: both packages plus the fixture quote check on every push and PR | Added, runs on GitHub |
 | MCP server, 9 tools, 3 Echo Show cards | Not started |
 | Ingestion pipeline: page text, Bedrock extraction, retrieval (the quote check and asset linking above are two of its steps) | Not started |
@@ -83,7 +83,7 @@ Needs Node 22 and Python 3.9 or newer.
 
 ```bash
 git clone https://github.com/Kranthisai07/Hippo.git && cd Hippo
-for p in obligation-kit core; do (cd packages/$p && npm ci && npm test && npm run typecheck); done   # 209 and 135 tests
+for p in obligation-kit core; do (cd packages/$p && npm ci && npm test && npm run typecheck); done   # 231 and 150 tests
 pip install reportlab pypdf pillow && python fixtures/tools/generate.py
 ```
 
