@@ -176,7 +176,7 @@ Pure functions from confirmed fields and today's date to obligations. Covers:
 - **Service:** `service_due` = last EVENT + interval.
 
 **Rules:**
-- Alerts for confirmed obligations within 30 days. High severity within 14 days for `expires`, `renews`, `notice_by` and `cancel_by`; within 7 days for `charge`, `service_due`, `trial_end` and `claim_by` (D-015).
+- Alerts for confirmed obligations within 30 days. High severity within 14 days for `expires`, `renews`, `notice_by` and `cancel_by`; within 7 days for `charge`, `service_due`, `trial_end` and `claim_by` (D-015). Lease rent `charge` stays on the timeline but never alerts (D-020).
 - Unconfirmed obligations show in the web app as "needs confirmation" and never alert.
 
 Unit tests: at least 40 cases, including month-end rollover, leap years, business-day notice, an already-passed notice window, and a subscription with a trial.
@@ -273,7 +273,7 @@ Design: clean, calm, accessible (WCAG AA contrast, keyboard navigable), mobile-r
   - two subscription confirmations, one with a trial ending soon.
   
   Generate them as real PDFs in Phase 0. Make one of them a phone photo, to exercise OCR.
-- **One real CPSC recall** for the car seat (or another child product) found in Phase 0. The seeded asset must truthfully match the recall record.
+- **One real CPSC recall** for a child product with a UPC or model number, found in Phase 0 (D-016: Boon NURSH baby bottles, CPSC 26530). The seeded asset must truthfully match the recall record.
 - **One real NHTSA recall** for the insured car. Pick a real make, model, and year with a recent campaign in Phase 0. The insurance declarations page (fictional insurer) lists that vehicle. The car recall appears as a secondary alert, not a demo beat.
 - **Dates** are set relative to the demo recording day so the deadlines fall inside the window.
 
@@ -387,7 +387,7 @@ Design: clean, calm, accessible (WCAG AA contrast, keyboard navigable), mobile-r
 | 0:00 to 0:12 | Hook: paperwork you never read twice, and the deadlines it hides. |
 | 0:12 to 0:50 | **Moment 1.** Drop the lease, warranty, and insurance PDFs into the web app. The lease shows "Give notice by Jun 1" with the page 4 quote. Click confirm. The Coming Up timeline fills. |
 | 0:50 to 1:35 | **Moment 2.** "Alexa, my dishwasher is leaking, am I covered?" The spoken answer, then the Coverage card with the exclusion clause on page 3, the claim steps, and the claim-by date. Tap "Claim steps". |
-| 1:35 to 1:55 | **Moment 3.** Next voice question. The interjection: "Before that, your car insurance renews in 9 days." The Coming Up card shows the subscription cancel-by date. Cut to the email digest in an inbox. Show the recall card for the car seat. |
+| 1:35 to 1:55 | **Moment 3.** Next voice question. The interjection: "Before that, your car insurance renews in 9 days." The Coming Up card shows the subscription cancel-by date. Cut to the email digest in an inbox. Show the recall card for the baby bottles. |
 | 1:55 to 2:30 | How it works: 20-second architecture diagram. The pipeline in a terminal: OCR on the phone photo, strict JSON extraction, quote verification nulling a hallucinated field, the deterministic deadline engine. The latency test output. |
 | 2:30 to 2:45 | Trust and close: nothing alerts until confirmed; citations everywhere; the open-source `obligation-kit`; AWS services; repo link. |
 

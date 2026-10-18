@@ -16,7 +16,7 @@ The cost shows up as missed deadlines:
 - a lease notice window that closed,
 - a warranty that expired three weeks before the dishwasher leaked,
 - a subscription that renewed at full price,
-- a recalled car seat still in use.
+- a recalled baby bottle set still in use.
 
 Alexa+ can already store notes and answer questions about documents you send it. It does not:
 - turn those documents into **dated obligations**,
@@ -55,7 +55,7 @@ Behind both doors, one engine:
 
 ## Who it's for
 
-The person in a household who "keeps track of everything" and is tired of being the system. Demo persona: a renter with a car, a few appliances, two subscriptions, and a kid's car seat.
+The person in a household who "keeps track of everything" and is tired of being the system. Demo persona: a renter with a car, a few appliances, two subscriptions, and a set of baby bottles.
 
 ## The moments that must land (in this order)
 
@@ -66,7 +66,7 @@ The person in a household who "keeps track of everything" and is tired of being 
    - and here's how to file within 30 days.
 
    The Echo Show shows the coverage card with the clause and the claim steps. **This is the hero moment.**
-3. **Proactive catch.** The next voice question starts with one sentence: "Before that, your car insurance renews in 9 days." The Coming Up card also shows a subscription cancel-by date, and the Recall card shows a car seat recall.
+3. **Proactive catch.** The next voice question starts with one sentence: "Before that, your car insurance renews in 9 days." The Coming Up card also shows a subscription cancel-by date, and the Recall card shows a baby bottle recall.
 
 Everything we build serves one of these moments or the trust behind them.
 
