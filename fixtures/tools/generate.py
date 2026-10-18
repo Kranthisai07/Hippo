@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 from pypdf import PdfReader
-from PIL import Image, ImageDraw, ImageFilter, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import inch
@@ -188,14 +188,14 @@ def make_photo(name, lines):
         d.text((x, y), row.strip(), font=f, fill=(25, 25, 30)); y += 44 + (14 if style != "li" else 0)
     desk = Image.new("RGB", (1500, 1900), (92, 78, 66))
     desk.paste(paper.rotate(2.6, expand=True, resample=Image.BICUBIC, fillcolor=(92, 78, 66)), (60, 110))
-    px = desk.load()
-    for yy in range(desk.height):
-        for xx in range(desk.width):
-            k = 1.0 - 0.38 * (xx / desk.width) - 0.18 * (yy / desk.height)  # shadow from the right and bottom
-            n = random.randint(-9, 9)
-            r, g, b = px[xx, yy]
-            px[xx, yy] = (max(0, min(255, int(r * k) + n)), max(0, min(255, int(g * k) + n)),
-                          max(0, min(255, int(b * k) + n)))
+    # Shadow from the right and bottom: two linear gradients darken the image, then seeded noise is added.
+    w, h = desk.size
+    across = Image.linear_gradient("L").rotate(90).resize((w, h)).point(lambda v: int(v * 0.38))
+    down = Image.linear_gradient("L").resize((w, h)).point(lambda v: int(v * 0.18))
+    light = ImageChops.invert(ImageChops.add(across, down))
+    desk = ImageChops.multiply(desk, Image.merge("RGB", [light] * 3))
+    noise = Image.frombytes("L", (w, h), random.randbytes(w * h)).point(lambda v: v // 14)
+    desk = ImageChops.add(desk, Image.merge("RGB", [noise] * 3), offset=-9)
     desk.filter(ImageFilter.GaussianBlur(0.9)).save(DOCS / name, "JPEG", quality=78)
 
 
