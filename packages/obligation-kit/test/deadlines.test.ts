@@ -193,7 +193,7 @@ describe("subscription", () => {
     expect(one(run(mk("subscription", { nextChargeDate: "2026-08-03", cycle: " Monthly " })), "charge").dueDate).toBe("2026-11-03");
   });
   it("leaves a past charge alone when the cycle is unknown, and never alerts", () => {
-    const o = one(run(mk("subscription", { nextChargeDate: "2026-08-03", cycle: "fortnightly" })), "charge");
+    const o = one(run(mk("subscription", { nextChargeDate: "2026-08-03", cycle: "whenever" })), "charge");
     expect(o.dueDate).toBe("2026-08-03");
     expect(o.severity).toBeNull();
   });
@@ -225,7 +225,7 @@ describe("service plan", () => {
 });
 
 describe("confirmation gate (no alert from an unconfirmed date)", () => {
-  const sub = { nextChargeDate: "2026-10-28", trialEndDate: "2026-10-28", cycle: "monthly", cancelNoticeDays: 2 };
+  const sub = { nextChargeDate: "2026-11-03", trialEndDate: "2026-10-28", cycle: "monthly", cancelNoticeDays: 2 };
   it("gives every obligation severity null when nothing is confirmed", () => {
     const obs = run({ kind: "subscription", fields: sub, fieldStatus: { nextChargeDate: "extracted", trialEndDate: "extracted", cycle: "extracted", cancelNoticeDays: "extracted" } });
     expect(obs.length).toBeGreaterThan(0);
@@ -263,7 +263,7 @@ describe("input handling", () => {
   });
   it("sorts by due date, then type", () => {
     const obs = run(mk("subscription", { nextChargeDate: "2026-10-28", trialEndDate: "2026-10-28", cancelNoticeDays: 2 }));
-    expect(obs.map((o) => `${o.dueDate} ${o.type}`)).toEqual(["2026-10-26 cancel_by", "2026-10-28 charge", "2026-10-28 trial_end"]);
+    expect(obs.map((o) => `${o.dueDate} ${o.type}`)).toEqual(["2026-10-26 cancel_by", "2026-10-28 trial_end"]);
   });
   it("throws when today is not a date", () => {
     expect(() => computeObligations(mk("warranty", { endDate: "2026-11-04" }), "10/21/2026")).toThrow(RangeError);
@@ -282,6 +282,71 @@ describe("input handling", () => {
     const o = one(run(mk("lease", { endDate: "2026-12-31", noticeDaysToVacate: 60 })), "notice_by");
     expect(o.label).toBe("Lease give notice by");
     expect(o.label).not.toMatch(new RegExp("[\u2013\u2014]"));
+  });
+});
+
+describe("trial that ends on its first charge day (one event, not two alerts)", () => {
+  const trial = { nextChargeDate: "2026-10-28", trialEndDate: "2026-10-28", cycle: "monthly", cancelNoticeDays: 2 };
+  it("makes no separate charge on the trial end day", () => {
+    expect(run(mk("subscription", trial)).map((o) => o.type)).toEqual(["cancel_by", "trial_end"]);
+  });
+  it("keeps the charge when it falls on a different day than the trial end", () => {
+    const obs = run(mk("subscription", { ...trial, nextChargeDate: "2026-10-30" }));
+    expect(obs.map((o) => o.type)).toEqual(["cancel_by", "trial_end", "charge"]);
+  });
+  it("keeps a confirmed charge when the trial end is not confirmed, so it can still alert", () => {
+    const obs = run(mk("subscription", trial, { trialEndDate: "extracted" }));
+    const charge = one(obs, "charge");
+    expect(charge.confirmed).toBe(true);
+    expect(charge.severity).toBe("high");
+    expect(one(obs, "trial_end").severity).toBeNull();
+  });
+  it("keeps the charge once the trial is over", () => {
+    const obs = run(mk("subscription", { nextChargeDate: "2026-11-03", trialEndDate: "2026-10-01", cycle: "monthly" }));
+    expect(obs.some((o) => o.type === "charge")).toBe(true);
+  });
+});
+
+describe("billing cycle spellings from a model", () => {
+  const next = (cycle: string, first = "2026-10-01") => one(run(mk("subscription", { nextChargeDate: first, cycle })), "charge").dueDate;
+  it.each([
+    ["biweekly", "2026-10-29"],
+    ["bi-weekly", "2026-10-29"],
+    ["fortnightly", "2026-10-29"],
+    ["every two weeks", "2026-10-29"],
+    ["Every  2 Weeks", "2026-10-29"],
+    ["weekly", "2026-10-22"],
+    ["per week", "2026-10-22"],
+  ])("rolls %s forward by whole periods", (cycle, due) => {
+    expect(next(cycle)).toBe(due);
+  });
+  it.each(["month", "per month", "Every Month", "MONTHLY"])("treats %s as monthly", (cycle) => {
+    expect(next(cycle, "2026-08-03")).toBe("2026-11-03");
+  });
+  it.each(["annually", "year", "per year", "every year", "yearly"])("treats %s as yearly", (cycle) => {
+    expect(next(cycle, "2025-10-01")).toBe("2027-10-01");
+  });
+  it("keeps a charge that lands exactly today", () => {
+    expect(next("biweekly", "2026-10-07")).toBe("2026-10-21");
+  });
+  it("still leaves a really unknown cycle alone", () => {
+    expect(next("whenever")).toBe("2026-10-01");
+  });
+});
+
+describe("rent never alerts (D-020)", () => {
+  const rent = { endDate: "2026-12-31", noticeDaysToVacate: 60, rentDueDay: 1 };
+  it("stays on the timeline but has no severity, even confirmed and due in 3 days", () => {
+    const o = one(run(mk("lease", rent), "2026-10-29"), "charge");
+    expect(o.dueDate).toBe("2026-11-01");
+    expect(o.confirmed).toBe(true);
+    expect(o.severity).toBeNull();
+  });
+  it("does not stop the notice deadline from alerting", () => {
+    expect(one(run(mk("lease", rent), "2026-10-29"), "notice_by").severity).toBe("high");
+  });
+  it("does not change subscription charges, which still alert", () => {
+    expect(one(run(mk("subscription", { nextChargeDate: "2026-10-23", cycle: "monthly" })), "charge").severity).toBe("high");
   });
 });
 

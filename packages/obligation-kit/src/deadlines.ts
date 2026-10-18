@@ -1,6 +1,7 @@
 import { addDays, addMonths, daysBetween, daysInMonth, parseIso, subtractBusinessDays } from "./dates";
 import { severityFor, type ObligationType, type Severity } from "./severity";
 
+// Same five values as the resolver's AgreementKind in packages/core. Merge them into one definition in the T1.1 contracts.
 export type AgreementKind = "warranty" | "insurance" | "lease" | "subscription" | "service_plan";
 export type FieldStatus = "extracted" | "confirmed" | "edited";
 
@@ -50,23 +51,42 @@ const count = (f: Record<string, unknown>, k: string): number | null => {
 };
 const present = (f: Record<string, unknown>, k: string): boolean => f[k] !== null && f[k] !== undefined;
 
+// The cycle comes from a model as free text, so accept the common spellings. T1.1 should make it an enum.
 const MONTHS_PER_CYCLE: Record<string, number> = {
   monthly: 1,
+  month: 1,
+  "per month": 1,
+  "every month": 1,
   quarterly: 3,
   semiannual: 6,
+  "semi-annual": 6,
   "six-month": 6,
   annual: 12,
+  annually: 12,
   yearly: 12,
+  year: 12,
+  "per year": 12,
+  "every year": 12,
+};
+
+const DAYS_PER_CYCLE: Record<string, number> = {
+  weekly: 7,
+  week: 7,
+  "per week": 7,
+  "every week": 7,
+  biweekly: 14,
+  "bi-weekly": 14,
+  fortnightly: 14,
+  "every two weeks": 14,
+  "every 2 weeks": 14,
 };
 
 /** Next charge on or after today. Steps from the original date so Jan 31 stays on the 31st when it can. */
 function rollForward(first: string, cycle: unknown, today: string): { date: string; rolled: boolean } {
-  const c = typeof cycle === "string" ? cycle.trim().toLowerCase() : "";
+  const c = typeof cycle === "string" ? cycle.trim().toLowerCase().replace(/\s+/g, " ") : "";
   if (daysBetween(today, first) >= 0) return { date: first, rolled: false };
-  if (c === "weekly") {
-    const weeks = Math.ceil(daysBetween(first, today) / 7);
-    return { date: addDays(first, weeks * 7), rolled: true };
-  }
+  const days = DAYS_PER_CYCLE[c];
+  if (days) return { date: addDays(first, Math.ceil(daysBetween(first, today) / days) * days), rolled: true };
   const step = MONTHS_PER_CYCLE[c];
   if (!step) return { date: first, rolled: false }; // shortcut: unknown cycle is not rolled, past date stays and never alerts
   let k = 1;
@@ -100,7 +120,8 @@ export function computeObligations(agreement: AgreementInput, today: string): Ob
   const status = agreement.fieldStatus ?? {};
   const out: Obligation[] = [];
 
-  const push = (type: ObligationType, dueDate: string, sourceFields: string[]) => {
+  /** alert=false keeps an obligation on the timeline but never gives it a severity (rent, D-020). */
+  const push = (type: ObligationType, dueDate: string, sourceFields: string[], alert = true) => {
     const confirmed = sourceFields.every((k) => status[k] === "confirmed" || status[k] === "edited");
     const daysUntil = daysBetween(today, dueDate);
     out.push({
@@ -109,7 +130,7 @@ export function computeObligations(agreement: AgreementInput, today: string): Ob
       daysUntil,
       label: `${KIND_LABEL[kind]} ${TYPE_LABEL[type]}`,
       confirmed,
-      severity: severityFor(type, daysUntil, confirmed),
+      severity: alert ? severityFor(type, daysUntil, confirmed) : null,
       sourceFields,
     });
   };
@@ -146,7 +167,7 @@ export function computeObligations(agreement: AgreementInput, today: string): Ob
     const day = count(f, "rentDueDay");
     if (day !== null && day >= 1 && day <= 31) {
       const due = nextMonthly(day, today);
-      if (!end || daysBetween(due, end) >= 0) push("charge", due, ["rentDueDay"]);
+      if (!end || daysBetween(due, end) >= 0) push("charge", due, ["rentDueDay"], false);
     }
   }
 
@@ -155,7 +176,12 @@ export function computeObligations(agreement: AgreementInput, today: string): Ob
     const trial = date(f, "trialEndDate");
     const notice = count(f, "cancelNoticeDays");
     const charge = next ? rollForward(next, f.cycle, today) : null;
-    if (next && charge) push("charge", charge.date, charge.rolled ? ["nextChargeDate", "cycle"] : ["nextChargeDate"]);
+    // A trial that ends on its first charge day is one event, so a confirmed trial_end covers it and charge is not
+    // repeated. If the trial end is not confirmed it cannot alert, so the confirmed charge is kept.
+    const trialCovers = trial && (status.trialEndDate === "confirmed" || status.trialEndDate === "edited");
+    if (next && charge && !(trialCovers && charge.date === trial)) {
+      push("charge", charge.date, charge.rolled ? ["nextChargeDate", "cycle"] : ["nextChargeDate"]);
+    }
     if (trial) push("trial_end", trial, ["trialEndDate"]);
     if (notice !== null) {
       // While a trial is still running, the deadline is set by the trial end, not the later regular charge.

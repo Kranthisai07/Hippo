@@ -44,6 +44,11 @@ describe("fixtures reproduce the expected obligations at the anchor date", () =>
     }
   });
 
+  it("makes one event of the Kestrel trial end and first charge", () => {
+    const obs = computeObligations(toInput("subscription_kestrel"), spec.anchorDate);
+    expect(obs.map((o) => `${o.dueDate} ${o.type}`)).toEqual(["2026-10-26 cancel_by", "2026-10-28 trial_end"]);
+  });
+
   it("invents no dates from the photo page, which states none", () => {
     expect(computeObligations(toInput("warranty_dishwasher_photo"), spec.anchorDate)).toEqual([]);
   });

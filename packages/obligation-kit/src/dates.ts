@@ -24,7 +24,12 @@ function need(iso: string): number {
   return t;
 }
 
-const toIso = (t: number): string => new Date(t).toISOString().slice(0, 10);
+function toIso(t: number): string {
+  const s = new Date(t).toISOString();
+  // Past year 9999 the string starts with "+" and is not an ISO date, so fail loudly instead.
+  if (s[0] === "+" || s[0] === "-") throw new RangeError("date out of range");
+  return s.slice(0, 10);
+}
 
 export const addDays = (iso: string, n: number): string => toIso(need(iso) + n * DAY_MS);
 

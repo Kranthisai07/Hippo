@@ -42,7 +42,7 @@ SPEC.md says what to build, INTENT.md says why, and MEMORY.md holds live status.
 | :--- | :--- | :--- |
 | T0.1 | Both run `alexa-ai configure`. Log whether the CLI installs and authenticates for each account. | both |
 | T0.2 | `docs-verifier` covers the SPEC §15 sources and writes `docs/VERIFIED.md`. Include: Lambda plus Streamable HTTP, the Bedrock model ID and document input, Textract limits, MiniSearch, SES sandbox, and Local Inspector setup. | K |
-| T0.3 | Write the 5 synthetic demo documents as PDFs (one as a phone photo). Find the real CPSC recall for the car seat and a real NHTSA recall for the insured car (make, model, year). Save to `/fixtures` with hand-written expected extractions. | P |
+| T0.3 | Write the 5 synthetic demo documents as PDFs (one as a phone photo). Find a real CPSC recall for a child product (baby bottles, D-016) and a real NHTSA recall for the insured car (make, model, year). Save to `/fixtures` with hand-written expected extractions. | P |
 | T0.4 | Monorepo scaffold: apps/api, apps/web, apps/workers, packages/core, packages/obligation-kit. Strict TS, eslint, prettier, vitest, DynamoDB Local compose, GitHub Actions CI. | K |
 | T0.5 | Decide CDK vs SAM, and SPA hosting (same Lambda vs S3 + CloudFront). Log both as decisions. | P |
 

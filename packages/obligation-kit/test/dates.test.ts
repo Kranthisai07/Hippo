@@ -35,6 +35,10 @@ describe("addDays and daysBetween", () => {
     expect(daysBetween("2026-03-01", "2026-04-01")).toBe(31);
     expect(daysBetween("2026-10-30", "2026-11-02")).toBe(3);
   });
+  it("throws instead of returning a non-ISO string past year 9999", () => {
+    expect(() => addDays("9999-12-31", 1)).toThrow(RangeError);
+    expect(() => addMonths("9999-12-15", 1)).toThrow(RangeError);
+  });
   it("throws on an invalid date", () => {
     expect(() => addDays("2026-02-30", 1)).toThrow(RangeError);
   });
