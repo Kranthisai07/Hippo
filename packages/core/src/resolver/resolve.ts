@@ -123,16 +123,18 @@ export function resolveAgreement(
   const byId = new Map(assets.map((a) => [a.id, a]));
   return decide(
     pool.flatMap((item) => {
-      // Only a kind word ("my lease") says nothing more, so every agreement of that kind is a candidate.
-      const found = new Set([
-        ...tokens(labelOf(item)),
-        ...(item.assetIds ?? []).flatMap((id) => {
-          const asset = byId.get(id);
-          return asset ? [...assetWords(asset).all] : [];
-        }),
-      ]);
+      const label = tokens(labelOf(item));
+      const linked = (item.assetIds ?? []).flatMap((id) => {
+        const asset = byId.get(id);
+        return asset ? [assetWords(asset)] : [];
+      });
+      const found = new Set([...label, ...linked.flatMap((w) => [...w.all])]);
       if (!rest.every((t) => found.has(t))) return [];
-      return [{ item, key: labelOf(item), id: item.id, strong: true, exact: false }];
+      // Same rule as assets: a word of the agreement's own name, or a head word of what it covers, says what it is.
+      // "fridge warranty" for the Fridge water filter's warranty is a question. A kind word alone ("my lease") is enough.
+      const heads = new Set([...label, ...linked.flatMap((w) => [...w.heads])]);
+      const strong = rest.length === 0 || rest.some((t) => heads.has(t));
+      return [{ item, key: labelOf(item), id: item.id, strong, exact: false }];
     }),
   );
 }

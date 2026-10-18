@@ -319,6 +319,34 @@ describe("resolveAgreement", () => {
     expect(resolveAgreement("", agreements, home).status).toBe("none");
     expect(resolveAgreement("my lease", [], home).status).toBe("none");
   });
+  describe("a warranty linked to a look-alike asset is a question, not an answer", () => {
+    const things: AssetLike[] = [
+      { id: "f", name: "Fridge water filter" },
+      { id: "t", name: "TV stand" },
+    ];
+    const warranties: AgreementLike[] = [
+      { id: "w1", kind: "warranty", title: "Filter warranty", assetIds: ["f"] },
+      { id: "w2", kind: "warranty", title: "Stand", assetIds: ["t"] },
+    ];
+    it.each([
+      ["fridge warranty", "w1"],
+      ["tv warranty", "w2"],
+      ["tv", "w2"],
+    ])("%s asks about %s", (query, want) => {
+      const r = resolveAgreement(query, warranties, things);
+      expect(r.status).toBe("ambiguous");
+      expect(r.status === "ambiguous" && r.candidates.map((c) => c.id)).toEqual([want]);
+    });
+    it("still answers when the head word is said", () => {
+      expect(aid(resolveAgreement("filter warranty", warranties, things))).toBe("w1");
+      expect(aid(resolveAgreement("stand warranty", warranties, things))).toBe("w2");
+    });
+    it("answers through the linked asset's own head word", () => {
+      const car: AssetLike[] = [{ id: "c", name: "Honda CR-V", category: "car" }];
+      const ins: AgreementLike[] = [{ id: "i", kind: "insurance", title: "Policy 4821", assetIds: ["c"] }];
+      expect(aid(resolveAgreement("car insurance", ins, car))).toBe("i");
+    });
+  });
   it("works without an asset list", () => {
     expect(aid(resolveAgreement("harbor mutual insurance", agreements))).toBe("i1");
   });
