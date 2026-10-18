@@ -4,7 +4,7 @@ Homefile turns the paperwork a household never reads twice (warranties, insuranc
 
 "Homefile" is a working name. The repo is called Hippo.
 
-> **Status: early build, Alexa+ hackathon.** Today the repo contains the demo fixtures, the deadline engine and the asset resolver, with 243 passing tests. The MCP server, ingestion pipeline, web app and AWS deploy are planned and not written yet. [What exists today](#what-exists-today) is the honest list.
+> **Status: early build, Alexa+ hackathon.** Today the repo contains the demo fixtures, the deadline engine and the asset resolver, with 249 passing tests. The MCP server, ingestion pipeline, web app and AWS deploy are planned and not written yet. [What exists today](#what-exists-today) is the honest list.
 
 ## Why
 
@@ -49,8 +49,8 @@ Full detail is in [INTENT.md](INTENT.md) (why and principles) and [SPEC.md](SPEC
 | Demo fixtures: 5 synthetic PDFs and a phone-photo JPG, fictional companies only | Done, in [fixtures/](fixtures/README.md) |
 | Hand-written expected extractions with page numbers and source quotes | Done, every quote checked against its page by `generate.py` |
 | Real recall data: CPSC 26530 (baby bottles, matched by UPC) and NHTSA campaigns for a 2021 Honda CR-V | Done, raw API responses saved |
-| Deadline engine (`packages/obligation-kit`) | Done, 159 tests |
-| Asset and agreement resolver (`packages/core`): turns "my fridge" into one asset, or asks | Done, 84 tests |
+| Deadline engine (`packages/obligation-kit`) | Done, 160 tests |
+| Asset and agreement resolver (`packages/core`): turns "my fridge" into one asset, or asks | Done, 89 tests |
 | CI: both packages plus the fixture quote check on every push and PR | Added, runs on GitHub |
 | MCP server, 9 tools, 3 Echo Show cards | Not started |
 | Ingestion pipeline (extraction, retrieval) | Not started |
@@ -81,7 +81,7 @@ Needs Node 22 and Python 3.9 or newer.
 
 ```bash
 git clone https://github.com/Kranthisai07/Hippo.git && cd Hippo
-for p in obligation-kit core; do (cd packages/$p && npm ci && npm test && npm run typecheck); done   # 159 and 84 tests
+for p in obligation-kit core; do (cd packages/$p && npm ci && npm test && npm run typecheck); done   # 160 and 89 tests
 pip install reportlab pypdf pillow && python fixtures/tools/generate.py
 ```
 
