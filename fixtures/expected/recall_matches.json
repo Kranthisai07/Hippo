@@ -1,0 +1,34 @@
+{
+  "cpsc": [
+    {
+      "asset": "A-baby-bottles",
+      "recallNumber": "26530",
+      "file": "recalls/cpsc/recall_26530_boon_nursh_bottles.json",
+      "expectedConfidence": "high",
+      "why": "Deterministic evidence: the asset UPC 669028116546 equals ProductUPCs[0].UPC in the record (INTENT principle 2). The matching rule is unchanged."
+    },
+    {
+      "asset": null,
+      "recallNumber": "26569",
+      "file": "recalls/cpsc/recall_26569_title_mismatch_record.json",
+      "expectedConfidence": "no_match",
+      "why": "Standalone negative control, no seeded asset. Real CPSC data error: Title says Joolz Aer2 car seat adapters but the record is CooCooBaby baby loungers. A matcher that trusts Title would raise a false alert. Match on Products[].Name and Description too."
+    }
+  ],
+  "nhtsa": [
+    {
+      "asset": "A-car",
+      "file": "recalls/nhtsa/recallsByVehicle_HONDA_CR-V_2021.json",
+      "expectedConfidence": "high",
+      "wording": "may affect your car",
+      "demoCampaign": "26V332000",
+      "campaigns": [
+        "26V332000",
+        "24V064000",
+        "23V858000",
+        "21V900000"
+      ],
+      "why": "Canonical HONDA / CR-V / 2021 match. Not VIN specific, so always say may affect. Demo campaign is 26V332000."
+    }
+  ]
+}

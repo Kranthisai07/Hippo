@@ -1,0 +1,109 @@
+# Homefile
+
+Homefile turns the paperwork a household never reads twice (warranties, insurance, a lease, subscriptions, recall notices) into dated obligations, and watches them while nobody is talking. It is an Alexa+ add-on with a web app for uploading and reviewing documents.
+
+"Homefile" is a working name. The repo is called Hippo.
+
+> **Status: early build, Alexa+ hackathon.** Today the repo contains the demo fixtures and the deadline engine, with 133 passing tests. The MCP server, ingestion pipeline, web app and AWS deploy are planned and not written yet. [What exists today](#what-exists-today) is the honest list.
+
+## Why
+
+The cost of household paperwork shows up as missed deadlines: a lease notice window that closed, a warranty that ran out three weeks before the dishwasher leaked, a subscription that renewed at full price, a recalled product still in use.
+
+Alexa+ can already store notes and answer questions about documents you give it. It does not turn those documents into dated obligations, join them (this item, this receipt, this warranty, this exclusion), or watch them in the background. That gap is the product.
+
+## The three moments
+
+1. **Upload to deadline.** Drop a lease PDF into the web app. Seconds later it shows "Give notice by Nov 1" with the quoted clause and page. You confirm the date.
+2. **Voice coverage check.** "Alexa, my dishwasher is leaking, am I covered?" The answer: yes, in warranty until a date, but water damage from improper installation is excluded (page 3), and here is how to file within 30 days. The Echo Show shows the clause and the claim steps.
+3. **Proactive catch.** The next voice question starts with one sentence: "Before that, your car insurance renews in 9 days." A Coming Up card shows a subscription cancel-by date, and a Recall card shows a recalled child product.
+
+## How it is meant to work
+
+```
+ Browser ──► Web app (upload, review, confirm, Coming Up)
+                │ HTTPS, one OAuth login
+ Alexa+ ──► api Lambda  /mcp  tools, no LLM, no outbound HTTP
+                │         /api  web JSON
+                │         /oauth
+                ▼
+           DynamoDB ◄──── daily job: deadlines, alerts, recall check, email digest
+                ▲
+                └──── ingest worker: text per page, Bedrock extraction,
+                      quote check, clause index   (S3 upload triggers it)
+```
+
+Planned, not built. Four rules shape everything:
+
+- **No unconfirmed alarms.** A date a model extracted creates no alert until a person confirms it in the web app.
+- **The voice path is fast and dumb.** Tool handlers make no LLM calls and no outbound HTTP. All reading happens at upload time. Document questions use in-process keyword retrieval, and Alexa+ writes the spoken answer from the clauses we return. Target round trip: under 500 ms.
+- **Cite or do not claim.** Any answer from a document names the document and the page.
+- **Documents are hostile input.** Text inside an upload is data, never instructions.
+
+Full detail is in [INTENT.md](INTENT.md) (why and principles) and [SPEC.md](SPEC.md) (what to build).
+
+## What exists today
+
+| Part | State |
+| :--- | :--- |
+| Demo fixtures: 5 synthetic PDFs and a phone-photo JPG, fictional companies only | Done, in [fixtures/](fixtures/README.md) |
+| Hand-written expected extractions with page numbers and source quotes | Done, every quote checked against its page by `generate.py` |
+| Real recall data: CPSC 26530 (baby bottles, matched by UPC) and NHTSA campaigns for a 2021 Honda CR-V | Done, raw API responses saved |
+| Deadline engine (`packages/obligation-kit`) | Done, 133 tests |
+| MCP server, 9 tools, 3 Echo Show cards | Not started |
+| Ingestion pipeline (extraction, retrieval) | Not started |
+| Web app and OAuth login | Not started |
+| Daily job, recall radar, email digest, AWS deploy | Not started |
+
+### The deadline engine
+
+Pure functions from confirmed fields and today's date to obligations. No dependencies, no network, no clock (today is a parameter). It covers warranty expiry, insurance renewal, lease notice-by (calendar or business days with US federal holidays), rent, subscription charge and cancel-by, trial end, and service due.
+
+On the demo fixtures at 2026-10-21 it produces:
+
+| Obligation | Due | Days | Severity |
+| :--- | :--- | :--- | :--- |
+| Kestrel trial: cancel by | Oct 26 | 5 | high |
+| Kestrel trial ends | Oct 28 | 7 | high |
+| Car insurance renews | Oct 30 | 9 | high |
+| Lease: give notice by | Nov 1 | 11 | high |
+| Fernwood: cancel by | Nov 2 | 12 | high |
+| Fernwood: next charge | Nov 3 | 13 | possible |
+| Dishwasher warranty expires | Nov 12 | 22 | possible |
+
+An obligation whose source fields are not all confirmed always has severity `null`, so it cannot alert. Severity windows live in one table, `HIGH_WITHIN_DAYS` in [severity.ts](packages/obligation-kit/src/severity.ts).
+
+## Run it
+
+Needs Node 22 and Python 3.9 or newer.
+
+```bash
+git clone https://github.com/Kranthisai07/Hippo.git && cd Hippo
+cd packages/obligation-kit && npm install
+npm test                  # 133 tests
+npm run typecheck
+cd ../.. && pip install reportlab pypdf pillow && python fixtures/tools/generate.py
+```
+
+The last command rebuilds the PDFs, the photo and the expected JSON, and fails if any expected source quote is missing from its cited page. The phone-photo JPG is drawn with Arial when found, so on another machine it will differ slightly from the committed copy. The quote check is unaffected.
+
+## Honest limits
+
+- Reminders arrive at your next Alexa+ interaction or in a daily email. There is no device push, because add-ons have no documented push API.
+- Recall matches are conservative. `high` only comes from a UPC match, an exact model number plus brand, or a confirmed vehicle make, model and year. Vehicle recalls always say "may affect", because NHTSA data is not VIN specific.
+- Coverage answers say what the document says and what the deadline is. They are not a claim decision, and not legal or insurance advice.
+- The phone-photo fixture has not been run through a real OCR engine yet.
+- `trial_end` and `claim_by` use a 7 day high window. That is an assumption (D-015 does not name them), kept in one table.
+
+## Hackathon
+
+- **Track:** Alexa+ (self-hosted MCP server, Streamable HTTP).
+- **Mini challenges:** AWS Builder (Bedrock, Textract, S3, Lambda, DynamoDB, EventBridge, SES) and Open Source (`obligation-kit` as a separate MIT package).
+- **Built in the hackathon window:** everything in this repo.
+- **Demo data:** all documents are synthetic with fictional companies (Northwind Appliances, Harbor Mutual Insurance, Maple Court Apartments, Fernwood Streaming, Kestrel Learning). The recalls are real public records.
+
+Project decisions, gotchas and open questions are logged in [MEMORY.md](MEMORY.md). The build order is in [PLAN.md](PLAN.md).
+
+## License
+
+[MIT](LICENSE)

@@ -1,0 +1,91 @@
+{
+  "file": "docs/warranty_dishwasher_photo.jpg",
+  "docType": "warranty",
+  "pages": 1,
+  "fields": {
+    "exclusions": [
+      {
+        "value": "Damage caused by improper installation, including water damage from improperly connected supply or drain lines",
+        "sourceRef": {
+          "page": 1,
+          "quote": "This warranty does not cover damage caused by improper installation, including water damage resulting from improperly connected supply or drain lines."
+        }
+      },
+      {
+        "value": "Cosmetic damage, commercial use, repairs by anyone other than an authorized technician",
+        "sourceRef": {
+          "page": 1,
+          "quote": "This warranty also does not cover cosmetic damage, damage from commercial use, or damage from repairs made by anyone other than a Northwind authorized technician."
+        }
+      }
+    ],
+    "claimSteps": [
+      {
+        "value": "Stop using the dishwasher and shut off the water supply.",
+        "sourceRef": {
+          "page": 1,
+          "quote": "1. Stop using the dishwasher and shut off the water supply."
+        }
+      },
+      {
+        "value": "Find your sales receipt, model number, and serial number.",
+        "sourceRef": {
+          "page": 1,
+          "quote": "2. Find your sales receipt, model number, and serial number."
+        }
+      },
+      {
+        "value": "Call Northwind Warranty Service or email warranty@northwind-appliances.example.",
+        "sourceRef": {
+          "page": 1,
+          "quote": "3. Call Northwind Warranty Service at 1-800-555-0142 or email warranty@northwind-appliances.example."
+        }
+      },
+      {
+        "value": "A technician visit is scheduled within five business days.",
+        "sourceRef": {
+          "page": 1,
+          "quote": "4. A technician visit is scheduled within five (5) business days."
+        }
+      }
+    ],
+    "claimWindowDays": {
+      "value": 30,
+      "sourceRef": {
+        "page": 1,
+        "quote": "You must report a defect within thirty (30) days of discovering it."
+      }
+    },
+    "contact": {
+      "phone": {
+        "value": "1-800-555-0142",
+        "sourceRef": {
+          "page": 1,
+          "quote": "Call Northwind Warranty Service at 1-800-555-0142"
+        }
+      },
+      "email": {
+        "value": "warranty@northwind-appliances.example",
+        "sourceRef": {
+          "page": 1,
+          "quote": "email warranty@northwind-appliances.example"
+        }
+      },
+      "url": {
+        "value": "www.northwind-appliances.example/warranty",
+        "sourceRef": {
+          "page": 1,
+          "quote": "Online: www.northwind-appliances.example/warranty"
+        }
+      }
+    },
+    "provider": null,
+    "assetHint": null,
+    "startDate": null,
+    "termMonths": null,
+    "endDate": null,
+    "coverageSummary": null,
+    "requiresProofOfPurchase": null
+  },
+  "ocrRequired": true
+}

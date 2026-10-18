@@ -1,0 +1,88 @@
+[
+ {
+  "RecallID": 10830,
+  "RecallNumber": "26569",
+  "RecallDate": "2026-06-18T00:00:00",
+  "Description": "This recall involves the \"Classic\" and \"Deluxe\" CooCooBaby Baby Loungers. The recalled baby loungers are made of a foam sleeping pad and padded bumpers with a cloth cover and were sold in multiple styles and colors. The Deluxe lounger has buttons at the foot, and the Classic lounger has a ribbon tie at the foot. \"CooCooBaby\" and the manufacturing information can be found on tags on the side of both baby loungers.",
+  "URL": "https://www.cpsc.gov/Recalls/2026/CooCooBaby-Baby-Loungers-Recalled-Due-to-Risk-of-Serious-Injury-or-Death-from-Suffocation-and-Fall-Hazards-Violates-Mandatory-Standard-for-Infant-Sleep-Products",
+  "Title": "Joolz Recalls Aer2 Car Seat Adapters for Strollers Due to Risk of Serious Injury or Death from Suffocation and Fall Hazards; Violates Mandatory Standard for Infant Sleep Products",
+  "ConsumerContact": "Email at support@coocoobabyofficial.com, or online at https://coocoobabyofficial.com/pages/recall-notice or coocoobabyofficial.com for more information.",
+  "LastPublishDate": "2026-06-18T00:00:00",
+  "Products": [
+   {
+    "Name": "CooCooBaby Baby Loungers",
+    "Description": "",
+    "Model": "",
+    "Type": "",
+    "CategoryID": "",
+    "NumberOfUnits": "About 2,355"
+   }
+  ],
+  "Inconjunctions": [],
+  "Images": [
+   {
+    "URL": "https://www.cpsc.gov/s3fs-public/coocoob-1.png",
+    "Caption": "Recalled CooCooBaby Deluxe Lounger – golden brown"
+   },
+   {
+    "URL": "https://www.cpsc.gov/s3fs-public/coocoob-2.png",
+    "Caption": "Recalled CooCooBaby Classic Lounger – golden brown"
+   },
+   {
+    "URL": "https://www.cpsc.gov/s3fs-public/coocoob-3.png",
+    "Caption": "Tags showing \"CooCooBaby\" and the manufacturing information"
+   },
+   {
+    "URL": "https://www.cpsc.gov/s3fs-public/coocoob-4.png",
+    "Caption": "Sewn-in tag with \"CooCooBaby\""
+   },
+   {
+    "URL": "https://www.cpsc.gov/s3fs-public/coocoob-5.png",
+    "Caption": "Sewn-in tag with manufacturing information"
+   }
+  ],
+  "Injuries": [
+   {
+    "Name": "None reported"
+   }
+  ],
+  "Manufacturers": [],
+  "Retailers": [
+   {
+    "Name": "Online at CooCooBabyOfficial.com and Amazon.com from December 2024 through March 2026 for between $35 and $70.",
+    "CompanyID": ""
+   }
+  ],
+  "Importers": [],
+  "Distributors": [
+   {
+    "Name": "CooCooBaby, of China",
+    "CompanyID": ""
+   }
+  ],
+  "SoldAtLabel": null,
+  "ManufacturerCountries": [
+   {
+    "Country": "China"
+   }
+  ],
+  "ProductUPCs": [],
+  "Hazards": [
+   {
+    "Name": "The baby loungers violate the mandatory standard for Infant Sleep Products because the sides are shorter than the minimum side height limit to secure the infant; the sleeping pad's thickness exceeds the maximum limit, posing a suffocation hazard; and an infant could fall out of an enclosed opening at the foot of the lounger or become entrapped. The portable loungers do not have a stand, posing a fall hazard. These violations create an unsafe sleeping environment for infants, posing a risk of serious injury or death.",
+    "HazardType": "",
+    "HazardTypeID": ""
+   }
+  ],
+  "Remedies": [
+   {
+    "Name": "Consumers should stop using the baby loungers immediately and contact CooCooBaby for a full refund. Consumers should remove the sleeping pad, cut up the sides of the baby lounger and the sleeping pad and email a photo of the destroyed lounger to support@coocoobabyofficial.com to obtain a full refund issued to the original payment method."
+   }
+  ],
+  "RemedyOptions": [
+   {
+    "Option": "Refund"
+   }
+  ]
+ }
+]

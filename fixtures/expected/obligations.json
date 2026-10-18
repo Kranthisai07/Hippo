@@ -1,0 +1,75 @@
+{
+  "anchorDate": "2026-10-21",
+  "note": "Expected output of the deadline engine once every source field is confirmed. Calendar days.",
+  "obligations": [
+    {
+      "from": "subscription_kestrel",
+      "type": "cancel_by",
+      "dueDate": "2026-10-26",
+      "daysFromAnchor": 5,
+      "rule": "trial end 2026-10-28 minus 2 days"
+    },
+    {
+      "from": "subscription_kestrel",
+      "type": "trial_end",
+      "dueDate": "2026-10-28",
+      "daysFromAnchor": 7
+    },
+    {
+      "from": "insurance_auto",
+      "type": "renews",
+      "dueDate": "2026-10-30",
+      "daysFromAnchor": 9,
+      "rule": "renewal is auto, so renews not expires"
+    },
+    {
+      "from": "lease",
+      "type": "notice_by",
+      "dueDate": "2026-11-01",
+      "daysFromAnchor": 11,
+      "rule": "end 2026-12-31 minus 60 calendar days"
+    },
+    {
+      "from": "subscription_fernwood",
+      "type": "cancel_by",
+      "dueDate": "2026-11-02",
+      "daysFromAnchor": 12,
+      "rule": "next charge 2026-11-03 minus 1 day"
+    },
+    {
+      "from": "subscription_fernwood",
+      "type": "charge",
+      "dueDate": "2026-11-03",
+      "daysFromAnchor": 13
+    },
+    {
+      "from": "warranty_dishwasher",
+      "type": "expires",
+      "dueDate": "2026-11-12",
+      "daysFromAnchor": 22,
+      "rule": "start 2025-11-12 plus 12 months"
+    },
+    {
+      "from": "lease",
+      "type": "expires",
+      "dueDate": "2026-12-31",
+      "daysFromAnchor": 71,
+      "note": "outside the 30 day alert window"
+    }
+  ],
+  "severity": {
+    "high": [
+      "subscription_kestrel cancel_by (5 days)",
+      "subscription_kestrel trial_end (7 days)",
+      "insurance_auto renews (9 days)",
+      "lease notice_by (11 days)",
+      "subscription_fernwood cancel_by (12 days)"
+    ],
+    "possible": [
+      "subscription_fernwood charge (13 days)",
+      "warranty_dishwasher expires (22 days)"
+    ],
+    "rule": "D-015 / SPEC 5: high within 14 days for expires, renews, notice_by and cancel_by; high within 7 days for charge, service_due, trial_end and claim_by; otherwise possible within 30 days",
+    "resolved": "Q-006 part 1: the 9 day insurance renewal is high under D-015, so moment 3 can speak it."
+  }
+}

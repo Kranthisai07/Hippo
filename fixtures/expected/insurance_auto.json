@@ -1,0 +1,200 @@
+{
+  "file": "docs/insurance_auto.pdf",
+  "docType": "insurance",
+  "pages": 2,
+  "fields": {
+    "insurer": {
+      "value": "Harbor Mutual Insurance Company",
+      "sourceRef": {
+        "page": 1,
+        "quote": "Harbor Mutual Insurance Company"
+      }
+    },
+    "policyType": {
+      "value": "auto",
+      "sourceRef": {
+        "page": 1,
+        "quote": "Personal Auto Policy: Declarations Page"
+      }
+    },
+    "policyNumberLast4": {
+      "value": "4821",
+      "sourceRef": {
+        "page": 1,
+        "quote": "Policy number: HM-AU-0048-4821"
+      }
+    },
+    "effectiveDate": {
+      "value": "2026-04-30",
+      "sourceRef": {
+        "page": 1,
+        "quote": "Policy period: April 30, 2026 to October 30, 2026"
+      }
+    },
+    "expirationDate": {
+      "value": "2026-10-30",
+      "sourceRef": {
+        "page": 1,
+        "quote": "Policy period: April 30, 2026 to October 30, 2026"
+      }
+    },
+    "renewal": {
+      "value": "auto",
+      "sourceRef": {
+        "page": 1,
+        "quote": "Renewal: This policy renews automatically for another six-month term"
+      }
+    },
+    "premium": {
+      "amount": {
+        "value": 684.0,
+        "sourceRef": {
+          "page": 1,
+          "quote": "Total premium for this period: $684.00, billed every six months."
+        }
+      },
+      "cycle": {
+        "value": "six-month",
+        "sourceRef": {
+          "page": 1,
+          "quote": "Total premium for this period: $684.00, billed every six months."
+        }
+      }
+    },
+    "deductibles": [
+      {
+        "value": {
+          "coverage": "collision",
+          "amount": 500
+        },
+        "sourceRef": {
+          "page": 1,
+          "quote": "Collision: $500 deductible"
+        }
+      },
+      {
+        "value": {
+          "coverage": "comprehensive",
+          "amount": 250
+        },
+        "sourceRef": {
+          "page": 1,
+          "quote": "Comprehensive: $250 deductible"
+        }
+      }
+    ],
+    "coverages": [
+      {
+        "value": "Bodily injury liability $100,000 per person / $300,000 per accident",
+        "sourceRef": {
+          "page": 1,
+          "quote": "Bodily injury liability: $100,000 per person / $300,000 per accident"
+        }
+      },
+      {
+        "value": "Property damage liability $100,000 per accident",
+        "sourceRef": {
+          "page": 1,
+          "quote": "Property damage liability: $100,000 per accident"
+        }
+      },
+      {
+        "value": "Collision",
+        "sourceRef": {
+          "page": 1,
+          "quote": "Collision: $500 deductible"
+        }
+      },
+      {
+        "value": "Comprehensive",
+        "sourceRef": {
+          "page": 1,
+          "quote": "Comprehensive: $250 deductible"
+        }
+      },
+      {
+        "value": "Uninsured motorist $100,000 per person / $300,000 per accident",
+        "sourceRef": {
+          "page": 1,
+          "quote": "Uninsured motorist: $100,000 per person / $300,000 per accident"
+        }
+      }
+    ],
+    "exclusions": [
+      {
+        "value": "Use of the vehicle to carry people or property for a fee, including delivery or rideshare driving",
+        "sourceRef": {
+          "page": 2,
+          "quote": "This policy does not cover loss while the vehicle is used to carry people or property for a fee, including delivery or rideshare driving."
+        }
+      },
+      {
+        "value": "Intentional damage caused by an insured person",
+        "sourceRef": {
+          "page": 2,
+          "quote": "This policy does not cover intentional damage caused by an insured person."
+        }
+      }
+    ],
+    "claimSteps": [
+      {
+        "value": "Report any accident or loss to Harbor Mutual within 14 days.",
+        "sourceRef": {
+          "page": 2,
+          "quote": "Report any accident or loss to Harbor Mutual within fourteen (14) days of the date it occurs."
+        }
+      },
+      {
+        "value": "Call the 24-hour claims line or email claims@harbor-mutual.example.",
+        "sourceRef": {
+          "page": 2,
+          "quote": "Call the 24-hour claims line at 1-800-555-0177 or email claims@harbor-mutual.example."
+        }
+      },
+      {
+        "value": "Do not admit fault or agree to a settlement before speaking with a claims representative.",
+        "sourceRef": {
+          "page": 2,
+          "quote": "Do not admit fault or agree to a settlement before speaking with a claims representative."
+        }
+      }
+    ],
+    "claimReportWindowDays": {
+      "value": 14,
+      "sourceRef": {
+        "page": 2,
+        "quote": "Report any accident or loss to Harbor Mutual within fourteen (14) days of the date it occurs."
+      }
+    },
+    "contact": {
+      "phone": {
+        "value": "1-800-555-0177",
+        "sourceRef": {
+          "page": 2,
+          "quote": "Call the 24-hour claims line at 1-800-555-0177"
+        }
+      },
+      "email": {
+        "value": "claims@harbor-mutual.example",
+        "sourceRef": {
+          "page": 2,
+          "quote": "email claims@harbor-mutual.example"
+        }
+      },
+      "url": null
+    },
+    "coveredAssetHints": [
+      {
+        "value": {
+          "make": "Honda",
+          "model": "CR-V",
+          "year": 2021
+        },
+        "sourceRef": {
+          "page": 1,
+          "quote": "Insured vehicle: 2021 Honda CR-V EX"
+        }
+      }
+    ]
+  }
+}

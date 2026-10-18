@@ -1,0 +1,70 @@
+{
+  "file": "docs/subscription_kestrel.pdf",
+  "docType": "subscription",
+  "pages": 1,
+  "fields": {
+    "vendor": {
+      "value": "Kestrel Learning",
+      "sourceRef": {
+        "page": 1,
+        "quote": "Kestrel Learning"
+      }
+    },
+    "plan": {
+      "value": "Premium",
+      "sourceRef": {
+        "page": 1,
+        "quote": "Plan: Premium"
+      }
+    },
+    "amount": {
+      "value": 9.99,
+      "sourceRef": {
+        "page": 1,
+        "quote": "Price after trial: $9.99 per month, billed monthly."
+      }
+    },
+    "cycle": {
+      "value": "monthly",
+      "sourceRef": {
+        "page": 1,
+        "quote": "Price after trial: $9.99 per month, billed monthly."
+      }
+    },
+    "nextChargeDate": {
+      "value": "2026-10-28",
+      "sourceRef": {
+        "page": 1,
+        "quote": "First charge date: October 28, 2026"
+      }
+    },
+    "trialEndDate": {
+      "value": "2026-10-28",
+      "sourceRef": {
+        "page": 1,
+        "quote": "Your 14-day free trial started on October 14, 2026 and ends on October 28, 2026."
+      }
+    },
+    "cancelNoticeDays": {
+      "value": 2,
+      "sourceRef": {
+        "page": 1,
+        "quote": "To avoid being charged, cancel at least 2 days before the trial ends."
+      }
+    },
+    "cancelMethod": {
+      "value": "Email cancel@kestrel-learning.example or Settings > Billing > End trial",
+      "sourceRef": {
+        "page": 1,
+        "quote": "How to cancel: email cancel@kestrel-learning.example or use Settings > Billing > End trial."
+      }
+    },
+    "accountEmailHint": {
+      "value": "j***@example.com",
+      "sourceRef": {
+        "page": 1,
+        "quote": "Account email: j***@example.com"
+      }
+    }
+  }
+}

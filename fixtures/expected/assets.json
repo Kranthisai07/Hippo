@@ -1,0 +1,60 @@
+[
+  {
+    "id": "A-dishwasher",
+    "name": "Dishwasher",
+    "aliases": [
+      "dish washer",
+      "kitchen dishwasher"
+    ],
+    "category": "appliance",
+    "brand": "Northwind",
+    "modelNumber": "NW-DW500",
+    "upc": null,
+    "serialLast4": "7731",
+    "purchaseDate": "2025-11-12",
+    "location": "kitchen",
+    "linkedDoc": "warranty_dishwasher"
+  },
+  {
+    "id": "A-car",
+    "name": "Car",
+    "aliases": [
+      "Honda",
+      "CR-V",
+      "my car"
+    ],
+    "category": "vehicle",
+    "brand": "Honda",
+    "modelNumber": null,
+    "upc": null,
+    "serialLast4": null,
+    "purchaseDate": null,
+    "location": "garage",
+    "vehicle": {
+      "make": "Honda",
+      "model": "CR-V",
+      "modelYear": 2021,
+      "nhtsaMake": "HONDA",
+      "nhtsaModel": "CR-V"
+    },
+    "linkedDoc": "insurance_auto"
+  },
+  {
+    "id": "A-baby-bottles",
+    "name": "Boon NURSH baby bottles",
+    "aliases": [
+      "baby bottles",
+      "bottles",
+      "Boon bottles"
+    ],
+    "category": "child_safety",
+    "brand": "Boon",
+    "modelNumber": null,
+    "upc": "669028116546",
+    "serialLast4": null,
+    "purchaseDate": "2026-02-14",
+    "location": "kitchen",
+    "linkedDoc": null,
+    "_fixtureNotes": "Matches CPSC 26530 truthfully (D-016): Boon NURSH 8 oz Reusable Baby Bottles 3-Pack, pink tie dye, UPC 669028116546, sold at Walmart November 2025 to May 2026. The match is on the structured UPC. The record's Model field is empty; item number B11654 appears only in Description. The purchase date is invented but inside the sales window."
+  }
+]

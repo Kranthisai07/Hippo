@@ -22,7 +22,9 @@ Format: `[owner] TaskID status (in progress | in review | done | blocked: reason
 - (none yet)
 
 ### P
-- (none yet)
+- [P] T0.3 in review, branch t0.3-fixtures
+- [P] T0.5 in review (recommendation logged as D-IAC, K to confirm), branch t0.3-fixtures
+- [P] T1.3 in review, branch t1.3-deadline-engine (133 tests)
 
 ### Blocked / waiting on the other dev
 - (none)
@@ -60,6 +62,10 @@ Format: `D-nnn | date | [owner] | decision | why | supersedes`
 - D-IAC | pending | | CDK vs SAM; SPA hosting | T0.5 | none
 - D-NAME | pending | | Final product name ("Homefile" is a working name; check for collisions) | Before README | none
 - D-IAC | 2026-10-16 | [K]+claude | IaC: CDK (TypeScript), not SAM. SPA hosting: served by the api Lambda (static assets bundled, Cache-Control set), not S3 + CloudFront. Proposed, K to confirm. | CDK keeps one language and one toolchain with the monorepo and covers Lambda, Function URL, S3 + KMS, DynamoDB, EventBridge, SES, SSM in typed code; SAM is YAML and splits us across two. Same-Lambda SPA means one origin (cookie and OAuth stay simple), one deploy, and no extra hop on the 500 ms /mcp path; revisit if the SPA bundle passes about 2 MB or the Lambda response limit bites. CloudFront OAC in front of a Function URL is unverified, so not relied on | supersedes D-IAC (pending)
+- D-015 | 2026-10-16 | [K]+claude | `expires` and `renews` obligations are high within 14 days, same as `notice_by` and `cancel_by`; `charge` and `service_due` stay at 7 days. `trial_end` and `claim_by` keep the 7 day rule (assumption, not stated). SPEC section 5 and fixtures/expected/obligations.json updated. Answers Q-006 part 1 | The 9 day insurance renewal must be high so moment 3 can speak it, since proactive injection only fires on high alerts | none
+- D-016 | 2026-10-16 | [K]+claude | Demo CPSC recall is 26530, Boon NURSH 8 oz Reusable Baby Bottles (TOMY), UPC 669028116546, replacing Joolz 26568. Seeded asset A-baby-bottles carries that UPC, so the matcher yields high; the matching rule is not loosened. Answers Q-006 part 2. INTENT, SPEC and D-013 still say "car seat"; the demo recall is now a baby bottle | Joolz 26568 has no UPC or Model, so it could only be possible. Scan of 594 CPSC recalls from the last 12 months found 18 with a Model or UPC, and 26530 is the only child product among them; no car seat qualified | refines D-013
+- D-IAC | 2026-10-16 | [K]+claude | Confirmed: CDK (TypeScript) for IaC; SPA served by the api Lambda | K approved the 2026-10-16 recommendation | supersedes D-IAC (pending)
+- D-017 | 2026-10-17 | [K]+claude | T1.3 deadline engine built in packages/obligation-kit before T0.4 (scaffold) and T1.1 (contracts) merged. It takes plain field-value objects named as in SPEC section 4 (no zod, no repository types) and returns obligations with `confirmed` and `severity`. Severity windows live in one table (severity.ts HIGH_WITHIN_DAYS). Standalone npm setup (vitest, typescript) to be replaced by the pnpm workspace when K's T0.4 lands | User chose to start T1.3 now rather than wait; thin inputs mean T1.1 can adopt or rename with no logic change | none
 
 ---
 
@@ -102,3 +108,4 @@ Format: `Q-nnn | asked by | question | answer when known`
 - Q-004 | [K] | Which Bedrock model in our region accepts PDF document input and gives reliable JSON? | T0.2
 - Q-005 | [K] | Partner's name and initial for this file | K to fill
 - Q-006 | [K]+claude | Two demo conflicts. (1) SPEC 5 makes a 9 day insurance renewal "possible", but the proactive injection only fires on unannounced high alerts, so moment 3 would not speak. Widen the rule for renews, or change the injection? (2) The recall seed (Joolz adapter) cannot reach "high" with no UPC or model, so the Recall card would say "possible". Accept that, or let the user add NL311 as a model number? | K to decide
+- Q-007 | [K]+claude | SPEC section 4 lease has no field for whether a notice period counts business or calendar days. The T1.3 engine reads an optional `noticeDaysType` ("business" or calendar by default). If T1.1 names it differently, a business-day clause silently becomes calendar days. Also: claim_by is only the helper claimByDate(); who calls it with severityFor in check_coverage (T2.4)? | K to decide in T1.1
