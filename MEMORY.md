@@ -24,7 +24,8 @@ Format: `[owner] TaskID status (in progress | in review | done | blocked: reason
 ### P
 - [P] T0.3 in review, branch t0.3-fixtures
 - [P] T0.5 in review (recommendation logged as D-IAC, K to confirm), branch t0.3-fixtures
-- [P] T1.3 in review, branch t1.3-deadline-engine (133 tests)
+- [P] T1.3 done, merged in PR #3
+- [P] T1.4 in review, branch pramod (61 tests)
 
 ### Blocked / waiting on the other dev
 - (none)
@@ -66,6 +67,7 @@ Format: `D-nnn | date | [owner] | decision | why | supersedes`
 - D-016 | 2026-10-16 | [K]+claude | Demo CPSC recall is 26530, Boon NURSH 8 oz Reusable Baby Bottles (TOMY), UPC 669028116546, replacing Joolz 26568. Seeded asset A-baby-bottles carries that UPC, so the matcher yields high; the matching rule is not loosened. Answers Q-006 part 2. INTENT, SPEC and D-013 still say "car seat"; the demo recall is now a baby bottle | Joolz 26568 has no UPC or Model, so it could only be possible. Scan of 594 CPSC recalls from the last 12 months found 18 with a Model or UPC, and 26530 is the only child product among them; no car seat qualified | refines D-013
 - D-IAC | 2026-10-16 | [K]+claude | Confirmed: CDK (TypeScript) for IaC; SPA served by the api Lambda | K approved the 2026-10-16 recommendation | supersedes D-IAC (pending)
 - D-017 | 2026-10-17 | [K]+claude | T1.3 deadline engine built in packages/obligation-kit before T0.4 (scaffold) and T1.1 (contracts) merged. It takes plain field-value objects named as in SPEC section 4 (no zod, no repository types) and returns obligations with `confirmed` and `severity`. Severity windows live in one table (severity.ts HIGH_WITHIN_DAYS). Standalone npm setup (vitest, typescript) to be replaced by the pnpm workspace when K's T0.4 lands | User chose to start T1.3 now rather than wait; thin inputs mean T1.1 can adopt or rename with no logic change | none
+- D-018 | 2026-10-17 | [K]+claude | T1.4 resolver lives in packages/core/src/resolver with plain AssetLike and AgreementLike inputs (SPEC section 3 names), own npm setup until T0.4 and T1.1 land. Returns match, ambiguous (max 3 candidates) or none; never guesses: more than half the query words must match and a tie asks. Question and problem words (leaking, say, show) are stripped, so the tool layer should still pass the asset phrase alone | T1.1 has not merged; thin inputs let it adopt or rename with no logic change. Tool descriptions for check_coverage should tell Alexa to pass just the thing, not the whole sentence | none
 
 ---
 
