@@ -2,7 +2,8 @@
 // data: it is only compared, never interpreted.
 //
 // Evidence ladder (INTENT principle 2): HIGH needs deterministic evidence (UPC, or a structured model plus the brand).
-// POSSIBLE is brand plus product-name overlap. Anything else is no match. The record Title is never evidence: CPSC
+// The brand must be in the SAME product Name as the model; Description, Importers, Manufacturers and Distributors
+// support POSSIBLE only. POSSIBLE is brand plus product-name overlap. Anything else is no match. The record Title is never evidence: CPSC
 // record 26569 has a Joolz title on a CooCooBaby recall.
 
 export class CpscApiError extends Error {
@@ -35,7 +36,7 @@ export type CpscRaw = Record<string, unknown>;
 export function parseCpscResponse(json: unknown, opts: { maxRecords?: number } = {}): CpscRaw[] {
   const max = opts.maxRecords ?? 2000;
   if (!Array.isArray(json)) throw new CpscApiError("CPSC response is not a list");
-  if (json.length > max) throw new CpscApiError(`CPSC result ceiling exceeded (${max})`);
+  if (json.length >= max) throw new CpscApiError(`CPSC result ceiling exceeded (${max})`);
   for (const r of json) {
     if (!r || typeof r !== "object" || Array.isArray(r)) throw new CpscApiError("CPSC record is not an object");
     const rec = r as CpscRaw;
@@ -54,8 +55,10 @@ export interface CpscRecall {
   title: string;
   url: string;
   productNames: string[];
-  /** Structured Product.Model values only. */
+  /** Structured Product.Model values only (display). Matching uses `products`. */
   models: string[];
+  /** Each product's own Name and Model, so brand and model can be tied to one product. */
+  products: { name: string; model: string }[];
   /** Digits, left padded to 14. */
   upcs: string[];
   hazards: string[];
@@ -64,10 +67,13 @@ export interface CpscRecall {
   brandEvidence: string[];
 }
 
-/** Digits only, left padded to 14 so UPC-A (12) and EAN-13 (13) of the same item compare equal. */
+/**
+ * Digits only. Only 12 (UPC-A), 13 (EAN-13) and 14 digit values are accepted and left padded to 14 so they compare
+ * equal. Anything else (8 digit EAN-8 or UPC-E, odd lengths) and any all-zero value is null, never padded.
+ */
 export function normalizeUpc(v: string | null | undefined): string | null {
   const d = (v ?? "").replace(/[\s-]/g, "");
-  if (!/^\d{8,14}$/.test(d)) return null;
+  if (!/^\d{12,14}$/.test(d) || /^0+$/.test(d)) return null;
   return d.padStart(14, "0");
 }
 
@@ -90,7 +96,12 @@ export function normalizeCpscRecall(raw: CpscRaw): CpscRecall {
     url: str(raw.URL),
     productNames,
     models: names(raw.Products, "Model"),
-    upcs: arr(raw.ProductUPCs).map((x) => normalizeUpc(str(x.UPC))).filter((x): x is string => x !== null),
+    products: arr(raw.Products).map((x) => ({ name: str(x.Name), model: str(x.Model) })),
+    // A field may hold a list ("a, b; c"), so every piece is a candidate.
+    upcs: arr(raw.ProductUPCs)
+      .flatMap((x) => str(x.UPC).split(/[,;\s]+/))
+      .map(normalizeUpc)
+      .filter((x): x is string => x !== null),
     hazards: names(raw.Hazards),
     remedies: names(raw.Remedies),
     brandEvidence: [
@@ -118,9 +129,20 @@ export interface CpscMatch {
   evidence: CpscEvidence;
 }
 
-const fold = (s: string): string => s.normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
+/**
+ * Separators (space, hyphen, underscore, slash, dot) become one marker, not nothing, so "1-23" and "12-3" differ.
+ * A marker between a letter and a digit is dropped so "NW-DW500" equals "nw dw 500".
+ */
+const modelKey = (s: string): string =>
+  s
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[\s\-_/.]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .replace(/(?<=\p{L})-(?=\p{N})|(?<=\p{N})-(?=\p{L})/gu, "");
+const usableModel = (key: string): boolean => /\p{L}/u.test(key) && /\p{N}/u.test(key) || key.replace(/[^\p{L}\p{N}]/gu, "").length >= 4;
 const words = (s: string): string[] => s.normalize("NFKC").toLowerCase().replace(/['’]/g, "").split(/[^\p{L}\p{N}]+/u).filter(Boolean);
-const MIN_MODEL = 3;
+const BRAND_STOP = new Set(["a", "an", "the", "and", "of", "co", "inc", "llc", "ltd"]);
 const STOP = new Set(["the", "a", "an", "and", "or", "of", "for", "with", "by", "in", "to", "set", "pack", "new", "oz", "kit", "pcs"]);
 
 /** Whole-word, in sequence, inside a single text. Boon is not found in Boone. */
@@ -140,11 +162,16 @@ export function matchCpscRecall(asset: RecallAsset, recall: CpscRecall): CpscMat
   if (upc && recall.upcs.includes(upc)) return { confidence: "high", evidence: "upc" };
 
   const brandWords = words(asset.brand ?? "");
+  // A one character or stopword brand is too weak to be evidence at any level.
+  if (brandWords.join("").length < 2 || brandWords.every((w) => BRAND_STOP.has(w))) return null;
   if (!hasBrand(brandWords, recall.brandEvidence)) return null;
 
-  const model = fold(asset.modelNumber ?? "");
-  if (model.length >= MIN_MODEL && recall.models.some((m) => fold(m) === model)) {
-    return { confidence: "high", evidence: "model_brand" };
+  const model = modelKey(asset.modelNumber ?? "");
+  if (usableModel(model)) {
+    const sameModel = recall.products.filter((p) => modelKey(p.model) === model);
+    // High only when brand and model sit on the same product. Brand elsewhere in the record caps at possible.
+    if (sameModel.some((p) => hasBrand(brandWords, [p.name]))) return { confidence: "high", evidence: "model_brand" };
+    if (sameModel.length > 0) return { confidence: "possible", evidence: "model_brand" };
   }
 
   const skip = new Set(brandWords);

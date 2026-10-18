@@ -33,6 +33,7 @@ const recall = (o: Partial<CpscRecall> = {}): CpscRecall => ({
   url: "",
   productNames: [],
   models: [],
+  products: [],
   upcs: [],
   hazards: [],
   remedies: [],
@@ -86,14 +87,16 @@ describe("parseCpscResponse", () => {
   it("throws on a non-object record", () => {
     expect(() => parseCpscResponse([null])).toThrow(CpscApiError);
   });
-  it("default ceiling is 2000", () => {
+  it("default ceiling is 2000 and a full 2000 is truncation", () => {
     const many = (n: number) => Array.from({ length: n }, (_, i) => ({ ...boonRaw, RecallID: i + 1, RecallNumber: String(i + 1) }));
-    expect(parseCpscResponse(many(2000))).toHaveLength(2000);
+    expect(parseCpscResponse(many(1999))).toHaveLength(1999);
+    expect(() => parseCpscResponse(many(2000))).toThrow(CpscApiError);
     expect(() => parseCpscResponse(many(2001))).toThrow(CpscApiError);
   });
   it("honours maxRecords", () => {
     expect(() => parseCpscResponse([boonRaw, mismatchRaw], { maxRecords: 1 })).toThrow(/ceiling/);
-    expect(parseCpscResponse([boonRaw], { maxRecords: 1 })).toHaveLength(1);
+    expect(() => parseCpscResponse([boonRaw], { maxRecords: 1 })).toThrow(/ceiling/);
+    expect(parseCpscResponse([boonRaw], { maxRecords: 2 })).toHaveLength(1);
   });
   it("error message does not echo the body", () => {
     expect(() => parseCpscResponse(errorRecord)).toThrow(/^(?!.*underlying provider)/);
@@ -105,7 +108,7 @@ describe("normalizeUpc", () => {
   it("pads EAN-13 to the same value", () => expect(normalizeUpc("0669028116546")).toBe("00669028116546"));
   it("is already 14", () => expect(normalizeUpc("00669028116546")).toBe("00669028116546"));
   it("strips spaces and dashes", () => expect(normalizeUpc("6 69028-116546")).toBe("00669028116546"));
-  it("accepts EAN-8 length", () => expect(normalizeUpc("12345678")).toBe("00000012345678"));
+  it("rejects EAN-8 length (never padded)", () => expect(normalizeUpc("12345678")).toBeNull());
   it.each([null, undefined, "", "abc", "1234567", "123456789012345"])("rejects %j", (v) => {
     expect(normalizeUpc(v)).toBeNull();
   });
@@ -168,12 +171,12 @@ describe("matchCpscRecall: high", () => {
   it("a different UPC does not match by itself", () => {
     expect(matchCpscRecall({ id: "a", name: "Thing", upc: "012345678905" }, boon)).toBeNull();
   });
-  const withModel = recall({ models: ["B-11654"], productNames: ["Boon Widget"], brandEvidence: ["Boon Widget"] });
+  const withModel = recall({ models: ["B-11654"], products: [{ name: "Boon Widget", model: "B-11654" }], productNames: ["Boon Widget"], brandEvidence: ["Boon Widget"] });
   it("model plus brand is high", () => {
     expect(matchCpscRecall({ id: "a", name: "x", brand: "Boon", modelNumber: "b11654" }, withModel)).toEqual({ confidence: "high", evidence: "model_brand" });
   });
   it("model folds spaces, case and punctuation", () => {
-    expect(matchCpscRecall({ id: "a", name: "x", brand: "boon", modelNumber: " B 11.654 " }, withModel)?.confidence).toBe("high");
+    expect(matchCpscRecall({ id: "a", name: "x", brand: "boon", modelNumber: " B 11654 " }, withModel)?.confidence).toBe("high");
   });
   it("model without brand is not high", () => {
     expect(matchCpscRecall({ id: "a", name: "x", modelNumber: "B11654" }, withModel)).toBeNull();
@@ -182,16 +185,16 @@ describe("matchCpscRecall: high", () => {
     const m = matchCpscRecall({ id: "a", name: "x", brand: "Acme", modelNumber: "B11654" }, withModel);
     expect(m?.confidence).not.toBe("high");
   });
-  it("model shorter than 3 characters never matches", () => {
-    const r = recall({ models: ["X1"], brandEvidence: ["Boon"] });
-    expect(matchCpscRecall({ id: "a", name: "x", brand: "Boon", modelNumber: "X1" }, r)).toBeNull();
+  it("model without both a letter and a digit and under 4 characters never matches", () => {
+    const r = recall({ models: ["123"], products: [{ name: "Boon", model: "123" }], brandEvidence: ["Boon"] });
+    expect(matchCpscRecall({ id: "a", name: "x", brand: "Boon", modelNumber: "123" }, r)).toBeNull();
   });
   it("model that only appears in the Description is not structured evidence", () => {
     const r = recall({ brandEvidence: ["Boon item number B11654"] });
     expect(matchCpscRecall({ id: "a", name: "zzz", brand: "Boon", modelNumber: "B11654" }, r)).toBeNull();
   });
   it("brand is whole word for model matches", () => {
-    const r = recall({ models: ["B11654"], brandEvidence: ["Boone Widget"] });
+    const r = recall({ models: ["B11654"], products: [{ name: "Boone Widget", model: "B11654" }], brandEvidence: ["Boone Widget"] });
     expect(matchCpscRecall({ id: "a", name: "x", brand: "Boon", modelNumber: "B11654" }, r)).toBeNull();
   });
 });

@@ -92,7 +92,11 @@ function isoDate(s: string): string {
 }
 
 export function parseNhtsaResponse(json: unknown): NhtsaRecall[] {
-  return results(json).map((row) => {
+  const rows = results(json);
+  // A Count that disagrees with the list means the list was cut short or damaged: never a clear.
+  const count = obj(json)?.Count;
+  if (typeof count === "number" && count !== rows.length) throw new NhtsaApiError("NHTSA Count does not match results");
+  return rows.map((row) => {
     const r = obj(row);
     if (!r) throw new NhtsaApiError("NHTSA record is not an object");
     const s = (k: string) => (typeof r[k] === "string" ? (r[k] as string).trim() : "");

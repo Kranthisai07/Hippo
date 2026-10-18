@@ -1,3 +1,6 @@
+// NOTE: DAILY JOB ONLY. The clients (fetchCpscRecalls, createNhtsaClient, fetchNhtsaRecalls) do outbound HTTP and must
+// never be reachable from the voice or MCP path. Nothing enforces that here: it is a convention, so a caller in a
+// request handler is a bug. Only the pure parsers and matchers are safe to import from request code.
 // HTTP clients for the Recall Radar. DAILY JOB ONLY: never call these from the voice or MCP path (CLAUDE.md: no
 // outbound HTTP inside MCP tool handlers). fetch, sleep and now are injected, so nothing here touches the network on its
 // own and tests run on a fake clock. URLs and bodies are never logged or put in error messages.
@@ -51,11 +54,11 @@ export function createNhtsaClient(deps: NhtsaDeps) {
     let why = "";
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       if (attempt > 1) await deps.sleep(BACKOFF_MS * 2 ** (attempt - 2));
-      if (last !== null) {
-        const wait = last + PACE_MS - deps.now();
-        if (wait > 0) await deps.sleep(wait);
-      }
-      last = deps.now();
+      // Reserve the slot synchronously so concurrent calls queue behind each other instead of racing.
+      const now = deps.now();
+      const slot = last === null ? now : Math.max(now, last + PACE_MS);
+      last = slot;
+      if (slot > now) await deps.sleep(slot - now);
       let res: HttpResponse | undefined;
       try {
         res = await deps.fetch(url);
