@@ -11,9 +11,21 @@ export class CpscApiError extends Error {
 }
 
 const BASE = "https://www.saferproducts.gov/RestWebServices/Recall";
-// Verified live. LastPublishDateStart/End and a UPC filter are UNVERIFIED (filtered queries were failing on the
-// day of testing), so they are left out on purpose. Unknown names return the whole database, hence the throw.
-const ALLOWED = new Set(["RecallDateStart", "RecallDateEnd", "RecallNumber", "ProductName"]);
+// Verified live (2026-10-16 and 2026-10-18): RecallDateStart/End, LastPublishDateStart/End, RecallNumber, ProductName.
+// A UPC filter is NOT allowed: on 2026-10-18 it returned an error record, then a silent empty array for a UPC that exists,
+// so UPCs are matched client side. Unknown names and an empty filter return the whole database (10,053 records), and an
+// End date on its own returned 10,047 records, so each End needs its Start.
+const DATE_PARAMS = new Set(["RecallDateStart", "RecallDateEnd", "LastPublishDateStart", "LastPublishDateEnd"]);
+const ALLOWED = new Set(["RecallNumber", "ProductName", ...DATE_PARAMS]);
+const END_NEEDS: Record<string, string> = { RecallDateEnd: "RecallDateStart", LastPublishDateEnd: "LastPublishDateStart" };
+
+function isIsoDate(v: string): boolean {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
+  if (!m) return false;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const t = new Date(Date.UTC(y, mo - 1, d));
+  return t.getUTCFullYear() === y && t.getUTCMonth() === mo - 1 && t.getUTCDate() === d;
+}
 
 /** `format=json` is always sent because the default is XML. */
 export function buildCpscUrl(params: Record<string, string>): string {
@@ -21,7 +33,12 @@ export function buildCpscUrl(params: Record<string, string>): string {
   for (const [k, v] of Object.entries(params)) {
     if (!ALLOWED.has(k)) throw new CpscApiError(`unknown CPSC parameter: ${k}`);
     if (typeof v !== "string" || v.trim() === "") throw new CpscApiError(`empty value for CPSC parameter: ${k}`);
+    if (DATE_PARAMS.has(k) && !isIsoDate(v.trim())) throw new CpscApiError(`CPSC parameter ${k} must be a YYYY-MM-DD date`);
     q.set(k, v.trim());
+  }
+  if (q.size === 0) throw new CpscApiError("refusing an unfiltered CPSC request: it returns the whole database");
+  for (const [end, start] of Object.entries(END_NEEDS)) {
+    if (q.has(end) && !q.has(start)) throw new CpscApiError(`CPSC parameter ${end} needs ${start}`);
   }
   q.set("format", "json");
   return `${BASE}?${q.toString()}`;

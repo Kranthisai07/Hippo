@@ -43,15 +43,33 @@ const recall = (o: Partial<CpscRecall> = {}): CpscRecall => ({
 
 describe("buildCpscUrl", () => {
   it("always sends format=json", () => {
-    expect(buildCpscUrl({})).toBe("https://www.saferproducts.gov/RestWebServices/Recall?format=json");
+    expect(buildCpscUrl({ RecallNumber: "26530" })).toBe("https://www.saferproducts.gov/RestWebServices/Recall?RecallNumber=26530&format=json");
   });
-  it.each(["RecallDateStart", "RecallDateEnd", "RecallNumber", "ProductName"])("allows %s", (k) => {
+  it("refuses a request with no filter, which would return the whole database (10,053 records on 2026-10-18)", () => {
+    expect(() => buildCpscUrl({})).toThrow(CpscApiError);
+  });
+  it.each(["RecallNumber", "ProductName"])("allows %s", (k) => {
     expect(buildCpscUrl({ [k]: "x" })).toContain(`${k}=x`);
+  });
+  it.each(["RecallDateStart", "LastPublishDateStart"])("allows %s on its own as a date", (k) => {
+    expect(buildCpscUrl({ [k]: "2026-10-01" })).toContain(`${k}=2026-10-01`);
+  });
+  it.each([["RecallDateStart", "RecallDateEnd"], ["LastPublishDateStart", "LastPublishDateEnd"]])("allows %s with %s", (a, b) => {
+    const url = buildCpscUrl({ [a]: "2026-10-01", [b]: "2026-10-08" });
+    expect(url).toContain(`${a}=2026-10-01`);
+    expect(url).toContain(`${b}=2026-10-08`);
+  });
+  it.each(["RecallDateEnd", "LastPublishDateEnd"])("refuses %s without its Start (End alone returned 10,047 records)", (k) => {
+    expect(() => buildCpscUrl({ [k]: "2026-10-08" })).toThrow(CpscApiError);
+  });
+  it.each(["10/01/2026", "2026-1-5", "2026-10-01T00:00:00", "yesterday", "2026-13-01", "2026-02-30"])("refuses the date %s", (d) => {
+    expect(() => buildCpscUrl({ RecallDateStart: d })).toThrow(CpscApiError);
+    expect(() => buildCpscUrl({ LastPublishDateStart: d })).toThrow(CpscApiError);
   });
   it("encodes values", () => {
     expect(buildCpscUrl({ ProductName: "baby & bottle" })).toContain("ProductName=baby+%26+bottle");
   });
-  it.each(["UPC", "LastPublishDateStart", "LastPublishDateEnd", "format", "recalldatestart", "Foo"])("throws on %s", (k) => {
+  it.each(["UPC", "format", "recalldatestart", "Foo", "Hazard"])("throws on %s (UPC returned an empty array for a UPC that exists)", (k) => {
     expect(() => buildCpscUrl({ [k]: "x" })).toThrow(CpscApiError);
   });
   it.each(["", "   "])("throws on empty value %j", (v) => {
