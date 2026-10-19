@@ -409,3 +409,83 @@ describe("purity", () => {
     expect(input).toEqual(copy);
   });
 });
+
+describe("second review: hostile length, wider separators, caps, urls, types", () => {
+  const hostile: [string, string][] = [
+    ["dots", ".".repeat(200_000)],
+    ["letters", "a".repeat(200_000)],
+    ["a then dot", "a.".repeat(100_000)],
+    ["a then hyphen", "a-".repeat(100_000)],
+    ["a then at", "a@".repeat(100_000)],
+    ["a then dot hyphen", "a" + ".-".repeat(100_000)],
+  ];
+  it.each(hostile)("a 200 KB label of %s does not stall the digest", (_name, text) => {
+    const t = performance.now();
+    const d = must([mk({ label: text, detail: text })]);
+    expect(performance.now() - t).toBeLessThan(750);
+    expect(d.text.length).toBeLessThan(2000);
+  });
+  it("a 3000 digit label leaks no long number", () => {
+    expect(all(must([mk({ label: "9".repeat(3000) })]))).not.toMatch(/\d{5}/);
+  });
+  it("cutting a long label cannot expose the head of a number that straddles the cut", () => {
+    const d = must([mk({ label: "x".repeat(1996) + "123456789012" })]);
+    expect(all(d)).not.toContain("1234");
+  });
+  it.each([
+    "1234:5678:90",
+    "1234*5678*90",
+    "1234#5678",
+    "1234+5678",
+    "1234'5678'90",
+    "1234|5678",
+    "1234;5678",
+    "1234=5678",
+    "1234&5678",
+    "[1234][5678]9",
+    "1234\u30025678",
+    "12\u{1F600}34\u{1F600}5678",
+  ])("masks a number split by punctuation or symbols: %s", (label) => {
+    const out = all(must([mk({ label })]));
+    expect(out).toContain("****");
+    expect(out).not.toMatch(/\d{5}/);
+    expect(out).not.toContain("1234");
+  });
+  it("still leaves short numbers alone", () => {
+    const out = all(must([mk({ label: "Case 1234 room 12, floor 3 and 1,2,3,4" })]));
+    expect(out).toContain("Case 1234 room 12, floor 3 and 1,2,3,4");
+  });
+  it("clamps maxItems so a huge value cannot print a huge list or a long count", () => {
+    const many = Array.from({ length: 200 }, () => mk());
+    const d = must(many, { maxItems: 1e6 });
+    expect(d.alertIds).toHaveLength(50);
+    const few = must(Array.from({ length: 30 }, () => mk()), { maxItems: 1e9 });
+    expect(few.alertIds).toHaveLength(30);
+    expect(few.subject).toBe("Homefile: 30 things need you");
+    expect(few.subject).not.toMatch(/\d{3}/);
+  });
+  it.each([
+    "https://a.com/%31%32%33%34%35",
+    "https://a.com/a_1234_5678",
+    "https://a.com/12.34.56.78",
+    "https://a.com/#12-34-56-78",
+    "https://12345678/",
+    "https://2130706433/",
+    "https://1.2.3.4/",
+    "https://[::1]/",
+  ])("rejects the appUrl %s", (u) => {
+    expect(() => buildDigest({ alerts: [mk()], appUrl: u, today })).toThrow();
+  });
+  it("still accepts an ordinary app url with short digits", () => {
+    expect(buildDigest({ alerts: [mk()], appUrl: "https://app.example.com/v2/home?page=3", today })).not.toBeNull();
+  });
+  it("ignores an alert with an unknown severity or status", () => {
+    expect(build([mk({ severity: "low" as never })])).toBeNull();
+    expect(build([mk({ severity: "high", status: "weird" as never })])).toBeNull();
+  });
+  it("does not print [object Object] for a label that is not text", () => {
+    const d = must([mk({ label: { a: 1 } as never, detail: 42 as never })]);
+    expect(all(d)).not.toContain("[object Object]");
+    expect(d.text).toContain("Untitled");
+  });
+});

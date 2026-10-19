@@ -33,6 +33,14 @@ export interface Digest {
 }
 
 const MAX_TEXT = 120;
+/** Untrusted text is cut to this many characters BEFORE any regex runs (and again after Unicode normalization, which can
+ * expand text), because the link and email regexes are quadratic on one long token: 200,000 dots took 92 s. */
+const MAX_RAW = 2000;
+const MAX_NORMALIZED = 4000;
+/** The most items one digest may list, whatever the caller asks for. */
+const MAX_ITEMS = 50;
+/** 5 or more digits, split by at most 3 characters that are not letters or digits (spaces, punctuation, symbols, emoji). */
+const NUMBER_RUN = /\p{Nd}(?:[^\p{L}\p{Nd}]{0,3}\p{Nd}){4,}/u;
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 function dayNumber(iso: string): number | null {
@@ -62,9 +70,17 @@ function validateAppUrl(raw: string): string {
   }
   if (u.username || u.password || !u.hostname) throw bad();
   if (!(u.protocol === "https:" || (u.protocol === "http:" && u.hostname === "localhost"))) throw bad();
-  // A long number in a link is a smell (it could be an account number).
-  if (/\d{5}/.test(u.pathname + u.search + u.hash)) throw bad();
+  // An IP address host (including all-digit hosts like https://12345678/, which the URL parser turns into an IP) is not a product URL.
+  if (/^[\d.]+$/.test(u.hostname) || u.hostname.includes(":")) throw bad();
+  // A long number in a link is a smell (it could be an account number), including one split by punctuation or by percent signs.
+  if (NUMBER_RUN.test(u.pathname + u.search + u.hash)) throw bad();
   return u.href;
+}
+
+/** Cuts text to `max` characters. Both caps are far above the final 120 character cut, so a number straddling a cut is never visible. */
+function capTail(text: string, max: number): string {
+  const chars = Array.from(text);
+  return chars.length <= max ? text : chars.slice(0, max).join("");
 }
 
 /**
@@ -72,9 +88,10 @@ function validateAppUrl(raw: string): string {
  * Digit rule: 5 or more digits, split only by separators (spaces, hyphens, dots, commas, slashes, underscores), count as one number
  * and become "****" plus the last 4. Fail safe on purpose: "1 2 3 4 5" and "Dec 5, 2026" are masked too, and so are ISO dates.
  */
-function clean(raw: string | undefined): string {
-  let s = String(raw ?? "")
-    .normalize("NFKC") // superscripts and full width digits become plain digits, look-alike dashes and dots become ASCII
+function clean(raw: unknown): string {
+  let s = capTail(typeof raw === "string" ? raw : "", MAX_RAW)
+    .normalize("NFKC"); // superscripts and full width digits become plain digits, look-alike dashes and dots become ASCII
+  s = capTail(s, MAX_NORMALIZED)
     .replace(/\p{M}/gu, "")
     .replace(/[\p{Z}\p{Cc}\p{Cf}]/gu, " ")
     .replace(/[\p{Pd}\u2212]/gu, "-")
@@ -83,7 +100,7 @@ function clean(raw: string | undefined): string {
     .replace(/(?<![^\s(\[])\/\/\S*/g, "[link removed]")
     // A bare domain with a letters-only TLD of 2+ characters, and anything after it. "Dec. 5" and "e.g. this" survive.
     .replace(/\b[a-z0-9][a-z0-9-]*(?:\.[a-z0-9-]+)*\.\p{L}{2,}\b(?:[/?#]\S*)?/giu, "[link removed]")
-    .replace(/\p{Nd}(?:[ .,/_-]*\p{Nd}){4,}/gu, (run) => `****${[...run.replace(/[^\p{Nd}]/gu, "")].slice(-4).join("")}`)
+    .replace(new RegExp(NUMBER_RUN.source, "gu"), (run) => `****${[...run.replace(/[^\p{Nd}]/gu, "")].slice(-4).join("")}`)
     .replace(/\s+/g, " ")
     .trim();
   const chars = [...s];
@@ -112,6 +129,7 @@ function dueLine(due: string | null | undefined, today: number): string | null {
 function eligible(a: DigestAlert): boolean {
   if (a.emailedAt) return false;
   if (a.status !== "pending" && a.status !== "announced") return false;
+  if (a.severity !== "high" && a.severity !== "possible") return false;
   if (a.severity === "high") return true;
   // Possible recalls only appear when asked; a possible deadline is new only until voice has announced it.
   return a.source === "deadline" && a.status === "pending";
@@ -137,7 +155,8 @@ export function buildDigest(input: DigestInput): Digest | null {
     .sort((a, b) => Number(b.severity === "high") - Number(a.severity === "high") || order(a, b));
   if (picked.length === 0) return null;
 
-  const cap = Number.isFinite(input.maxItems) && (input.maxItems as number) >= 1 ? Math.floor(input.maxItems as number) : 10;
+  const asked = Number.isFinite(input.maxItems) && (input.maxItems as number) >= 1 ? Math.floor(input.maxItems as number) : 10;
+  const cap = Math.min(asked, MAX_ITEMS);
   const shown = picked.slice(0, cap);
   const more = picked.length - shown.length;
 
