@@ -86,6 +86,8 @@ export const ComingUpResultSchema = z.strictObject({
   items: z.array(ComingUpItemSchema).max(5),
   /** How many items matched before the cap of 5. */
   totalCount: z.number().int().min(0),
+  /** Open recall alerts (at most 3), kept apart so the Recall card is never pushed out by the cap of 5. */
+  recalls: z.array(ComingUpItemSchema).max(3),
   ...proactive,
 });
 
@@ -117,7 +119,9 @@ export const CoverageResultSchema = z.strictObject({
   topClause: QuotedClauseSchema.nullable(),
   exclusionClause: QuotedClauseSchema.nullable(),
   /** At most 4, in the order of the document. */
-  claimSteps: z.array(z.strictObject({ text: z.string().min(1).max(500), page: z.number().int().min(1).nullable() })).max(4),
+  claimSteps: z
+    .array(z.strictObject({ text: z.string().min(1).max(500), page: z.number().int().min(1).nullable() }))
+    .max(4),
   claimWindowDays: z.number().int().min(0).nullable(),
   /** Today plus the claim window. Null when the document states no window. */
   claimByDate: IsoDate.nullable(),
@@ -165,7 +169,9 @@ export const AgreementResultSchema = z.strictObject({
   }),
   /** Values read from the document or the voice add. Numbers are masked to the last 4. */
   terms: z
-    .array(z.strictObject({ label: shortText, value: z.string().min(1).max(500), page: z.number().int().min(1).nullable() }))
+    .array(
+      z.strictObject({ label: shortText, value: z.string().min(1).max(500), page: z.number().int().min(1).nullable() }),
+    )
     .max(30),
   datesConfirmed: z.boolean(),
   quotedFromDocument: z.boolean(),
@@ -195,9 +201,7 @@ export const RecordAddedResultSchema = z.strictObject({
   recordKind: z.enum(["asset", "subscription"]),
   id,
   name: shortText,
-  obligations: z
-    .array(z.strictObject({ id, type: ObligationTypeSchema, dueDate: IsoDate, label: shortText }))
-    .max(20),
+  obligations: z.array(z.strictObject({ id, type: ObligationTypeSchema, dueDate: IsoDate, label: shortText })).max(20),
   undoAvailable: z.boolean(),
   ...proactive,
 });
@@ -263,11 +267,31 @@ export const TOOL_RESULT_SCHEMAS = {
     NotFoundResultSchema,
     ...common,
   ]),
-  ask_documents: z.discriminatedUnion("kind", [ClausesResultSchema, AmbiguousResultSchema, NotFoundResultSchema, ...common]),
-  get_agreement: z.discriminatedUnion("kind", [AgreementResultSchema, AmbiguousResultSchema, NotFoundResultSchema, ...common]),
+  ask_documents: z.discriminatedUnion("kind", [
+    ClausesResultSchema,
+    AmbiguousResultSchema,
+    NotFoundResultSchema,
+    ...common,
+  ]),
+  get_agreement: z.discriminatedUnion("kind", [
+    AgreementResultSchema,
+    AmbiguousResultSchema,
+    NotFoundResultSchema,
+    ...common,
+  ]),
   add_record: z.discriminatedUnion("kind", [RecordAddedResultSchema, ...common]),
-  log_service: z.discriminatedUnion("kind", [ServiceLoggedResultSchema, AmbiguousResultSchema, NotFoundResultSchema, ...common]),
-  get_history: z.discriminatedUnion("kind", [HistoryResultSchema, AmbiguousResultSchema, NotFoundResultSchema, ...common]),
+  log_service: z.discriminatedUnion("kind", [
+    ServiceLoggedResultSchema,
+    AmbiguousResultSchema,
+    NotFoundResultSchema,
+    ...common,
+  ]),
+  get_history: z.discriminatedUnion("kind", [
+    HistoryResultSchema,
+    AmbiguousResultSchema,
+    NotFoundResultSchema,
+    ...common,
+  ]),
   resolve_alert: z.discriminatedUnion("kind", [AlertResolvedResultSchema, NotFoundResultSchema, ...common]),
   undo_last: z.discriminatedUnion("kind", [UndoResultSchema, ...common]),
   ui_resolve_alert: z.discriminatedUnion("kind", [AlertResolvedResultSchema, NotFoundResultSchema, ...common]),
