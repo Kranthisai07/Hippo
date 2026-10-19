@@ -1,0 +1,22 @@
+{
+  "name": "hippo",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "packageManager": "pnpm@12.6.0",
+  "engines": { "node": ">=22.13.0" },
+  "scripts": {
+    "test": "pnpm -r --if-present test",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "test:latency": "node scripts/not-built.mjs test:latency T1.5",
+    "dev": "node scripts/not-built.mjs dev T1.5",
+    "ingest:fixture": "node scripts/not-built.mjs ingest:fixture T2.2",
+    "daily:run": "node scripts/not-built.mjs daily:run T3.4",
+    "inspect": "node scripts/not-built.mjs inspect T1.5",
+    "deploy": "node scripts/not-built.mjs deploy T4.3",
+    "format:check": "prettier --check apps scripts"
+  },
+  "devDependencies": {
+    "prettier": "3.9.10"
+  }
+}
