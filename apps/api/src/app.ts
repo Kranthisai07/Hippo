@@ -88,6 +88,8 @@ export function createApp(deps: AppDeps): Hono {
     bodyLimit({ maxSize: maxBody, onError: () => rpcError(413, -32000, "Payload too large") }),
     async (c) => {
       const text = await c.req.text();
+      // bodyLimit trusts a Content-Length header, so the real size is checked again here.
+      if (text.length > maxBody) return rpcError(413, -32000, "Payload too large");
       let body: unknown;
       try {
         body = JSON.parse(text);

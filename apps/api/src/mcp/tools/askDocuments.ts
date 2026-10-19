@@ -12,7 +12,7 @@ export const description =
   "Finds the passages in the household's own documents that answer a question, and returns the top 3 with document name and page. You then compose the answer from them and cite the page. " +
   "Use it for questions about what a document says: leases, policies, warranties, subscriptions. Do not use it for a broken item (use check_coverage) or for dates (use whats_coming_up). " +
   'Examples: "what does my lease say about breaking it early", "what is my car insurance deductible". ' +
-  "Pass the question as question, and only the thing or document (for example lease) as about if they named one.";
+  "Pass the question as question. Pass only the thing or document (for example lease) as about, not the whole sentence.";
 
 type Args = z.infer<typeof AskDocumentsInput>;
 

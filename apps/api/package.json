@@ -12,7 +12,7 @@
     "start": "tsx src/server.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "test:latency": "vitest run --config vitest.latency.config.ts",
+    "test:latency": "vitest run --config vitest.latency.config.ts --silent=false",
     "demo": "tsx scripts/demo-client.ts"
   },
   "dependencies": {
