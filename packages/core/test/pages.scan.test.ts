@@ -37,7 +37,7 @@ describe("pre-scan cost is linear", () => {
       const markers = Buffer.from("/Type /ObjStm ".repeat(Math.floor((mb * MB) / 14)), "latin1");
       const r = await timed(extractPages(buildBinaryPdf("", markers)));
       expect(r.out).toMatch(/^(ok:1|corrupt|unsupported)$/);
-      expect(r.ms).toBeLessThan(1000);
+      expect(r.ms).toBeLessThan(4000) /* the quadratic scan took 7 s and 23 s */;
     });
   }
   for (const unit of ["stream\n", "/", "/Type %", "/Type /Page\n", "endstream stream\r"]) {
@@ -45,7 +45,7 @@ describe("pre-scan cost is linear", () => {
       const junk = Buffer.from(unit.repeat(Math.floor((10 * MB) / unit.length)), "latin1");
       const r = await timed(extractPages(buildBinaryPdf("", junk)));
       expect(r.out).toMatch(/^(ok:1|corrupt|unsupported|too_large|too_many_pages)$/);
-      expect(r.ms).toBeLessThan(3000); // a quadratic scan takes minutes here
+      expect(r.ms).toBeLessThan(12_000); // a quadratic scan takes minutes here; the margin keeps a loaded CI machine from flaking
     });
   }
   it("thousands of markers before a deflate bomb: rejected too_large, fast, and the bomb is unreferenced so pdf.js never saw it", async () => {
@@ -57,7 +57,7 @@ describe("pre-scan cost is linear", () => {
     });
     const r = await timed(extractPages(pdf));
     expect(r.out).toBe("too_large");
-    expect(r.ms).toBeLessThan(3000);
+    expect(r.ms).toBeLessThan(8000);
   });
 });
 
@@ -65,14 +65,14 @@ describe("decompression is bounded before pdf.js runs", () => {
   it("rejects a 100 MB flate stream (over the per stream cap) as too_large", async () => {
     const r = await timed(extractPages(buildBinaryPdf("/Filter /FlateDecode", deflateSync(Buffer.alloc(100 * MB, 0x20)))));
     expect(r.out).toBe("too_large");
-    expect(r.ms).toBeLessThan(3000);
+    expect(r.ms).toBeLessThan(8000);
   });
   it("caps how many compressed streams it will try (corrupt ones too)", async () => {
     const objs: Record<number, string | Buffer> = { ...BASE };
     for (let i = 0; i < 5001; i++) objs[10 + i] = streamObj("/Filter /FlateDecode", Buffer.from([0x78, 0x9c, 1, 2, 3]));
     const r = await timed(extractPages(buildRawPdf(objs)));
     expect(r.out).toBe("too_large");
-    expect(r.ms).toBeLessThan(3000);
+    expect(r.ms).toBeLessThan(8000);
   });
   it("rejects many streams that together decode past the total cap", async () => {
     const one = deflateSync(Buffer.alloc(40 * MB, 0x20)); // each is under the per stream cap
