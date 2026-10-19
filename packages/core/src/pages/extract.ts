@@ -179,6 +179,13 @@ interface Scan {
 
 const unescapeNames = (s: string): string => s.replace(/#([0-9A-Fa-f]{2})/g, (_, h: string) => String.fromCharCode(parseInt(h, 16)));
 
+/**
+ * The zlib header test zlib and pdf.js both apply: deflate method, a window size of at most 32 KB, a header checksum divisible by 31 and no
+ * preset dictionary. Matching only the four common headers (78 01, 78 5e, 78 9c, 78 da) let a bomb behind 68 DE reach pdf.js unchecked.
+ */
+const looksZlib = (b0: number | undefined, b1: number | undefined): boolean =>
+  b0 !== undefined && b1 !== undefined && (b0 & 0x0f) === 8 && b0 >> 4 <= 7 && ((b0 << 8) | b1) % 31 === 0 && (b1 & 0x20) === 0;
+
 /** Walks the file once, strictly forward. Throws too_large when decoding would exceed the caps. Never touches pdf.js. */
 function prescan(b: Buffer): Scan {
   const scan: Scan = { pages: countPageObjects(b), opaqueObjStm: false };
@@ -210,7 +217,7 @@ function prescan(b: Buffer): Scan {
         end = b.indexOf("endstream", after, "latin1");
         if (end < 0) end = b.length;
       }
-      if (b[after] === 0x78 && [0x01, 0x5e, 0x9c, 0xda].includes(b[after + 1] ?? -1)) {
+      if (looksZlib(b[after], b[after + 1])) {
         if (++inflates > MAX_INFLATES) throw new PdfError("too_large", "too many compressed streams");
         try {
           const out = inflateSync(b.subarray(after, end), { maxOutputLength: PER_STREAM_CAP });

@@ -62,6 +62,17 @@ describe("pre-scan cost is linear", () => {
 });
 
 describe("decompression is bounded before pdf.js runs", () => {
+  it.each([[0x68, 0xde], [0x58, 0x85], [0x48, 0x89]])(
+    "a bomb behind the valid zlib header %i %i is rejected like one behind 78 9c (a four pair allowlist let it through)",
+    async (b0, b1) => {
+      const z = deflateSync(Buffer.alloc(100 * MB, 0x20));
+      z[0] = b0;
+      z[1] = b1;
+      const r = await timed(extractPages(buildBinaryPdf("/Filter /FlateDecode", z)));
+      expect(r.out).toBe("too_large");
+      expect(r.ms).toBeLessThan(8000);
+    },
+  );
   it("rejects a 100 MB flate stream (over the per stream cap) as too_large", async () => {
     const r = await timed(extractPages(buildBinaryPdf("/Filter /FlateDecode", deflateSync(Buffer.alloc(100 * MB, 0x20)))));
     expect(r.out).toBe("too_large");
