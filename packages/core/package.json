@@ -4,7 +4,9 @@
   "private": true,
   "license": "MIT",
   "type": "module",
-  "engines": { "node": ">=22.13.0" },
+  "engines": {
+    "node": ">=22.13.0"
+  },
   "main": "src/index.ts",
   "scripts": {
     "test": "vitest run",
@@ -16,6 +18,8 @@
     "vitest": "5.0.5"
   },
   "dependencies": {
-    "pdfjs-dist": "6.4.299"
+    "pdfjs-dist": "6.4.299",
+    "zod": "4.6.7",
+    "obligation-kit": "workspace:*"
   }
 }

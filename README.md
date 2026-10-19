@@ -2,7 +2,7 @@
 
 Hippo turns the paperwork a household never reads twice (warranties, insurance, a lease, subscriptions, recall notices) into dated obligations, and watches them while nobody is talking. It is an Alexa+ add-on with a web app for uploading and reviewing documents.
 
-> **Status: early build, Alexa+ hackathon.** Today the repo contains the demo fixtures, the deadline engine, the asset resolver, the source quote check, asset linking, recall matchers, PDF page text extraction and the daily digest builder, with 862 passing tests. The MCP server, the Bedrock extraction step, the web app and the AWS deploy are planned and not written yet. [What exists today](#what-exists-today) is the honest list.
+> **Status: early build, Alexa+ hackathon.** Today the repo contains the demo fixtures, the deadline engine, the asset resolver, the source quote check, asset linking, recall matchers, PDF page text extraction and the daily digest builder, with 964 passing tests. The MCP server, the Bedrock extraction step, the web app and the AWS deploy are planned and not written yet. [What exists today](#what-exists-today) is the honest list.
 
 ## Why
 
@@ -85,7 +85,7 @@ Needs Node 22.13 or newer (the PDF library requires it), pnpm (version pinned in
 
 ```bash
 git clone https://github.com/Kranthisai07/Hippo.git && cd Hippo
-pnpm install --frozen-lockfile && pnpm test && pnpm typecheck   # 484 and 378 tests
+pnpm install --frozen-lockfile && pnpm test && pnpm typecheck   # 530 and 434 tests
 pip install reportlab pypdf pillow && python fixtures/tools/generate.py
 ```
 
