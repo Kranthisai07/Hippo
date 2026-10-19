@@ -1,4 +1,4 @@
-# INTENT.md: Homefile (working name)
+# INTENT.md: Hippo
 
 Read this before any task. If a task, a doc, or a teammate pushes against something here, stop and raise it. Don't route around it.
 
