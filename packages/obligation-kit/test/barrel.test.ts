@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 import * as kit from "../src";
-import * as recalls from "../src/recalls";
+import * as clients from "../src/recalls/clients";
+import * as recallsBarrel from "../src/recalls";
 
 describe("package barrel", () => {
   it("keeps the outbound HTTP clients out, so the voice path cannot import them by accident", () => {
     for (const name of ["fetchCpscRecalls", "fetchNhtsaRecalls", "createNhtsaClient"]) {
-      expect(name in recalls, `${name} should exist in recalls/clients`).toBe(true);
-      expect(name in kit, `${name} must not be exported from the barrel`).toBe(false);
+      expect(name in clients, `${name} should exist in recalls/clients`).toBe(true);
+      expect(name in kit, `${name} must not be exported from the package barrel`).toBe(false);
+      expect(name in recallsBarrel, `${name} must not be exported from the recalls barrel`).toBe(false);
     }
   });
   it("still exports the pure parsers and matchers", () => {

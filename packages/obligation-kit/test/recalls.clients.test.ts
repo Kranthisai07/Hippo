@@ -1,14 +1,8 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import {
-  CpscApiError,
-  NhtsaApiError,
-  createNhtsaClient,
-  fetchCpscRecalls,
-  fetchNhtsaRecalls,
-  type HttpResponse,
-} from "../src/recalls";
+import { CpscApiError, NhtsaApiError } from "../src/recalls";
+import { createNhtsaClient, fetchCpscRecalls, fetchNhtsaRecalls, type HttpResponse } from "../src/recalls/clients";
 
 const FIX = fileURLToPath(new URL("../../../fixtures/recalls/", import.meta.url));
 const load = (p: string) => JSON.parse(readFileSync(`${FIX}${p}`, "utf8"));

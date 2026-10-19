@@ -3,15 +3,14 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
   NhtsaApiError,
-  createNhtsaClient,
   matchCpscRecall,
   normalizeCpscRecall,
   normalizeUpc,
   parseCpscResponse,
   parseNhtsaResponse,
-  type HttpResponse,
   type RecallAsset,
 } from "../src/recalls";
+import { createNhtsaClient, type HttpResponse } from "../src/recalls/clients";
 
 const FIX = fileURLToPath(new URL("../../../fixtures/recalls/", import.meta.url));
 const load = (p: string) => JSON.parse(readFileSync(`${FIX}${p}`, "utf8"));
@@ -124,10 +123,10 @@ describe("NHTSA body integrity", () => {
     expect(() => parseNhtsaResponse({ Count: 5, Message: "x", results: [] })).toThrow(NhtsaApiError);
     expect(() => parseNhtsaResponse({ ...nraw(), Count: 2 })).toThrow(NhtsaApiError);
   });
-  it("Count that matches, or is absent or not a number, is accepted", () => {
+  it("a Count that matches is accepted; absent or non-numeric is not (see recalls.review3.test.ts)", () => {
     expect(parseNhtsaResponse({ Count: 0, results: [] })).toEqual([]);
-    expect(parseNhtsaResponse({ results: [] })).toEqual([]);
-    expect(parseNhtsaResponse({ ...nraw(), Count: "1" })).toHaveLength(1);
+    expect(() => parseNhtsaResponse({ results: [] })).toThrow(NhtsaApiError);
+    expect(() => parseNhtsaResponse({ ...nraw(), Count: "1" })).toThrow(NhtsaApiError);
   });
   it.each([{ Count: 0 }, { Count: 0, results: null }, { Count: 0, results: {} }])("throws when results is missing or not a list %j", (b) => {
     expect(() => parseNhtsaResponse(b)).toThrow(NhtsaApiError);

@@ -99,12 +99,36 @@ const arr = (v: unknown): Record<string, unknown>[] =>
 const str = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
 const names = (v: unknown, key = "Name"): string[] => arr(v).map((x) => str(x[key])).filter(Boolean);
 
+/** A list field must be absent, null or an array of objects. Anything else would silently drop evidence, so it throws. */
+function list(v: unknown, field: string): Record<string, unknown>[] {
+  if (v === undefined || v === null) return [];
+  if (!Array.isArray(v)) throw new CpscApiError(`CPSC ${field} is not a list`);
+  return v.map((x) => {
+    if (!x || typeof x !== "object" || Array.isArray(x)) throw new CpscApiError(`CPSC ${field} holds something that is not a record`);
+    return x as Record<string, unknown>;
+  });
+}
+const namesOf = (v: unknown, field: string, key = "Name"): string[] => list(v, field).map((x) => str(x[key])).filter(Boolean);
+
+/** One UPC field can hold a list ("a, b; c"), and one code can be written with spaces or hyphens ("0 12345 67890 5"). */
+function upcCandidates(v: unknown): string[] {
+  if (v === undefined || v === null) return [];
+  if (typeof v !== "string") throw new CpscApiError("CPSC UPC is not text");
+  return v
+    .split(/[,;]+/)
+    .flatMap((piece) => {
+      const joined = piece.replace(/[\s-]/g, "");
+      return /^\d{12,14}$/.test(joined) ? [normalizeUpc(joined)] : piece.split(/\s+/).map(normalizeUpc);
+    })
+    .filter((x): x is string => x !== null);
+}
+
 export function normalizeCpscRecall(raw: CpscRaw): CpscRecall {
   const recallNumber = str(raw.RecallNumber);
   if (!recallNumber) throw new CpscApiError("CPSC record has no RecallNumber");
   const date = /^(\d{4}-\d{2}-\d{2})(?:T|$)/.exec(str(raw.RecallDate))?.[1];
   if (!date) throw new CpscApiError("CPSC record has a malformed RecallDate");
-  const productNames = names(raw.Products);
+  const productNames = namesOf(raw.Products, "Products");
   const description = str(raw.Description);
   return {
     recallNumber,
@@ -112,21 +136,17 @@ export function normalizeCpscRecall(raw: CpscRaw): CpscRecall {
     title: str(raw.Title),
     url: str(raw.URL),
     productNames,
-    models: names(raw.Products, "Model"),
-    products: arr(raw.Products).map((x) => ({ name: str(x.Name), model: str(x.Model) })),
-    // A field may hold a list ("a, b; c"), so every piece is a candidate.
-    upcs: arr(raw.ProductUPCs)
-      .flatMap((x) => str(x.UPC).split(/[,;\s]+/))
-      .map(normalizeUpc)
-      .filter((x): x is string => x !== null),
-    hazards: names(raw.Hazards),
-    remedies: names(raw.Remedies),
+    models: namesOf(raw.Products, "Products", "Model"),
+    products: list(raw.Products, "Products").map((x) => ({ name: str(x.Name), model: str(x.Model) })),
+    upcs: list(raw.ProductUPCs, "ProductUPCs").flatMap((x) => upcCandidates(x.UPC)),
+    hazards: namesOf(raw.Hazards, "Hazards"),
+    remedies: namesOf(raw.Remedies, "Remedies"),
     brandEvidence: [
       ...productNames,
       ...(description ? [description] : []),
-      ...names(raw.Importers),
-      ...names(raw.Manufacturers),
-      ...names(raw.Distributors),
+      ...namesOf(raw.Importers, "Importers"),
+      ...namesOf(raw.Manufacturers, "Manufacturers"),
+      ...namesOf(raw.Distributors, "Distributors"),
     ],
   };
 }

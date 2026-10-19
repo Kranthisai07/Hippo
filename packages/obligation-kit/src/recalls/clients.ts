@@ -37,6 +37,8 @@ export async function fetchCpscRecalls(
 }
 
 const PACE_MS = 250;
+/** More queued time than this means the clock went backwards, so the backlog is dropped instead of slept. */
+const MAX_BACKLOG_MS = 10_000;
 const MAX_ATTEMPTS = 3;
 const BACKOFF_MS = 500;
 
@@ -56,6 +58,7 @@ export function createNhtsaClient(deps: NhtsaDeps) {
       if (attempt > 1) await deps.sleep(BACKOFF_MS * 2 ** (attempt - 2));
       // Reserve the slot synchronously so concurrent calls queue behind each other instead of racing.
       const now = deps.now();
+      if (last !== null && last - now > MAX_BACKLOG_MS) last = null;
       const slot = last === null ? now : Math.max(now, last + PACE_MS);
       last = slot;
       if (slot > now) await deps.sleep(slot - now);
