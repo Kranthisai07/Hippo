@@ -2,3 +2,8 @@ packages:
   - "packages/*"
   - "apps/*"
   - "infra"
+
+# tsx runs esbuild through its platform package, so the esbuild install script is not needed. Decided here so that
+# pnpm install does not rewrite this file asking.
+allowBuilds:
+  esbuild: false
