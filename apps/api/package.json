@@ -3,5 +3,31 @@
   "version": "0.0.0",
   "private": true,
   "license": "MIT",
-  "type": "module"
+  "type": "module",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "test:latency": "vitest run --config vitest.latency.config.ts",
+    "demo": "tsx scripts/demo-client.ts"
+  },
+  "dependencies": {
+    "@hippo/auth": "workspace:*",
+    "@hono/node-server": "2.1.5",
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "core": "workspace:*",
+    "hono": "4.13.13",
+    "obligation-kit": "workspace:*",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.5",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2",
+    "vitest": "5.0.5"
+  }
 }
