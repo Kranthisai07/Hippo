@@ -81,11 +81,11 @@ An obligation whose source fields are not all confirmed always has severity `nul
 
 ## Run it
 
-Needs Node 22.13 or newer (the PDF library requires it) and Python 3.9 or newer.
+Needs Node 22.13 or newer (the PDF library requires it), pnpm (version pinned in `package.json`) and Python 3.9 or newer.
 
 ```bash
 git clone https://github.com/Kranthisai07/Hippo.git && cd Hippo
-for p in obligation-kit core; do (cd packages/$p && npm ci && npm test && npm run typecheck); done   # 484 and 378 tests
+pnpm install --frozen-lockfile && pnpm test && pnpm typecheck   # 484 and 378 tests
 pip install reportlab pypdf pillow && python fixtures/tools/generate.py
 ```
 

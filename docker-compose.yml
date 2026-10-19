@@ -1,0 +1,7 @@
+# DynamoDB Local for development and the repository tests (T1.2). In memory: data is gone when the container stops.
+services:
+  dynamodb:
+    image: amazon/dynamodb-local:latest
+    command: ["-jar", "DynamoDBLocal.jar", "-sharedDb", "-inMemory"]
+    ports:
+      - "8000:8000"

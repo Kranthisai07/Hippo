@@ -30,7 +30,7 @@ Loaded automatically by Claude Code. Keep it under 60 lines. Details live in the
 
 Run `reviewer` before every merge.
 
-## Commands (fill in as they exist)
+## Commands (only `test`, `typecheck` and `format:check` exist; the rest fail on purpose until their task lands)
 - `pnpm dev`: api + web + DynamoDB Local
 - `pnpm test` / `pnpm test:latency` / `pnpm typecheck`
 - `pnpm ingest:fixture <file>`: run the ingest worker locally on a fixture
