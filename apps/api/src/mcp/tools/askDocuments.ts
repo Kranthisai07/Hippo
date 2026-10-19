@@ -4,7 +4,7 @@ import { resolveAgreement, resolveAsset } from "core/src/resolver";
 import { searchIndex } from "core/src/retrieval";
 import type { z } from "zod";
 import type { ToolHandler } from "../context";
-import { clip, docNameOf, firstSentence, friendlyDocName, quote } from "../format";
+import { clip, docNameOf, friendlyDocName, leadSentence, quote, relevantSentence } from "../format";
 import { ask, notFound } from "../resolve";
 import { ok } from "../result";
 
@@ -28,15 +28,16 @@ export const askDocuments: ToolHandler<Args> = async (ctx, args) => {
     const [assets, agreements] = await Promise.all([repo.listAssets(hh), repo.listAgreements(hh)]);
     const a = resolveAsset(args.about, assets);
     const g = resolveAgreement(args.about, agreements, assets);
-    if (g.status === "match") {
+    // A thing ("dishwasher") covers every document linked to it, so it wins over the one agreement that also fits.
+    if (a.status === "match") {
+      scope.assetId = a.item.id;
+      docIds = agreements.filter((x) => x.assetIds.includes(a.item.id) && x.docId).map((x) => x.docId!);
+      aboutName = a.item.name;
+    } else if (g.status === "match") {
       const agreement = agreements.find((x) => x.id === g.item.id)!;
       scope.agreementId = agreement.id;
       docIds = agreement.docId ? [agreement.docId] : [];
       aboutName = args.about;
-    } else if (a.status === "match") {
-      scope.assetId = a.item.id;
-      docIds = agreements.filter((x) => x.assetIds.includes(a.item.id) && x.docId).map((x) => x.docId!);
-      aboutName = a.item.name;
     } else if (a.status === "ambiguous" || g.status === "ambiguous") {
       if (a.status === "ambiguous")
         return ask(
@@ -74,9 +75,12 @@ export const askDocuments: ToolHandler<Args> = async (ctx, args) => {
   const first = hits[0]!.chunk;
   const name = friendlyDocName(docNameOf(docs.get(first.docId)));
   const count = hits.length > 1 ? `I found ${hits.length} passages. ` : "";
-  return ok(`${count}Quoted from ${name}, page ${first.page}: "${clip(firstSentence(first), 22)}"`, {
-    ...structuredBase,
-    found: true,
-    clauses,
-  });
+  return ok(
+    `${count}Quoted from ${name}, page ${first.page}: "${clip(relevantSentence(first, args.question, true) ?? leadSentence(first), 26)}"`,
+    {
+      ...structuredBase,
+      found: true,
+      clauses,
+    },
+  );
 };

@@ -3,7 +3,7 @@ import { GetAgreementInput } from "core/src/contracts";
 import { computeObligations } from "obligation-kit";
 import type { z } from "zod";
 import type { ToolHandler } from "../context";
-import { docNameOf, num, pageOf, speakDate, str } from "../format";
+import { docNameOf, num, pageOf, speakDate, speakRange, str } from "../format";
 import { findAgreement } from "../resolve";
 import { ok } from "../result";
 import { maskNumbers } from "../speak";
@@ -136,11 +136,7 @@ function summary(a: Agreement, assets: Asset[], today: string): string[] {
   const f = a.fields;
   const asset = assets.find((x) => a.assetIds.includes(x.id));
   const range = (start: string | null, end: string | null) =>
-    start && end
-      ? `runs from ${speakDate(start, today)} to ${speakDate(end, today)}`
-      : end
-        ? `ends ${speakDate(end, today)}`
-        : "";
+    start && end ? `runs ${speakRange(start, end, today)}` : end ? `ends ${speakDate(end, today)}` : "";
   const end = (k: "endDate" | "expirationDate") =>
     str(f, k) ??
     computeObligations({ kind: a.kind, fields: f, fieldStatus: a.fieldStatus }, today).find((o) => o.type === "expires")

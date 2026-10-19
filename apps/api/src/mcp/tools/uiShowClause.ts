@@ -1,7 +1,7 @@
 import { UiShowClauseInput } from "core/src/contracts";
 import type { z } from "zod";
 import type { ToolHandler } from "../context";
-import { docNameOf, quote } from "../format";
+import { docNameOf, friendlyDocName, quote } from "../format";
 import { fail, ok } from "../result";
 
 export const description =
@@ -20,7 +20,7 @@ export const uiShowClause: ToolHandler<z.infer<typeof UiShowClauseInput>> = asyn
     return { ...fail("I could not find that page."), structuredContent: { kind: "not_found", what: "clause" } };
   }
   const name = docNameOf(doc);
-  return ok(`Page ${args.page} of ${name}.`, {
+  return ok(`Page ${args.page} of ${friendlyDocName(name)}.`, {
     kind: "clause_view",
     docId: doc.id,
     docName: name,

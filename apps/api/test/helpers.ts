@@ -1,7 +1,9 @@
 import { createAuth, type Auth } from "@hippo/auth";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import type { ToolResult } from "core/src/contracts";
+import { TOOL_RESULT_SCHEMAS, ToolResultSchema, type ToolResult, type ToolResultName } from "core/src/contracts";
+import { expect } from "vitest";
+import { countWords } from "../src/mcp/speak";
 import { createMemoryRepository } from "core/src/repository";
 import { createApp } from "../src/app";
 import { createMemoryIndexSource, createIndexCache } from "../src/mcp/indexCache";
@@ -116,6 +118,19 @@ async function seedSecond(repo: ReturnType<typeof createMemoryRepository>): Prom
   await syncObligations(repo, B, agr!, await repo.listAssets(B), ANCHOR);
 }
 
+/** A seeded repository and index without HTTP, for calling tool handlers directly. */
+export async function seeded(today = ANCHOR): Promise<{
+  repo: ReturnType<typeof createMemoryRepository>;
+  indexSource: ReturnType<typeof createMemoryIndexSource>;
+  ctx: ToolContext;
+}> {
+  const repo = createMemoryRepository();
+  const indexSource = createMemoryIndexSource();
+  await seedHousehold(repo, { today, householdId: A, indexSource });
+  const nowMs = Date.parse(`${today}T12:00:00.000Z`);
+  return { repo, indexSource, ctx: makeContext({ repo, indexSource }, { today, nowMs }) };
+}
+
 export interface Connected {
   client: Client;
   call(name: string, args?: Record<string, unknown>): Promise<ToolResult>;
@@ -181,3 +196,17 @@ export const callBody = (name: string, args: Record<string, unknown>, id = 1) =>
   method: "tools/call",
   params: { name, arguments: args },
 });
+
+/** Every model facing result must be speakable and match its schema. Returns the result so calls can be chained. */
+export function check(name: ToolResultName, r: ToolResult): ToolResult {
+  expect(ToolResultSchema.safeParse(r).success, "ToolResultSchema").toBe(true);
+  const parsed = TOOL_RESULT_SCHEMAS[name].safeParse(r.structuredContent);
+  expect(parsed.success, parsed.success ? "" : JSON.stringify(parsed.error.issues)).toBe(true);
+  const spoken = text(r);
+  expect(spoken).not.toMatch(/[*_#`<>|~\[\]]|https?:|www\.|@/);
+  const prefix = (r.structuredContent?.proactive as { sentence?: string } | undefined)?.sentence ?? "";
+  const body = prefix ? spoken.slice(prefix.length) : spoken;
+  expect(countWords(body), `spoken body: ${body}`).toBeLessThanOrEqual(45);
+  expect(/\d{5,}/.test(spoken.replace(/\d{4}-\d{2}-\d{2}/g, "")), "no long digit runs").toBe(false);
+  return r;
+}

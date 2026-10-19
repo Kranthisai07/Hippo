@@ -4,7 +4,7 @@ import { searchIndex, type Chunk, type Hit } from "core/src/retrieval";
 import { claimByDate, computeObligations } from "obligation-kit";
 import type { z } from "zod";
 import type { ToolHandler } from "../context";
-import { docNameOf, exclusionLead, num, pageOf, quote, speakDate, str, strList } from "../format";
+import { docNameOf, exclusionApplies, exclusionLead, num, pageOf, quote, speakDate, str, strList } from "../format";
 import { findAsset } from "../resolve";
 import { ok } from "../result";
 
@@ -115,7 +115,7 @@ export const checkCoverage: ToolHandler<Args> = async (ctx, args) => {
       const docIds = [agreement.docId];
       const relevant = searchIndex(index, args.issue, { docIds, limit: 6 });
       if (relevant.length > 0) {
-        exclusion = best(relevant, isExclusion);
+        exclusion = best(relevant, (c) => isExclusion(c) && exclusionApplies(c, args.issue));
         top = best(relevant, isCoverage);
         if (!top) top = best(searchIndex(index, `covered ${args.issue}`, { docIds, limit: 6 }), isCoverage);
         if (top) topClause = quote(top, docName ?? "document");
@@ -177,7 +177,7 @@ export const checkCoverage: ToolHandler<Args> = async (ctx, args) => {
     );
   }
   if (badge === "unclear") {
-    const lead = exclusion ? exclusionLead(exclusion) : null;
+    const lead = exclusion ? exclusionLead(exclusion, args.issue) : null;
     if (exclusion && lead) {
       return ok(
         [
@@ -196,13 +196,13 @@ export const checkCoverage: ToolHandler<Args> = async (ctx, args) => {
     );
   }
 
-  const lead = exclusion ? exclusionLead(exclusion) : null;
+  const lead = exclusion ? exclusionLead(exclusion, args.issue) : null;
   const first = `Yes, your ${name} ${noun} runs to ${speakDate(end!, today)}${exclusion ? (lead ? `, but page ${exclusion.page} excludes ${lead}` : `, but page ${exclusion.page} has an exclusion that may apply`) : ""}.`;
-  const steps = [
-    claimBy && windowDays !== null ? `Report within ${windowDays} days, by ${speakDate(claimBy, today)}` : "",
-    missingProof.length > 0 ? "and upload your receipt" : "",
-  ].filter(Boolean);
+  const report =
+    claimBy && windowDays !== null ? `Report within ${windowDays} days, by ${speakDate(claimBy, today)}` : "";
+  const receipt = missingProof.length > 0 ? (report ? "and upload your receipt" : "Upload your receipt") : "";
+  const steps = [report, receipt].filter(Boolean).join(", ");
   const disclaimer = DISCLAIMER.charAt(0).toLowerCase() + DISCLAIMER.slice(1);
-  const second = steps.length > 0 ? `${steps.join(", ")}; ${disclaimer}` : DISCLAIMER;
+  const second = steps ? `${steps}; ${disclaimer}` : DISCLAIMER;
   return ok([first, second], structured);
 };

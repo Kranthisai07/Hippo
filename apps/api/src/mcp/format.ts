@@ -1,6 +1,7 @@
-import type { Agreement, Doc } from "core/src/contracts";
-import type { QuotedClause } from "core/src/contracts";
+import type { Agreement, Doc, QuotedClause } from "core/src/contracts";
 import type { Chunk } from "core/src/retrieval";
+import { expandQuery } from "core/src/retrieval/synonyms";
+import { contentStems, stem } from "core/src/retrieval/text";
 import { addDays, daysBetween, type ObligationType } from "obligation-kit";
 import { maskNumbers } from "./speak";
 
@@ -20,12 +21,18 @@ const MONTH_NAMES = [
 ];
 
 /** "November 12", or "November 12, 2027" when the year is not the current one. Reads the ISO date as written. */
-export function speakDate(iso: string, today: string): string {
+export function speakDate(iso: string, today: string, withYear = false): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
   if (!m) return iso;
   const month = MONTH_NAMES[Number(m[2]) - 1] ?? m[2];
   const day = Number(m[3]);
-  return m[1] === today.slice(0, 4) ? `${month} ${day}` : `${month} ${day}, ${m[1]}`;
+  return !withYear && m[1] === today.slice(0, 4) ? `${month} ${day}` : `${month} ${day}, ${m[1]}`;
+}
+
+/** "from November 12, 2025 to November 12, 2026": both years are said when the two dates are in different years. */
+export function speakRange(start: string, end: string, today: string): string {
+  const years = start.slice(0, 4) !== end.slice(0, 4);
+  return `from ${speakDate(start, today, years)} to ${speakDate(end, today, years)}`;
 }
 
 /** "today", "tomorrow", "in 9 days" or "3 days ago". */
@@ -129,22 +136,82 @@ export function clip(text: string, max: number): string {
   return kept.join(" ").replace(/[.,;:]+$/, "");
 }
 
-/** The first sentence of a clause body that is not its heading line. */
-export function firstSentence(chunk: Chunk): string {
+/** The sentences of a clause body, without its heading line. A line break also ends a sentence (policy lines). */
+export function sentencesOf(chunk: Chunk): string[] {
   let body = chunk.text;
   if (chunk.heading && body.startsWith(chunk.heading)) body = body.slice(chunk.heading.length);
-  body = body.replace(/^\s+/, "");
-  const m = /^[\s\S]*?[.!?](?=\s|$)/.exec(body);
-  return (m ? m[0] : body).replace(/\s+/g, " ").trim();
+  return body
+    .split(/(?<=[.!?])\s+|\n+/)
+    .map((x) => x.replace(/\s+/g, " ").trim())
+    .filter((x) => x.length > 0);
 }
+
+// Words that say little about WHICH problem a person has, so they do not make an exclusion relevant on their own.
+const GENERIC = new Set(
+  [
+    "damage",
+    "loss",
+    "claim",
+    "cover",
+    "repair",
+    "problem",
+    "issue",
+    "broken",
+    "break",
+    "insurance",
+    "policy",
+    "warranty",
+    "car",
+    "document",
+  ].map(stem),
+);
+
+/** Stems of what the person said, plus the words the retrieval synonym table adds (leak: water damage, flood). */
+function questionStems(question: string): Set<string> {
+  return new Set(contentStems(`${question} ${expandQuery(question).join(" ")}`));
+}
+
+function overlap(sentence: string, stems: ReadonlySet<string>, ignoreGeneric: boolean): number {
+  let n = 0;
+  for (const t of new Set(contentStems(sentence))) if (stems.has(t) && !(ignoreGeneric && GENERIC.has(t))) n++;
+  return n;
+}
+
+/** The sentence of a clause that shares the most words with the question (first on a tie), or null when none does. */
+export function relevantSentence(
+  chunk: Chunk,
+  question: string,
+  ignoreGeneric = false,
+  only: RegExp | null = null,
+): string | null {
+  const stems = questionStems(question);
+  let best: { s: string; n: number } | null = null;
+  for (const s of sentencesOf(chunk)) {
+    if (only && !only.test(s)) continue;
+    const n = overlap(s, stems, ignoreGeneric);
+    if (n > 0 && (!best || n > best.n)) best = { s, n };
+  }
+  return best ? best.s : null;
+}
+
+/** The sentence to quote when nothing in a clause matches the question: its first one. */
+export const leadSentence = (chunk: Chunk): string => sentencesOf(chunk)[0] ?? "";
+
+/** A sentence that says something is not covered. */
+const EXCLUSION_SENTENCE = /\b(?:not\s+cover|does\s+not|do\s+not|exclu\w*|except|limitations?)\b/i;
 
 const EXCLUDES = /^(?:this|the)\s+\w+\s+(?:also\s+)?(?:does\s+not|doesn't)\s+(?:cover|apply\s+to)\s+/i;
 
-/** "damage caused by improper installation, including water damage", read out of a "does not cover ..." sentence. */
-export function exclusionLead(chunk: Chunk): string | null {
-  const s = firstSentence(chunk);
-  const m = EXCLUDES.exec(s);
-  if (!m) return null;
+/** True when an exclusion clause has a sentence about the person's actual problem, not just a word like damage. */
+export function exclusionApplies(chunk: Chunk, issue: string): boolean {
+  return relevantSentence(chunk, issue, true, EXCLUSION_SENTENCE) !== null;
+}
+
+/** "damage caused by improper installation, including water damage", read out of the matching "does not cover ..." sentence. */
+export function exclusionLead(chunk: Chunk, issue: string): string | null {
+  const s = relevantSentence(chunk, issue, true, EXCLUSION_SENTENCE);
+  const m = s ? EXCLUDES.exec(s) : null;
+  if (!s || !m) return null;
   const lead = clip(s.slice(m[0].length), 9);
   return lead.length > 0 ? lead : null;
 }
