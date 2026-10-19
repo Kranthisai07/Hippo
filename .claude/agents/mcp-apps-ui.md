@@ -21,7 +21,7 @@ You build what the Echo Show displays. A card helps the user make the next decis
   - Light and dark mode from `hostContext`.
 - **Build:**
   - Each card is a single self-contained HTML file built with Vite.
-  - Serve it at a content-hashed URI like `ui://homefile/coverage-<hash>.html` with MIME type `text/html;profile=mcp-app`.
+  - Serve it at a content-hashed URI like `ui://hippo/coverage-<hash>.html` with MIME type `text/html;profile=mcp-app`.
   - The tool references it via `_meta.ui.resourceUri`.
 - **Network:** a strict `_meta.ui.csp` that allows nothing external if possible.
 - **Host bridge:**

@@ -172,13 +172,13 @@ export function buildDigest(input: DigestInput): Digest | null {
 
   const n = shown.length;
   // Counts in the subject and the "more" line are capped so a huge alert pile never prints a long number.
-  const subject = more > 0 ? "Homefile: Several things need you" : `Homefile: ${n} ${n === 1 ? "thing needs" : "things need"} you`;
+  const subject = more > 0 ? "Hippo: Several things need you" : `Hippo: ${n} ${n === 1 ? "thing needs" : "things need"} you`;
   const moreLine = more > 0 ? `and ${more > 99 ? "many" : more} more in the app` : null;
 
   const text = [
     ...items.map((i) => [`- ${i.label}`, ...i.lines.map((l) => `  ${l}`)].join("\n")),
     ...(moreLine ? [moreLine] : []),
-    `Open Homefile: ${link}`,
+    `Open Hippo: ${link}`,
   ].join("\n\n");
 
   const p = 'style="margin:0 0 14px;font-size:16px;line-height:1.4"';
@@ -186,7 +186,7 @@ export function buildDigest(input: DigestInput): Digest | null {
     '<div style="font-family:Arial,Helvetica,sans-serif;color:#222;max-width:560px;margin:0 auto;padding:16px">',
     ...items.map((i) => `<p ${p}><strong>${esc(i.label)}</strong>${i.lines.map((l) => `<br>${esc(l)}`).join("")}</p>`),
     ...(moreLine ? [`<p ${p}>${moreLine}</p>`] : []),
-    `<p ${p}><a href="${esc(link)}" style="color:#0b5cad">Open Homefile</a></p>`,
+    `<p ${p}><a href="${esc(link)}" style="color:#0b5cad">Open Hippo</a></p>`,
     "</div>",
   ].join("\n");
 
