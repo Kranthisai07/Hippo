@@ -1,7 +1,7 @@
 import { LogServiceInput } from "core/src/contracts";
 import type { z } from "zod";
 import type { ToolHandler } from "../context";
-import { speakDate } from "../format";
+import { lowerGeneric, speakDate } from "../format";
 import { findAsset } from "../resolve";
 import { fail, ok } from "../result";
 import { recomputeService } from "../service";
@@ -34,7 +34,7 @@ export const logService: ToolHandler<z.infer<typeof LogServiceInput>> = async (c
   await repo.addEvent(hh, event);
   await repo.pushUndo(hh, {
     ts: nowIso,
-    summary: `the ${asset.name.toLowerCase()} service you just logged`,
+    summary: `the ${lowerGeneric(asset.name)} service you just logged`,
     inverse: { type: "delete_event", assetId: asset.id, eventId: event.id },
     expiresAt: Math.floor(ctx.nowMs / 1000) + UNDO_SECONDS,
   });
@@ -42,7 +42,7 @@ export const logService: ToolHandler<z.infer<typeof LogServiceInput>> = async (c
   const due = (await recomputeService(ctx, asset.id)).find((o) => o.type === "service_due")?.dueDate ?? null;
   return ok(
     [
-      `Logged: ${args.action} on your ${asset.name.toLowerCase()}, ${speakDate(date, today)}.`,
+      `Logged: ${args.action} on your ${lowerGeneric(asset.name)}, ${speakDate(date, today)}.`,
       due ? `The next service is due ${speakDate(due, today)}.` : "You can say undo if that was a mistake.",
     ],
     {

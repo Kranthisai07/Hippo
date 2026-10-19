@@ -3,7 +3,7 @@ import { GetAgreementInput } from "core/src/contracts";
 import { computeObligations } from "obligation-kit";
 import type { z } from "zod";
 import type { ToolHandler } from "../context";
-import { docNameOf, num, pageOf, speakDate, speakRange, str } from "../format";
+import { docNameOf, lowerGeneric, num, pageOf, speakDate, speakRange, str } from "../format";
 import { findAgreement } from "../resolve";
 import { ok } from "../result";
 import { maskNumbers } from "../speak";
@@ -147,7 +147,7 @@ function summary(a: Agreement, assets: Asset[], today: string): string[] {
     case "warranty": {
       const win = num(f, "claimWindowDays");
       return [
-        `Your ${asset ? asset.name.toLowerCase() + " " : ""}warranty from ${str(f, "provider") ?? "the maker"} ${range(str(f, "startDate"), end("endDate")) || "has no dates on file"}.`,
+        `Your ${asset ? lowerGeneric(asset.name) + " " : ""}warranty from ${str(f, "provider") ?? "the maker"} ${range(str(f, "startDate"), end("endDate")) || "has no dates on file"}.`,
         win !== null ? `Claims must be reported within ${win} days.` : "",
       ];
     }
@@ -155,7 +155,7 @@ function summary(a: Agreement, assets: Asset[], today: string): string[] {
       const last4 = str(f, "policyNumberLast4");
       const auto = f.renewal === "auto" ? " and renews automatically" : "";
       return [
-        `Your ${asset ? asset.name.toLowerCase() + " " : ""}insurance with ${str(f, "insurer") ?? "your insurer"}${last4 ? `, policy ending ${last4},` : ""} ${range(str(f, "effectiveDate"), end("expirationDate")) || "has no dates on file"}${auto}.`,
+        `Your ${asset ? lowerGeneric(asset.name) + " " : ""}insurance with ${str(f, "insurer") ?? "your insurer"}${last4 ? `, policy ending ${last4},` : ""} ${range(str(f, "effectiveDate"), end("expirationDate")) || "has no dates on file"}${auto}.`,
       ];
     }
     case "lease": {

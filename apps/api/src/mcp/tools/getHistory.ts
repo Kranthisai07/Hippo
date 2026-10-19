@@ -2,7 +2,7 @@ import { GetHistoryInput } from "core/src/contracts";
 import { addDays } from "obligation-kit";
 import type { z } from "zod";
 import type { ToolHandler } from "../context";
-import { speakDate } from "../format";
+import { lowerGeneric, speakDate } from "../format";
 import { findAsset } from "../resolve";
 import { ok } from "../result";
 
@@ -32,7 +32,7 @@ export const getHistory: ToolHandler<z.infer<typeof GetHistoryInput>> = async (c
     events: events.map((e) => ({ id: e.id, ts: e.ts, action: e.action, note: e.note ?? null, source: e.source })),
     nextServiceDue: next,
   };
-  const name = asset.name.toLowerCase();
+  const name = lowerGeneric(asset.name);
   const nextLine = next
     ? next.date < today
       ? `Service was due ${speakDate(next.date, today)}.`

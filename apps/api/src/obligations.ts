@@ -1,6 +1,6 @@
 import type { Agreement, Alert, Asset, ObligationRecord, Repository } from "core/src/contracts";
 import { computeObligations, type ObligationType } from "obligation-kit";
-import { capitalize } from "./mcp/format";
+import { capitalize, lowerGeneric } from "./mcp/format";
 
 const PHRASE: Record<ObligationType, string> = {
   expires: "expires",
@@ -13,16 +13,10 @@ const PHRASE: Record<ObligationType, string> = {
   claim_by: "claim deadline",
 };
 
-/** Lower the first letter of a generic noun ("Dishwasher") but keep names ("Kestrel Learning", "NURSH"). */
-const generic = (name: string): string => {
-  const first = name.split(" ")[0] ?? "";
-  return /^[A-Z][a-z]+$/.test(first) ? first.toLowerCase() + name.slice(first.length) : name;
-};
-
 function subjectOf(agreement: Agreement, assets: Asset[]): string {
   const f = agreement.fields;
   const asset = assets.find((a) => agreement.assetIds.includes(a.id));
-  const named = asset ? generic(asset.name) : null;
+  const named = asset ? lowerGeneric(asset.name) : null;
   switch (agreement.kind) {
     case "warranty":
       return `${named ?? "product"} warranty`;

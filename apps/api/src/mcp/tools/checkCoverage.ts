@@ -4,7 +4,18 @@ import { searchIndex, type Chunk, type Hit } from "core/src/retrieval";
 import { claimByDate, computeObligations } from "obligation-kit";
 import type { z } from "zod";
 import type { ToolHandler } from "../context";
-import { docNameOf, exclusionApplies, exclusionLead, num, pageOf, quote, speakDate, str, strList } from "../format";
+import {
+  docNameOf,
+  exclusionApplies,
+  exclusionLead,
+  lowerGeneric,
+  num,
+  pageOf,
+  quote,
+  speakDate,
+  str,
+  strList,
+} from "../format";
 import { findAsset } from "../resolve";
 import { ok } from "../result";
 
@@ -82,7 +93,7 @@ export const checkCoverage: ToolHandler<Args> = async (ctx, args) => {
   const doc: Doc | null = agreement.docId ? await repo.getDoc(hh, agreement.docId) : null;
   const docName = agreement.docId ? docNameOf(doc) : null;
   const noun = agreement.kind === "warranty" ? "warranty" : "insurance";
-  const name = asset.name.toLowerCase();
+  const name = lowerGeneric(asset.name);
 
   // Claim window and the claim-by date. The incident is taken to be today (Q-007 part 2): claimByDate is called here
   // at check time, and severityFor is not, because a claim-by date is an answer, not a stored obligation or alert.

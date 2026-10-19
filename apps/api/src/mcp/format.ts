@@ -43,6 +43,12 @@ export function whenPhrase(days: number): string {
   return days > 0 ? `in ${days} days` : `${-days} days ago`;
 }
 
+/** Lower the first letter of a plain noun ("Dishwasher" is "dishwasher") but keep names ("Kestrel Learning", "Boon NURSH"). */
+export const lowerGeneric = (name: string): string => {
+  const first = name.split(" ")[0] ?? "";
+  return /^[A-Z][a-z]+$/.test(first) ? first.toLowerCase() + name.slice(first.length) : name;
+};
+
 export const capitalize = (s: string): string => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 
 const KIND_WORDS = ["Warranty", "Insurance", "Lease", "Subscription", "Service"];

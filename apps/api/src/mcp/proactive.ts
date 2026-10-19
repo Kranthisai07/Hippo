@@ -1,6 +1,6 @@
 import type { Alert, ToolResult } from "core/src/contracts";
 import type { ToolContext } from "./context";
-import { deadlinePhrase, lowerKindWord, typeFromRefId } from "./format";
+import { deadlinePhrase, lowerGeneric, lowerKindWord, typeFromRefId } from "./format";
 import { daysBetween } from "obligation-kit";
 import { speak } from "./speak";
 
@@ -24,7 +24,7 @@ async function sentenceFor(ctx: ToolContext, alert: Alert): Promise<string> {
   const { householdId: hh, repo, today } = ctx;
   if (alert.source === "recall") {
     const asset = alert.assetId ? await repo.getAsset(hh, alert.assetId) : null;
-    return `Before that, a recall may affect your ${asset ? asset.name.toLowerCase() : "household items"}.`;
+    return `Before that, a recall may affect your ${asset ? lowerGeneric(asset.name) : "household items"}.`;
   }
   const due = alert.dueDate ?? today;
   // The obligation holds the spoken form of the label ("car insurance renews"); the alert holds the display form.
@@ -46,7 +46,7 @@ export async function injectProactive(
 ): Promise<ToolResult> {
   if (result.isError) return result;
   const sc = result.structuredContent;
-  if (sc?.kind === "ambiguous") return result;
+  if (sc?.kind === "ambiguous" || sc?.kind === "not_found") return result;
   const { householdId: hh, repo, today } = ctx;
 
   const open = await repo.listAlerts(hh, { open: true });
