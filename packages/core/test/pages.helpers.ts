@@ -4,6 +4,8 @@ export interface BuildOpts {
   count?: number;
   /** Text render mode (Tr) for the page text; 3 is invisible. */
   renderMode?: number;
+  /** Replaces the literal `/Type /Page` in page objects (e.g. with name escapes or comments pdf.js still accepts). */
+  pageType?: string;
 }
 
 export function buildPdf(pageTexts: (string | null)[], opts: BuildOpts = {}): Uint8Array {
@@ -18,11 +20,11 @@ export function buildPdf(pageTexts: (string | null)[], opts: BuildOpts = {}): Ui
     const contentId = pageId + 1;
     const res = "/Resources << /Font << /F1 3 0 R >> >>";
     if (t === null) {
-      objs[pageId] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] ${res} >>`;
+      objs[pageId] = `<< ${opts.pageType ?? "/Type /Page"} /Parent 2 0 R /MediaBox [0 0 612 792] ${res} >>`;
       objs[contentId] = "<< /Length 0 >>\nstream\n\nendstream";
     } else {
       const stream = `BT /F1 12 Tf ${opts.renderMode ?? 0} Tr 72 700 Td (${t.replace(/[()\\]/g, "\\$&")}) Tj ET`;
-      objs[pageId] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] ${res} /Contents ${contentId} 0 R >>`;
+      objs[pageId] = `<< ${opts.pageType ?? "/Type /Page"} /Parent 2 0 R /MediaBox [0 0 612 792] ${res} /Contents ${contentId} 0 R >>`;
       objs[contentId] = `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`;
     }
   });
@@ -68,5 +70,32 @@ export function buildBinaryPdf(streamDictExtra: string, streamBytes: Uint8Array)
   let x = "xref\n0 6\n0000000000 65535 f \n";
   for (let i = 1; i <= 5; i++) x += `${String(offsets[i]).padStart(10, "0")} 00000 n \n`;
   push(`${x}trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
+  return new Uint8Array(Buffer.concat(parts));
+}
+
+/** An indirect object body for a stream: dictionary plus raw data. */
+export function streamObj(dictExtra: string, data: Buffer): Buffer {
+  const head = Buffer.from(`<< /Length ${data.length} ${dictExtra} >>\nstream\n`, "latin1");
+  return Buffer.concat([head, data, Buffer.from("\nendstream", "latin1")]);
+}
+
+/** Assembles numbered objects (missing numbers become free xref entries) into a valid file with an xref table. */
+export function buildRawPdf(objs: Record<number, string | Buffer>, trailerExtra = ""): Uint8Array {
+  const parts: Buffer[] = [Buffer.from("%PDF-1.4\n", "latin1")];
+  let len = parts[0]!.length;
+  const max = Math.max(...Object.keys(objs).map(Number));
+  const offsets: (number | undefined)[] = [];
+  for (let i = 1; i <= max; i++) {
+    const o = objs[i];
+    if (o === undefined) continue;
+    offsets[i] = len;
+    const body = typeof o === "string" ? Buffer.from(o, "latin1") : o;
+    const b = Buffer.concat([Buffer.from(`${i} 0 obj\n`, "latin1"), body, Buffer.from("\nendobj\n", "latin1")]);
+    parts.push(b);
+    len += b.length;
+  }
+  let x = `xref\n0 ${max + 1}\n0000000000 65535 f \n`;
+  for (let i = 1; i <= max; i++) x += offsets[i] === undefined ? "0000000000 65535 f \n" : `${String(offsets[i]).padStart(10, "0")} 00000 n \n`;
+  parts.push(Buffer.from(`${x}trailer\n<< /Size ${max + 1} /Root 1 0 R ${trailerExtra} >>\nstartxref\n${len}\n%%EOF\n`, "latin1"));
   return new Uint8Array(Buffer.concat(parts));
 }
