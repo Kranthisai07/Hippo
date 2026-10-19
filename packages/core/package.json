@@ -18,8 +18,9 @@
     "vitest": "5.0.5"
   },
   "dependencies": {
+    "minisearch": "7.2.0",
+    "obligation-kit": "workspace:*",
     "pdfjs-dist": "6.4.299",
-    "zod": "4.6.7",
-    "obligation-kit": "workspace:*"
+    "zod": "4.6.7"
   }
 }
