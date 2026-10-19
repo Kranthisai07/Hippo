@@ -4,7 +4,7 @@ Homefile turns the paperwork a household never reads twice (warranties, insuranc
 
 "Homefile" is a working name. The repo is called Hippo.
 
-> **Status: early build, Alexa+ hackathon.** Today the repo contains the demo fixtures, the deadline engine, the asset resolver, the source quote check and asset linking, with 381 passing tests. The MCP server, ingestion pipeline, web app and AWS deploy are planned and not written yet. [What exists today](#what-exists-today) is the honest list.
+> **Status: early build, Alexa+ hackathon.** Today the repo contains the demo fixtures, the deadline engine, the asset resolver, the source quote check, asset linking, recall matchers, PDF page text extraction and the daily digest builder, with 773 passing tests. The MCP server, the Bedrock extraction step, the web app and the AWS deploy are planned and not written yet. [What exists today](#what-exists-today) is the honest list.
 
 ## Why
 
@@ -53,11 +53,15 @@ Full detail is in [INTENT.md](INTENT.md) (why and principles) and [SPEC.md](SPEC
 | Source quote check (`packages/obligation-kit`): drops any extracted field whose quote is not on the page it cites | Done, 71 tests |
 | Asset and agreement resolver (`packages/core`): turns "my fridge" into one asset, or asks | Done, 89 tests |
 | Asset linking (`packages/core`): matches a document's brand, model and serial, or a vehicle, to an owned asset, or proposes a new one | Done, 61 tests |
+| Recall matchers (`packages/obligation-kit`): CPSC and NHTSA parsers and matchers. `high` only on a UPC, a model plus brand on the same product, or the confirmed vehicle year, make and model; a failing API can never read as "no recalls" | Done, 229 tests |
+| PDF page text extraction (`packages/core`): text per page with stable page numbers, pages flagged for OCR, size, page and time limits. The OCR call itself is a stub | Done, 37 tests |
+| Daily digest email builder (`packages/core`): short plain and HTML email, numbers masked to the last 4, everything from documents escaped. Sending through SES is not built | Done, 126 tests |
+| Live docs check (`docs/VERIFIED.md`): what AWS, Alexa+, MCP, CPSC and Devpost documentation says against what this project assumed, checked twice | Done |
 | CI: both packages plus the fixture quote check on every push and PR | Added, runs on GitHub |
 | MCP server, 9 tools, 3 Echo Show cards | Not started |
-| Ingestion pipeline: page text, Bedrock extraction, retrieval (the quote check and asset linking above are two of its steps) | Not started |
+| Ingestion pipeline: Bedrock extraction and retrieval (page text, the quote check and asset linking above are three of its steps) | Not started |
 | Web app and OAuth login | Not started |
-| Daily job, recall radar, email digest, AWS deploy | Not started |
+| Daily job scheduling, SES sending, AWS deploy | Not started (the recall matchers and the digest builder it will call are done) |
 
 ### The deadline engine
 
@@ -79,11 +83,11 @@ An obligation whose source fields are not all confirmed always has severity `nul
 
 ## Run it
 
-Needs Node 22 and Python 3.9 or newer.
+Needs Node 22.13 or newer (the PDF library requires it) and Python 3.9 or newer.
 
 ```bash
 git clone https://github.com/Kranthisai07/Hippo.git && cd Hippo
-for p in obligation-kit core; do (cd packages/$p && npm ci && npm test && npm run typecheck); done   # 231 and 150 tests
+for p in obligation-kit core; do (cd packages/$p && npm ci && npm test && npm run typecheck); done   # 460 and 313 tests
 pip install reportlab pypdf pillow && python fixtures/tools/generate.py
 ```
 
@@ -97,6 +101,10 @@ The last command rebuilds the PDFs, the photo and the expected JSON, and fails i
 - The phone-photo fixture has not been run through a real OCR engine yet.
 - `trial_end` and `claim_by` use a 7 day high window. That is an assumption (D-015 does not name them), kept in one table.
 - Monthly rent shows on the timeline but never raises an alert (D-020), so it cannot crowd out a notice or cancel deadline.
+- Recall matches are deliberately cautious: a brand that appears only in a description, or on a different product than the model, is at most `possible`. The recall network clients are for the daily job only and are kept out of the package barrel.
+- The CPSC recall API reports a database failure as a normal response with a fake record, and its UPC filter is unreliable (it returned an empty list for a UPC that exists), so the code treats that record as an error and matches UPCs itself.
+- Page text extraction cannot tell visible text from hidden text, and a PDF that lies about its page count is caught only when its page objects are readable (flate compressed object streams are counted, other filters are not). Extracted text is always treated as untrusted.
+- The digest masks any run of 5 or more digits, so a date like "Dec 5, 2026" inside document text is shown as "Dec ****2026". That is the safe side.
 - The resolver asks instead of guessing. "tv" with only a "TV stand" gets a question, and a whole sentence like "my dishwasher isn't working" returns nothing, so the voice tool must pass just the thing.
 
 ## Hackathon
