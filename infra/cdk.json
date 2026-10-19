@@ -1,0 +1,8 @@
+{
+  "app": "node --experimental-strip-types src/bin.ts",
+  "context": {
+    "hippo:destroyable": false,
+    "hippo:webOrigin": "http://localhost:5173",
+    "hippo:dailyTimeUtc": "13:00"
+  }
+}
