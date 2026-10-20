@@ -1,3 +1,5 @@
+import { parseIso } from "obligation-kit";
+
 // The one place that turns text into something a speaker can read: no markdown, no links, no long numbers, a word cap.
 // Every model-facing tool builds its `content` through speak() (SPEC section 6 response contract).
 
@@ -45,26 +47,70 @@ export function stripUrls(input: string): string {
   return tidy(s);
 }
 
-const EXEMPT = [
-  /^\d{4}-\d{2}-\d{2}$/,
-  /^\d{1,2}[/.]\d{1,2}[/.]\d{2,4}$/,
-  /^\$?\d{1,3}(?:,\d{3})+(?:\.\d+)?$/,
-  /^\$\d+(?:\.\d+)?$/,
-  /^(?:\+?1-)?\(?\d{3}\)?[-. ]?\d{3}-\d{4}$/,
-];
+// A shape is only exempt when it really is what it looks like. "1234-56-78" has the shape of a date but is not one, and
+// "123456-7890" has the shape of a phone number but has no separator after the first group, so both are masked.
+const dayMonthOk = (a: number, b: number): boolean => a >= 1 && a <= 12 && b >= 1 && b <= 31;
+const isRealDate = (core: string): boolean => {
+  if (parseIso(core) !== null) return true;
+  const m = /^(\d{1,2})[/.](\d{1,2})[/.](?:\d{2}|\d{4})$/.exec(core);
+  return !!m && (dayMonthOk(Number(m[1]), Number(m[2])) || dayMonthOk(Number(m[2]), Number(m[1])));
+};
+const isMoney = (core: string): boolean => /^\$\d{1,3}(?:,\d{3})+(?:\.\d+)?$/.test(core) || /^\$\d+(?:\.\d+)?$/.test(core);
+const isPhone = (core: string): boolean => /^(?:\+?1[-. ])?\(?\d{3}\)?[-. ]\d{3}[-. ]\d{4}$/.test(core);
+const isExempt = (core: string): boolean => isRealDate(core) || isMoney(core) || isPhone(core);
 
 const LEAD = /^[("'[“]+/;
 
-/** Any word with 5 or more digits (policy, account, card numbers) becomes "ending" plus its last 4 digits. */
+const splitToken = (token: string): { lead: string; core: string; trail: string } => {
+  const lead = LEAD.exec(token)?.[0] ?? "";
+  const rest = token.slice(lead.length);
+  const trail = TRAILING_PUNCT.exec(rest)?.[0] ?? "";
+  return { lead, core: trail ? rest.slice(0, rest.length - trail.length) : rest, trail };
+};
+
+const PLAIN_DIGITS = /^\p{Nd}{2,}$/u;
+/** Numbers are often written in groups ("1234 5678 9012 3456"): this many digits in adjacent groups is one number. */
+const MIN_GROUPED_DIGITS = 8;
+
+/** Joins runs of two or more whitespace separated digit groups, so a spaced card or account number is masked as one. */
+function maskSpacedGroups(input: string): string {
+  const parts = input.split(/(\s+)/);
+  const out: string[] = [];
+  let i = 0;
+  while (i < parts.length) {
+    let digits = "";
+    let groups = 0;
+    let end = i;
+    let lead = "";
+    let trail = "";
+    for (let j = i; j < parts.length; j += 2) {
+      const t = splitToken(parts[j]!);
+      if (!PLAIN_DIGITS.test(t.core) || (groups > 0 && t.lead)) break;
+      if (groups === 0) lead = t.lead;
+      digits += t.core;
+      groups++;
+      end = j + 1;
+      trail = t.trail;
+      if (trail) break;
+    }
+    if (groups >= 2 && digits.length >= MIN_GROUPED_DIGITS) {
+      out.push(`${lead}ending ${digits.slice(-4)}${trail}`);
+      i = end;
+    } else {
+      out.push(parts[i]!);
+      i++;
+    }
+  }
+  return out.join("");
+}
+
+/** Any number with 5 or more digits (policy, account, card numbers), also in groups, becomes "ending" plus the last 4. */
 export function maskNumbers(input: string): string {
-  return input.replace(/\S+/g, (token) => {
-    const lead = LEAD.exec(token)?.[0] ?? "";
-    const rest = token.slice(lead.length);
-    const trail = TRAILING_PUNCT.exec(rest)?.[0] ?? "";
-    const core = trail ? rest.slice(0, rest.length - trail.length) : rest;
+  return maskSpacedGroups(input).replace(/\S+/g, (token) => {
+    const { lead, core, trail } = splitToken(token);
     const digits = core.match(/\p{Nd}/gu);
     if (!digits || digits.length < 5) return token;
-    if (EXEMPT.some((re) => re.test(core))) return token;
+    if (isExempt(core)) return token;
     return `${lead}ending ${digits.slice(-4).join("")}${trail}`;
   });
 }

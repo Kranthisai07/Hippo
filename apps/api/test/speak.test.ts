@@ -67,6 +67,51 @@ describe("maskNumbers", () => {
     expect(maskNumbers("")).toBe("");
     expect(maskNumbers("número １２３４５６７８")).toContain("ending");
   });
+
+  // Review finding: numbers split by spaces, or shaped like a date, a phone or money, used to be spoken in full.
+  describe("numbers that hide inside an exemption shape", () => {
+    it.each([
+      ["Policy number 1234 5678 9012 3456", "Policy number ending 3456"],
+      ["card 4111 1111 1111 1111", "card ending 1111"],
+      ["card 4111 1111 1111 1111.", "card ending 1111."],
+      ["Account 123456-7890", "Account ending 7890"],
+      ["acct 1234-56-78", "acct ending 5678"],
+      ["No. 1,234,567", "No. ending 4567"],
+      ["Account 1234 5678", "Account ending 5678"],
+      ["Account 12345 6789", "Account ending 6789"],
+      ["Account\n1234\n5678", "Account\nending 5678"],
+    ])("%s", (input, out) => {
+      expect(maskNumbers(input)).toBe(out);
+    });
+
+    it("masks each separate number in a sentence", () => {
+      expect(maskNumbers("A 1111 2222 and B 3333 4444")).toBe("A ending 2222 and B ending 4444");
+    });
+
+    it("still leaves real dates, money and phones alone", () => {
+      const keep =
+        "Due 2026-10-21 or 10/21/2026 or 2026-10-21 2026-11-12, $1,950 a month, $100,000 limit, " +
+        "call 1-800-555-0142 or 800-555-0142 or 800.555.0142, in 2026, page 3, 30 days, Dec 5 2026";
+      expect(maskNumbers(keep)).toBe(keep);
+    });
+
+    it("an impossible date is not a date", () => {
+      expect(maskNumbers("Ref 2026-13-45")).toBe("Ref ending 1345");
+      expect(maskNumbers("Ref 2026-02-30")).toBe("Ref ending 0230");
+    });
+
+    it("stays linear on hostile input", () => {
+      const t0 = performance.now();
+      maskNumbers("1 ".repeat(10_000));
+      maskNumbers("1234 ".repeat(4_000));
+      maskNumbers("-".repeat(20_000) + "1");
+      expect(performance.now() - t0).toBeLessThan(1000);
+    });
+
+    it("reaches the spoken text and the quoted clause", () => {
+      expect(speak("Your policy number is 1234 5678 9012 3456.")).toBe("Your policy number is ending 3456.");
+    });
+  });
 });
 
 describe("countWords", () => {
