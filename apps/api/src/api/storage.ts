@@ -45,13 +45,14 @@ export interface LocalUploader extends Uploader {
 
 export const LOCAL_UPLOAD_TTL_SECONDS = 900;
 
-export function createLocalUploader(): LocalUploader {
-  const pending = new Map<string, { contentType: string; size: number }>();
+export function createLocalUploader(opts: { now?: () => number } = {}): LocalUploader {
+  const now = opts.now ?? Date.now;
+  const pending = new Map<string, { contentType: string; size: number; at: number }>();
   return {
     prepare({ key, contentType, size }) {
       // The key is uploads/<household>/<docId>/original.<ext>, so the doc id is the third segment.
       const docId = key.split("/")[2] ?? "";
-      pending.set(key, { contentType, size });
+      pending.set(key, { contentType, size, at: now() });
       return {
         method: "PUT",
         url: `/api/uploads/${encodeURIComponent(docId)}/content`,
@@ -59,7 +60,13 @@ export function createLocalUploader(): LocalUploader {
         expiresInSeconds: LOCAL_UPLOAD_TTL_SECONDS,
       };
     },
-    expected: (key) => pending.get(key),
+    // An announced upload is only open for the time the descriptor promised (expiresInSeconds).
+    expected: (key) => {
+      const p = pending.get(key);
+      return p && now() - p.at <= LOCAL_UPLOAD_TTL_SECONDS * 1000
+        ? { contentType: p.contentType, size: p.size }
+        : undefined;
+    },
     done: (key) => void pending.delete(key),
   };
 }

@@ -105,6 +105,8 @@ export async function startServer(opts: ServerOptions = {}): Promise<Running> {
         : `hh_${createHash("sha256").update(email).digest("base64url").slice(0, 16)}`,
     log,
     ...(demoOn ? { demoUser: { email: demoEmail, code: demoCode } } : {}),
+    // Without the demo there is no mailer, so a printed code would only leak into a shared log.
+    logMagicCodes: demoOn,
     ...(serviceId && serviceSecret ? { serviceClient: { clientId: serviceId, clientSecret: serviceSecret } } : {}),
     now: clock,
   });
@@ -117,7 +119,11 @@ export async function startServer(opts: ServerOptions = {}): Promise<Running> {
     allowedOrigins,
     // Web API: files in memory, the PUT route of this server, and the fixture ingest (createApp's default hook) that
     // only reads the demo documents. The web dev server may send the cookie from its own origin.
-    web: { objectStore, uploader: createLocalUploader(), origins: [new URL(issuer).origin, ...allowedOrigins] },
+    web: {
+      objectStore,
+      uploader: createLocalUploader({ now: clock }),
+      origins: [new URL(issuer).origin, ...allowedOrigins],
+    },
     log,
   });
 

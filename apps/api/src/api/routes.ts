@@ -1,12 +1,13 @@
 import type { Auth } from "@hippo/auth";
 import type { Alert, Repository } from "core/src/contracts";
-import { isOpenAlert } from "core/src/repository/shared";
+import { isOpenAlert, s3KeysForDoc } from "core/src/repository/shared";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { addDays, parseIso } from "obligation-kit";
 import { z } from "zod";
 import { syncObligations } from "../obligations";
 import { applyAlertAction } from "../mcp/alerts";
+import { maskNumbers } from "../mcp/speak";
 import type { IndexCache } from "../mcp/indexCache";
 import { agreementView, allReviewed, docView, isKnownField, valueSchemaOf } from "./agreements";
 import { readPages, updateIndex, type IndexStore, type OnUploaded } from "./fixtureIngest";
@@ -209,16 +210,22 @@ export function createWebApi(deps: WebApiDeps): Hono<{ Variables: { hh: string; 
     const pages = doc ? await readPages(objectStore, hh, doc.id) : null;
     const text = pages?.[n - 1];
     if (text === undefined) throw notFound();
-    return c.json({ page: n, text });
+    // Policy and account numbers are masked here like everywhere else (CLAUDE.md hard rule).
+    return c.json({ page: n, text: maskNumbers(text) });
   });
 
   api.delete("/docs/:id", async (c) => {
     const hh = c.var.hh;
     const id = c.req.param("id");
-    if (!(await repo.getDoc(hh, id))) throw notFound();
+    const doc = await repo.getDoc(hh, id);
+    if (!doc) throw notFound();
+    // Files and index entries go first and the records last, so a storage failure leaves the document in place and a
+    // retry works. Deleting a file that is already gone is fine.
+    const chunkMeta = await repo.getChunkMeta(hh, id);
+    await objectStore.delete(s3KeysForDoc(hh, doc, chunkMeta?.s3Key));
+    await updateIndex(deps.indexStore, hh, { removeDocId: id });
     const { s3Keys } = await repo.deleteDocumentCascade(hh, id);
     await objectStore.delete(s3Keys);
-    await updateIndex(deps.indexStore, hh, { removeDocId: id });
     return c.body(null, 204);
   });
 
@@ -365,9 +372,14 @@ export function createWebApi(deps: WebApiDeps): Hono<{ Variables: { hh: string; 
   api.delete("/data", async (c) => {
     const hh = c.var.hh;
     await readJson(c, DeleteDataBody);
+    // Same order as deleting one document: files and index first, records last, so a failure can be retried.
+    for (const doc of await repo.listDocs(hh)) {
+      const chunkMeta = await repo.getChunkMeta(hh, doc.id);
+      await objectStore.delete(s3KeysForDoc(hh, doc, chunkMeta?.s3Key));
+    }
+    await updateIndex(deps.indexStore, hh, { clear: true });
     const { s3Keys } = await repo.deleteHousehold(hh);
     await objectStore.delete(s3Keys);
-    await updateIndex(deps.indexStore, hh, { clear: true });
     return c.body(null, 204);
   });
 

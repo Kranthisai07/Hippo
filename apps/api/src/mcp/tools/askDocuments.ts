@@ -55,10 +55,10 @@ export const askDocuments: ToolHandler<Args> = async (ctx, args) => {
   }
 
   const index = await ctx.indexes.get(repo, hh);
-  const hits =
-    index && (docIds === undefined || docIds.length > 0)
-      ? searchIndex(index, args.question, { limit: 3, ...(docIds ? { docIds } : {}) })
-      : [];
+  // Only reviewed documents answer (status active): what a person has not looked at yet is not something to speak from.
+  const activeIds = new Set((await repo.listDocs(hh, { status: "active" })).map((d) => d.id));
+  const searchIds = (docIds ?? [...activeIds]).filter((id) => activeIds.has(id));
+  const hits = index && searchIds.length > 0 ? searchIndex(index, args.question, { limit: 3, docIds: searchIds }) : [];
   const structuredBase = { kind: "clauses", question: args.question, scope, notice: NOTICE };
 
   if (hits.length === 0) {
