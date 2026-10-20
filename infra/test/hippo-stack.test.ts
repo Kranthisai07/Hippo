@@ -82,7 +82,9 @@ describe("DynamoDB table", () => {
 
   // Review finding: the stack said expiresAt while the repository writes ttl, so undo records would never expire.
   it("uses the same key, index and TTL names as the repository", () => {
-    const [table] = Object.values(template.findResources("AWS::DynamoDB::Table")) as { Properties: Record<string, any> }[];
+    const [table] = Object.values(template.findResources("AWS::DynamoDB::Table")) as {
+      Properties: Record<string, any>;
+    }[];
     const p = table!.Properties;
     expect(p.KeySchema).toEqual(TABLE_DEFINITION.KeySchema);
     expect(p.GlobalSecondaryIndexes).toHaveLength(1);
