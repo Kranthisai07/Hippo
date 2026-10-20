@@ -100,6 +100,50 @@ describe("maskNumbers", () => {
       expect(maskNumbers("Ref 2026-02-30")).toBe("Ref ending 0230");
     });
 
+    // Round 2 review: joiner punctuation, invisible characters and short groups still let digits through.
+    it.each([
+      ["1234 - 5678 - 9012", "ending 9012"],
+      ["1234 / 5678 / 9012", "ending 9012"],
+      ["1234 • 5678 • 9012", "ending 9012"],
+      ["1234, 5678, 9012", "ending 9012"],
+      ["1234. 5678. 9012", "ending 9012"],
+      ["1234​ 5678​ 9012", "ending 9012"],
+      ["12​34 5678 9012", "ending 9012"],
+      ["123 4567", "ending 4567"],
+      ["12 345 67", "ending 4567"],
+      ["$4111111111111111", "ending 1111"],
+      ["Account 4111-1111-1111-1111 is open", "Account ending 1111 is open"],
+    ])("%j is masked", (input, out) => {
+      expect(maskNumbers(input)).toBe(out);
+    });
+
+    it.each([
+      "Call (555) 123-4567 today",
+      "Call 800 555 0199 today",
+      "limit of 25,000 miles",
+      "Date of purchase: November 12, 2025",
+      "Lease term: January 1, 2026 through December 31, 2026.",
+      "Policy period: April 30, 2026 to October 30, 2026",
+      "Due Oct 21, 2026 and again Nov 5, 2026",
+      "Pay $1,850.00 by the 5th, late fee $75.00, deposit $1,850",
+      "Section 3, page 12, items 4 and 5",
+    ])("%j stays readable", (input) => {
+      expect(maskNumbers(input)).toBe(input);
+    });
+
+    it("still masks digits split by an invisible character inside one word", () => {
+      expect(maskNumbers("ref 1234­5678​9012")).toBe("ref ending 9012");
+    });
+
+    it("stays linear on joiner heavy hostile input", () => {
+      const t0 = performance.now();
+      maskNumbers("1 - ".repeat(10_000));
+      maskNumbers("1234, ".repeat(4_000));
+      maskNumbers("​".repeat(20_000));
+      maskNumbers("1234 ".repeat(4_000) + "x");
+      expect(performance.now() - t0).toBeLessThan(1500);
+    });
+
     it("stays linear on hostile input", () => {
       const t0 = performance.now();
       maskNumbers("1 ".repeat(10_000));

@@ -55,10 +55,13 @@ const isRealDate = (core: string): boolean => {
   const m = /^(\d{1,2})[/.](\d{1,2})[/.](?:\d{2}|\d{4})$/.exec(core);
   return !!m && (dayMonthOk(Number(m[1]), Number(m[2])) || dayMonthOk(Number(m[2]), Number(m[1])));
 };
+// Money is capped at 9 digits: "$4111111111111111" is a card number with a dollar sign in front, not an amount.
 const isMoney = (core: string): boolean =>
-  /^\$\d{1,3}(?:,\d{3})+(?:\.\d+)?$/.test(core) || /^\$\d+(?:\.\d+)?$/.test(core);
+  /^\$\d{1,3}(?:,\d{3})+(?:\.\d+)?$/.test(core) || /^\$\d{1,9}(?:\.\d+)?$/.test(core);
 const isPhone = (core: string): boolean => /^(?:\+?1[-. ])?\(?\d{3}\)?[-. ]\d{3}[-. ]\d{4}$/.test(core);
-const isExempt = (core: string): boolean => isRealDate(core) || isMoney(core) || isPhone(core);
+/** "25,000": one thousands group is a quantity, two or more ("1,234,567") look like an account number. */
+const isThousands = (core: string): boolean => /^\d{1,3},\d{3}(?:\.\d+)?$/.test(core);
+const isExempt = (core: string): boolean => isRealDate(core) || isMoney(core) || isPhone(core) || isThousands(core);
 
 const LEAD = /^[("'[“]+/;
 
@@ -69,51 +72,62 @@ const splitToken = (token: string): { lead: string; core: string; trail: string 
   return { lead, core: trail ? rest.slice(0, rest.length - trail.length) : rest, trail };
 };
 
-const PLAIN_DIGITS = /^\p{Nd}{2,}$/u;
-/** Numbers are often written in groups ("1234 5678 9012 3456"): this many digits in adjacent groups is one number. */
-const MIN_GROUPED_DIGITS = 8;
+/** A number written in groups ("1234 - 5678 - 9012", "4111, 1111", "123 4567") is one number when it has this many digits. */
+const MIN_GROUPED_DIGITS = 7;
 
-/** Joins runs of two or more whitespace separated digit groups, so a spaced card or account number is masked as one. */
-function maskSpacedGroups(input: string): string {
-  const parts = input.split(/(\s+)/);
-  const out: string[] = [];
-  let i = 0;
-  while (i < parts.length) {
-    let digits = "";
-    let groups = 0;
-    let end = i;
-    let lead = "";
-    let trail = "";
-    for (let j = i; j < parts.length; j += 2) {
-      const t = splitToken(parts[j]!);
-      if (!PLAIN_DIGITS.test(t.core) || (groups > 0 && t.lead)) break;
-      if (groups === 0) lead = t.lead;
-      digits += t.core;
-      groups++;
-      end = j + 1;
-      trail = t.trail;
-      if (trail) break;
-    }
-    if (groups >= 2 && digits.length >= MIN_GROUPED_DIGITS) {
-      out.push(`${lead}ending ${digits.slice(-4)}${trail}`);
-      i = end;
-    } else {
-      out.push(parts[i]!);
-      i++;
-    }
-  }
-  return out.join("");
-}
+/**
+ * Digit groups joined by spaces or by punctuation (dash, slash, dot, comma, bullet, bar, with or without spaces around
+ * it). Not after a letter or a dollar sign ("HM-AU-0048-4821" is handled as one word, "$1,850" is money) and not inside
+ * a longer digit run. Every part is bounded, so it runs in linear time.
+ */
+const DIGIT_RUN = /(?<![\p{L}\p{Nd}$])(?<!\p{L}-)\p{Nd}+(?:(?:\s*[-–—/.,;•|·]\s*|\s+)\p{Nd}+)+(?!\p{Nd})/gu;
 
-/** Any number with 5 or more digits (policy, account, card numbers), also in groups, becomes "ending" plus the last 4. */
-export function maskNumbers(input: string): string {
-  return maskSpacedGroups(input).replace(/\S+/g, (token) => {
+const maskDigitRuns = (s: string): string =>
+  s.replace(DIGIT_RUN, (run) => {
+    const digits = run.match(/\p{Nd}/gu) ?? [];
+    return digits.length < MIN_GROUPED_DIGITS ? run : `ending ${digits.slice(-4).join("")}`;
+  });
+
+/** One word with 5 or more digits (policy, account, card numbers) becomes "ending" plus its last 4 digits. */
+const maskTokens = (s: string): string =>
+  s.replace(/\S+/g, (token) => {
     const { lead, core, trail } = splitToken(token);
     const digits = core.match(/\p{Nd}/gu);
     if (!digits || digits.length < 5) return token;
     if (isExempt(core)) return token;
     return `${lead}ending ${digits.slice(-4).join("")}${trail}`;
   });
+
+const maskPlain = (s: string): string => maskTokens(maskDigitRuns(s));
+
+/** Things that look like numbers but are not account numbers. Kept only when they pass the checks above. */
+const PROTECTED = new RegExp(
+  [
+    String.raw`(?<!\p{Nd})(?:\+?1[-. ])?\(?\d{3}\)?[-. ]\d{3}[-. ]\d{4}(?!\p{Nd})`,
+    String.raw`(?<!\p{Nd})\d{4}-\d{2}-\d{2}(?!\p{Nd})`,
+    String.raw`(?<!\p{Nd})\d{1,2}[/.]\d{1,2}[/.](?:\d{4}|\d{2})(?!\p{Nd})`,
+    String.raw`\$\d{1,3}(?:,\d{3})+(?:\.\d+)?(?!\p{Nd})`,
+    String.raw`\$\d{1,9}(?:\.\d+)?(?!\p{Nd})`,
+  ].join("|"),
+  "gu",
+);
+
+/**
+ * Any number with 5 or more digits (policy, account, card numbers), also written in groups or split by punctuation or
+ * invisible characters, becomes "ending" plus the last 4. Real dates, phone numbers and amounts of money stay readable.
+ */
+export function maskNumbers(input: string): string {
+  // Zero width characters, soft hyphens and bidi marks (category Cf) are invisible to a reader and hide digits from a
+  // pattern, so they are dropped first.
+  const text = input.replace(/\p{Cf}/gu, "");
+  let out = "";
+  let last = 0;
+  for (const m of text.matchAll(PROTECTED)) {
+    if (!(isRealDate(m[0]) || isMoney(m[0]) || isPhone(m[0]))) continue;
+    out += maskPlain(text.slice(last, m.index)) + m[0];
+    last = m.index + m[0].length;
+  }
+  return out + maskPlain(text.slice(last));
 }
 
 function sentencesOf(s: string): string[] {
