@@ -31,7 +31,8 @@ export function createMcpServer(deps: McpDeps): McpServer {
       {
         description: tool.description,
         inputSchema: tool.schema,
-        annotations: { readOnlyHint: tool.readOnly, openWorldHint: false },
+        // A tool that may announce an alert writes its status, so it is not read only.
+        annotations: { readOnlyHint: tool.readOnly && !tool.proactive, openWorldHint: false },
         ...(tool.app ? { _meta: { ui: { visibility: ["app"] } } } : {}),
       },
       async () => fail("This tool is called through tools/call.") as CallToolResult,
