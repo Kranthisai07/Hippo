@@ -70,6 +70,14 @@ export async function syncObligations(
 ): Promise<ObligationRecord[]> {
   const records = buildObligations(agreement, assets, today);
   await repo.replaceObligations(householdId, agreement.id, records);
+  // Alert ids include the due date, so a changed date leaves the alert for the old date behind. Close it unless the
+  // person already did (done and dismissed stay as they are).
+  const kept = new Set(records.map((o) => o.id));
+  for (const alert of await repo.listAlerts(householdId, { open: true })) {
+    if (alert.source === "deadline" && alert.refId.startsWith(`${agreement.id}:`) && !kept.has(alert.refId)) {
+      await repo.putAlert(householdId, { ...alert, status: "dismissed" });
+    }
+  }
   for (const o of records) {
     if (!o.confirmed || o.severity === null) continue;
     const id = alertIdFor(o.id);

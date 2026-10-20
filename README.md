@@ -2,7 +2,7 @@
 
 Hippo turns the paperwork a household never reads twice (warranties, insurance, a lease, subscriptions, recall notices) into dated obligations, and watches them while nobody is talking. It is an Alexa+ add-on with a web app for uploading and reviewing documents.
 
-> **Status: early build, Alexa+ hackathon.** Today the repo contains the demo fixtures, the deadline engine, the asset resolver, the source quote check, asset linking, recall matchers, PDF page text extraction and the daily digest builder, with 2396 passing tests. The MCP server, the Bedrock extraction step, the web app and the AWS deploy are planned and not written yet. [What exists today](#what-exists-today) is the honest list.
+> **Status: early build, Alexa+ hackathon.** Today the repo contains the demo fixtures, the deadline engine, the asset resolver, the source quote check, asset linking, recall matchers, PDF page text extraction and the daily digest builder, with 2684 passing tests. The MCP server, the Bedrock extraction step, the web app and the AWS deploy are planned and not written yet. [What exists today](#what-exists-today) is the honest list.
 
 ## Why
 
@@ -58,7 +58,7 @@ Full detail is in [INTENT.md](INTENT.md) (why and principles) and [SPEC.md](SPEC
 | CI: both packages plus the fixture quote check on every push and PR | Added, runs on GitHub |
 | MCP server (`apps/api`): 9 tools and 3 card button tools over stateless Streamable HTTP, OAuth 2.1 with PKCE (`packages/auth`), in memory data seeded from the fixtures | Done, 298 tests, `pnpm test:latency` measured p95 under 150 ms locally. The 3 Echo Show cards are not started |
 | Ingestion pipeline: Bedrock extraction and retrieval (page text, the quote check and asset linking above are three of its steps) | Not started |
-| Web app | Not started (the OAuth login it needs is done) |
+| Web JSON API (`apps/api/src/api`, contract in `docs/WEB_API.md`): upload, review and confirm, Coming Up, assets, settings, with a dev fixture ingest for the demo documents | Done, 284 tests. The web app itself is not started (the OAuth login it needs is done) |
 | Daily job (`apps/workers`): deadline alerts, recall radar, digest and a dry run (`pnpm daily:run`) | Done, 155 tests, never run against live CPSC or NHTSA. SES sending and the AWS deploy are not built |
 
 ### The deadline engine
@@ -85,7 +85,7 @@ Needs Node 22.13 or newer (the PDF library requires it), pnpm (version pinned in
 
 ```bash
 git clone https://github.com/Kranthisai07/Hippo.git && cd Hippo
-pnpm install --frozen-lockfile && pnpm test && pnpm typecheck   # 531, 1038, 303, 344, 155 and 25 tests
+pnpm install --frozen-lockfile && pnpm test && pnpm typecheck   # 531, 1038, 303, 632, 155 and 25 tests
 pnpm --filter @hippo/api demo   # walks the demo moments through a real MCP client
 pip install reportlab pypdf pillow && python fixtures/tools/generate.py
 ```
