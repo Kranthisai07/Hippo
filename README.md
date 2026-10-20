@@ -2,7 +2,7 @@
 
 Hippo turns the paperwork a household never reads twice (warranties, insurance, a lease, subscriptions, recall notices) into dated obligations, and watches them while nobody is talking. It is an Alexa+ add-on with a web app for uploading and reviewing documents.
 
-> **Status: working build, Alexa+ hackathon.** Today the repo contains the demo fixtures, the deadline engine, the asset resolver, the source quote check, asset linking, recall matchers, PDF page text extraction, the daily digest builder and daily job, the repository (memory and DynamoDB), the clause index, an OAuth 2.1 server, the MCP server with its nine tools, the web JSON API and a CDK stack that has never been deployed, with 3000 passing tests. The Bedrock extraction step, the web app, the MCP Apps cards and the AWS deploy are not written yet (a dev fixture ingest reads the demo documents in their place). [What exists today](#what-exists-today) is the honest list.
+> **Status: working build, Alexa+ hackathon.** Today the repo contains the demo fixtures, the deadline engine, the asset resolver, the source quote check, asset linking, recall matchers, PDF page text extraction, the daily digest builder and daily job, the repository (memory and DynamoDB), the clause index, an OAuth 2.1 server, the MCP server with its nine tools, the web JSON API and a CDK stack that has never been deployed, with 3030 passing tests. The Bedrock extraction step, the web app, the MCP Apps cards and the AWS deploy are not written yet (a dev fixture ingest reads the demo documents in their place). [What exists today](#what-exists-today) is the honest list.
 
 ## Why
 
@@ -85,7 +85,7 @@ Needs Node 22.13 or newer (the PDF library requires it), pnpm (version pinned in
 
 ```bash
 git clone https://github.com/Kranthisai07/Hippo.git && cd Hippo
-pnpm install --frozen-lockfile && pnpm test && pnpm typecheck   # 531, 1038, 303, 632, 155 and 25 tests
+pnpm install --frozen-lockfile && pnpm test && pnpm typecheck   # 531, 1048 (1319 in CI with DynamoDB Local), 306, 665, 184 and 25 tests
 pnpm --filter @hippo/api demo   # walks the demo moments through a real MCP client
 pip install reportlab pypdf pillow && python fixtures/tools/generate.py
 ```
