@@ -2,7 +2,7 @@
 
 Hippo turns the paperwork a household never reads twice (warranties, insurance, a lease, subscriptions, recall notices) into dated obligations, and watches them while nobody is talking. It is an Alexa+ add-on with a web app for uploading and reviewing documents.
 
-> **Status: early build, Alexa+ hackathon.** Today the repo contains the demo fixtures, the deadline engine, the asset resolver, the source quote check, asset linking, recall matchers, PDF page text extraction and the daily digest builder, with 862 passing tests. The MCP server, the Bedrock extraction step, the web app and the AWS deploy are planned and not written yet. [What exists today](#what-exists-today) is the honest list.
+> **Status: working build, Alexa+ hackathon.** Today the repo contains the demo fixtures, the deadline engine, the asset resolver, the source quote check, asset linking, recall matchers, PDF page text extraction, the daily digest builder and daily job, the repository (memory and DynamoDB), the clause index, an OAuth 2.1 server, the MCP server with its nine tools, the web JSON API and a CDK stack that has never been deployed, with 3030 passing tests. The Bedrock extraction step, the web app, the MCP Apps cards and the AWS deploy are not written yet (a dev fixture ingest reads the demo documents in their place). [What exists today](#what-exists-today) is the honest list.
 
 ## Why
 
@@ -56,10 +56,10 @@ Full detail is in [INTENT.md](INTENT.md) (why and principles) and [SPEC.md](SPEC
 | Daily digest email builder (`packages/core`): short plain and HTML email, numbers masked to the last 4, everything from documents escaped. Sending through SES is not built | Done, 159 tests |
 | Live docs check (`docs/VERIFIED.md`): what AWS, Alexa+, MCP, CPSC and Devpost documentation says against what this project assumed, checked twice | Done |
 | CI: both packages plus the fixture quote check on every push and PR | Added, runs on GitHub |
-| MCP server, 9 tools, 3 Echo Show cards | Not started |
+| MCP server (`apps/api`): 9 tools and 3 card button tools over stateless Streamable HTTP, OAuth 2.1 with PKCE (`packages/auth`), in memory data seeded from the fixtures | Done, 298 tests, `pnpm test:latency` measured p95 under 150 ms locally. The 3 Echo Show cards are not started |
 | Ingestion pipeline: Bedrock extraction and retrieval (page text, the quote check and asset linking above are three of its steps) | Not started |
-| Web app and OAuth login | Not started |
-| Daily job scheduling, SES sending, AWS deploy | Not started (the recall matchers and the digest builder it will call are done) |
+| Web JSON API (`apps/api/src/api`, contract in `docs/WEB_API.md`): upload, review and confirm, Coming Up, assets, settings, with a dev fixture ingest for the demo documents | Done, 284 tests. The web app itself is not started (the OAuth login it needs is done) |
+| Daily job (`apps/workers`): deadline alerts, recall radar, digest and a dry run (`pnpm daily:run`) | Done, 155 tests, never run against live CPSC or NHTSA. SES sending and the AWS deploy are not built |
 
 ### The deadline engine
 
@@ -85,7 +85,8 @@ Needs Node 22.13 or newer (the PDF library requires it), pnpm (version pinned in
 
 ```bash
 git clone https://github.com/Kranthisai07/Hippo.git && cd Hippo
-pnpm install --frozen-lockfile && pnpm test && pnpm typecheck   # 484 and 378 tests
+pnpm install --frozen-lockfile && pnpm test && pnpm typecheck   # 531, 1048 (1319 in CI with DynamoDB Local), 306, 665, 184 and 25 tests
+pnpm --filter @hippo/api demo   # walks the demo moments through a real MCP client
 pip install reportlab pypdf pillow && python fixtures/tools/generate.py
 ```
 

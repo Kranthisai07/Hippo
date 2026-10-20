@@ -1,7 +1,7 @@
 import { addDays, addMonths, daysBetween, daysInMonth, parseIso, subtractBusinessDays } from "./dates";
 import { severityFor, type ObligationType, type Severity } from "./severity";
 
-// Same five values as the resolver's AgreementKind in packages/core. Merge them into one definition in the T1.1 contracts.
+// The one definition of the five kinds. packages/core imports it instead of keeping its own copy.
 export type AgreementKind = "warranty" | "insurance" | "lease" | "subscription" | "service_plan";
 export type FieldStatus = "extracted" | "confirmed" | "edited";
 
@@ -52,7 +52,7 @@ const count = (f: Record<string, unknown>, k: string): number | null => {
 const present = (f: Record<string, unknown>, k: string): boolean => f[k] !== null && f[k] !== undefined;
 
 // The cycle comes from a model as free text, so accept the common spellings. T1.1 should make it an enum.
-const MONTHS_PER_CYCLE: Record<string, number> = {
+export const MONTHS_PER_CYCLE: Record<string, number> = {
   monthly: 1,
   month: 1,
   "per month": 1,
@@ -69,7 +69,7 @@ const MONTHS_PER_CYCLE: Record<string, number> = {
   "every year": 12,
 };
 
-const DAYS_PER_CYCLE: Record<string, number> = {
+export const DAYS_PER_CYCLE: Record<string, number> = {
   weekly: 7,
   week: 7,
   "per week": 7,

@@ -1,3 +1,4 @@
+import type { AgreementKind } from "obligation-kit";
 import { tokens } from "./normalize";
 
 /** Plain shapes named after SPEC section 3. T1.1 can pass its entities straight in or map to these. */
@@ -10,8 +11,8 @@ export interface AssetLike {
   location?: string;
 }
 
-// Same five values as obligation-kit's AgreementKind. Merge them into one definition in the T1.1 contracts.
-export type AgreementKind = "warranty" | "insurance" | "lease" | "subscription" | "service_plan";
+// The one definition lives in obligation-kit. Re-exported so imports from this package keep working.
+export type { AgreementKind };
 
 export interface AgreementLike {
   id: string;
