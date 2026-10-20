@@ -277,8 +277,9 @@ export function createWebApi(deps: WebApiDeps): Hono<{ Variables: { hh: string; 
   api.get("/obligations", async (c) => {
     const hh = c.var.hh;
     const from = c.req.query("from") ?? today();
+    if (parseIso(from) === null) throw new ApiError(400, "Dates must look like 2026-10-21.");
     const to = c.req.query("to") ?? addDays(from, DEFAULT_RANGE_DAYS);
-    if (parseIso(from) === null || parseIso(to) === null) throw new ApiError(400, "Dates must look like 2026-10-21.");
+    if (parseIso(to) === null) throw new ApiError(400, "Dates must look like 2026-10-21.");
     if (to < from) throw new ApiError(400, "The end date must not be before the start date.");
     if (addDays(from, MAX_RANGE_DAYS) < to) {
       throw new ApiError(400, `Ask for at most ${MAX_RANGE_DAYS} days at a time.`);
