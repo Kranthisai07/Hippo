@@ -56,7 +56,8 @@ export const ContactSchema = z.strictObject({
 export const AssetHintSchema = z.strictObject({
   brand: field(leaf(text)),
   model: field(leaf(text)),
-  serial: field(leaf(text)),
+  /** The last 4 characters only (INTENT principle 7), never a full serial number. */
+  serial: field(leaf(z.string().regex(/^[A-Za-z0-9]{1,4}$/))),
 });
 
 /** One bullet-sized statement a person reads in review: coverage, exclusion, claim step. */

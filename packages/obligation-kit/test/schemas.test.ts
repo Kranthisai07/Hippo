@@ -181,6 +181,21 @@ describe("other field rules", () => {
     }
   });
 
+  // Review finding: the comment said "the last 4 only" but the schema accepted any text, so a full serial could be stored.
+  it("the serial on an asset hint is the last 4 characters only", () => {
+    const w = () => clone(load("warranty_dishwasher").fields);
+    for (const ok of ["7731", "ab12", "1"]) {
+      const f = w();
+      f.assetHint.serial.value = ok;
+      expect(ExtractionSchemas.warranty.safeParse(f).success, ok).toBe(true);
+    }
+    for (const bad of ["SN-7731-ABCD", "77311", "", "77 31", "7731\n"]) {
+      const f = w();
+      f.assetHint.serial.value = bad;
+      expect(ExtractionSchemas.warranty.safeParse(f).success, JSON.stringify(bad)).toBe(false);
+    }
+  });
+
   it("the service plan schema takes an interval or a next date", () => {
     const ok = ExtractionSchemas.service_plan.safeParse({
       provider: { value: "Acme HVAC", sourceRef: { page: 1, quote: "Acme HVAC" } },
