@@ -51,6 +51,11 @@ export const TTL = {
 
 const MAX_BODY = 16 * 1024;
 const MAX_MAGIC_ATTEMPTS = 5;
+// Counters are keyed by email, not by code, so issuing a new code never resets them.
+const SEND_GAP_MS = 60_000;
+const SENDS_PER_HOUR = 5;
+const MAX_GUESSES = 10;
+const GUESS_WINDOW_MS = 15 * 60_000;
 const SESSION_COOKIE = "hippo_session";
 const CSRF_COOKIE = "hippo_csrf";
 const B64URL = /^[A-Za-z0-9_-]+$/;
@@ -61,7 +66,7 @@ export const trimSlash = (u: string): string => (u.endsWith("/") ? u.slice(0, -1
 
 export function normalizeEmail(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
-  const e = raw.trim().toLowerCase();
+  const e = raw.normalize("NFKC").trim().toLowerCase();
   return e.length <= 254 && EMAIL.test(e) ? e : null;
 }
 
@@ -177,7 +182,18 @@ export function createAuth(opts: AuthOptions): Auth {
     return { sub: "u_" + (await sha256b64url(email)).slice(0, 22), householdId };
   };
 
-  const issueMagic = async (email: string): Promise<void> => {
+  const retrySec = (ms: number): number => Math.max(1, Math.ceil(ms / 1000));
+
+  /** Returns Retry-After seconds when the send is refused, otherwise null. */
+  const issueMagic = async (email: string): Promise<number | null> => {
+    const gate = await store.tryHit(
+      "send:" + (await sha256b64url(email)),
+      3600_000,
+      SENDS_PER_HOUR,
+      SEND_GAP_MS,
+      now(),
+    );
+    if (!gate.ok) return retrySec(gate.retryAfterMs);
     const code = sixDigits(random);
     await store.putMagic(await sha256b64url(email), {
       codeHash: await sha256b64url(code),
@@ -186,25 +202,35 @@ export function createAuth(opts: AuthOptions): Auth {
     });
     // DELIBERATE: the only place a secret is logged. The demo has no mail provider, so the magic code goes to the server log.
     opts.log(`[hippo-auth] magic code for ${email}: ${code}`);
+    return null;
   };
 
-  const checkMagic = async (email: string, code: unknown): Promise<boolean> => {
-    if (typeof code !== "string" || code.length === 0 || code.length > 12) return false;
-    if (opts.demoUser && email === opts.demoUser.email && (await safeEqual(code, opts.demoUser.code))) return true;
+  // Every guess takes a slot before it is compared, so parallel guesses cannot exceed the limit.
+  // The demo code goes through the same counter. A success clears it.
+  const checkMagic = async (email: string, code: unknown): Promise<"ok" | "bad" | { retryAfterSec: number }> => {
+    if (typeof code !== "string" || code.length === 0 || code.length > 12) return "bad";
     const k = await sha256b64url(email);
+    const slot = await store.tryHit("fail:" + k, GUESS_WINDOW_MS, MAX_GUESSES, 0, now());
+    if (!slot.ok) return { retryAfterSec: retrySec(slot.retryAfterMs) };
+    const ok = async (): Promise<"ok"> => {
+      await store.clearCounter("fail:" + k);
+      await store.deleteMagic(k);
+      return "ok";
+    };
+    if (opts.demoUser && email === opts.demoUser.email && (await safeEqual(code, opts.demoUser.code))) return ok();
     const rec = await store.getMagic(k);
-    if (!rec || rec.expiresAt <= now()) return false;
+    if (!rec || rec.expiresAt <= now()) return "bad";
     if (rec.attempts >= MAX_MAGIC_ATTEMPTS) {
       await store.deleteMagic(k);
-      return false;
+      return "bad";
     }
-    if (await safeEqual(await sha256b64url(code), rec.codeHash)) {
-      await store.deleteMagic(k);
-      return true;
-    }
+    if (await safeEqual(await sha256b64url(code), rec.codeHash)) return ok();
     await store.putMagic(k, { ...rec, attempts: rec.attempts + 1 });
-    return false;
+    return "bad";
   };
+
+  const limited = (c: Context, retryAfterSec: number): Response =>
+    c.json({ error: "rate_limited" }, 429, { ...noStore, "Retry-After": String(retryAfterSec) });
 
   const startSession = async (c: Context, email: string): Promise<{ email: string; householdId: string }> => {
     const id = await identity(email);
@@ -301,7 +327,7 @@ export function createAuth(opts: AuthOptions): Auth {
     p: AuthzParams,
     csrf: string,
     extra: { email?: string; notice?: string; error?: string } = {},
-    status: 200 | 401 = 200,
+    status: 200 | 401 | 429 = 200,
   ): Promise<Response> => {
     const s = await sessionFromId(getCookie(c, SESSION_COOKIE));
     const html = loginPage({
@@ -351,14 +377,29 @@ export function createAuth(opts: AuthOptions): Auth {
       email = normalizeEmail(opts.demoUser.email);
     } else if (action === "send") {
       const e = normalizeEmail(single(sp, "email"));
-      if (e) await issueMagic(e);
+      const wait = e ? await issueMagic(e) : null;
+      if (wait !== null) {
+        c.header("Retry-After", String(wait));
+        return renderLogin(
+          c,
+          p,
+          csrfCookie,
+          { email: e ?? "", error: "Too many codes requested. Try again later." },
+          429,
+        );
+      }
       return renderLogin(c, p, csrfCookie, {
         email: e ?? "",
         notice: "If that address can sign in, a code was sent. Enter it below.",
       });
     } else if (action === "login") {
       const e = normalizeEmail(single(sp, "email"));
-      if (e && (await checkMagic(e, single(sp, "code")))) email = e;
+      const r = e ? await checkMagic(e, single(sp, "code")) : "bad";
+      if (typeof r === "object") {
+        c.header("Retry-After", String(r.retryAfterSec));
+        return renderLogin(c, p, csrfCookie, { email: e ?? "", error: "Too many tries. Try again later." }, 429);
+      }
+      if (e && r === "ok") email = e;
       else return renderLogin(c, p, csrfCookie, { email: e ?? "", error: "That code did not work." }, 401);
     } else {
       return bad();
@@ -571,7 +612,8 @@ export function createAuth(opts: AuthOptions): Auth {
     if (g) return g;
     const email = normalizeEmail((await readJson(c))?.email);
     if (!email) return c.json({ error: "invalid_request" }, 400, noStore);
-    await issueMagic(email);
+    const wait = await issueMagic(email);
+    if (wait !== null) return limited(c, wait);
     return c.json({ ok: true }, 200, noStore); // same answer whether or not the address is known
   });
 
@@ -586,7 +628,9 @@ export function createAuth(opts: AuthOptions): Auth {
       email = normalizeEmail(opts.demoUser.email);
     } else {
       const e = normalizeEmail(body.email);
-      if (e && (await checkMagic(e, body.code))) email = e;
+      const r = e ? await checkMagic(e, body.code) : "bad";
+      if (typeof r === "object") return limited(c, r.retryAfterSec);
+      if (e && r === "ok") email = e;
     }
     if (!email) return c.json({ error: "access_denied" }, 401, noStore);
     return c.json(await startSession(c, email), 200, noStore);
