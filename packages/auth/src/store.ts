@@ -49,13 +49,23 @@ export interface AuthStore {
   putMagic(emailKey: string, rec: MagicRecord): Promise<void>;
   getMagic(emailKey: string): Promise<MagicRecord | undefined>;
   deleteMagic(emailKey: string): Promise<void>;
+  /**
+   * Atomic rate counter. Records a hit at nowMs and returns ok only if fewer than max hits fall inside the
+   * trailing windowMs and the last hit is at least minGapMs old. A refused call records nothing.
+   * A durable store must do this as one conditional write.
+   */
+  tryHit(key: string, windowMs: number, max: number, minGapMs: number, nowMs: number): Promise<HitResult>;
+  clearCounter(key: string): Promise<void>;
 }
+
+export type HitResult = { ok: true } | { ok: false; retryAfterMs: number };
 
 export function createMemoryStore(): AuthStore {
   const codes = new Map<string, { rec: CodeRecord; used: boolean }>();
   const refresh = new Map<string, { rec: RefreshRecord; used: boolean }>();
   const sessions = new Map<string, SessionRecord>();
   const magic = new Map<string, MagicRecord>();
+  const counters = new Map<string, number[]>();
 
   const consume = <T>(m: Map<string, { rec: T; used: boolean }>, key: string): Consumed<T> => {
     const e = m.get(key);
@@ -99,6 +109,23 @@ export function createMemoryStore(): AuthStore {
     },
     async deleteMagic(k) {
       magic.delete(k);
+    },
+    async tryHit(key, windowMs, max, minGapMs, nowMs) {
+      const hits = (counters.get(key) ?? []).filter((t) => t > nowMs - windowMs);
+      const last = hits[hits.length - 1];
+      const waits: number[] = [];
+      if (hits.length >= max) waits.push(hits[hits.length - max]! + windowMs - nowMs);
+      if (last !== undefined && nowMs - last < minGapMs) waits.push(last + minGapMs - nowMs);
+      if (waits.length > 0) {
+        counters.set(key, hits);
+        return { ok: false, retryAfterMs: Math.max(...waits) };
+      }
+      hits.push(nowMs);
+      counters.set(key, hits);
+      return { ok: true };
+    },
+    async clearCounter(key) {
+      counters.delete(key);
     },
   };
 }
