@@ -54,6 +54,37 @@ describe("check_coverage: the hero answer", () => {
     }
   });
 
+  // Review finding: a long asset name pushed the disclaimer past the word cap and speak() dropped the whole sentence.
+  it("keeps the disclaimer and stays under 45 words when the asset has a very long name", async () => {
+    const env = await seeded("2026-10-21");
+    const asset = (await env.repo.getAsset(A, "A-dishwasher"))!;
+    await env.repo.putAsset(A, {
+      ...asset,
+      name: "Bosch 800 Series Built-in Stainless Steel Quiet Dishwasher Kitchen Island",
+    });
+    for (const issue of ["leaking", "quantum flux capacitor"]) {
+      const r = check("check_coverage", await checkCoverage(env.ctx, { asset: "dishwasher", issue }));
+      const t = text(r);
+      expect(t.toLowerCase(), issue).toContain("not a claim decision");
+      expect(countWords(t), issue).toBeLessThanOrEqual(45);
+      expect(t.match(/[.!?](\s|$)/g), issue).toHaveLength(2);
+    }
+  });
+
+  it("keeps the disclaimer in every branch when the name is long (expired, not started, unconfirmed)", async () => {
+    for (const today of ["2027-02-01", "2025-01-01"]) {
+      const env = await seeded(today);
+      const asset = (await env.repo.getAsset(A, "A-dishwasher"))!;
+      await env.repo.putAsset(A, {
+        ...asset,
+        name: "Bosch 800 Series Built-in Stainless Steel Quiet Dishwasher Kitchen Island",
+      });
+      const t = text(check("check_coverage", await checkCoverage(env.ctx, { asset: "dishwasher", issue: "leaking" })));
+      expect(t.toLowerCase(), today).toContain("not a claim decision");
+      expect(countWords(t), today).toBeLessThanOrEqual(45);
+    }
+  });
+
   it("lists the missing receipt as proof and keeps the receipt out when one is uploaded", async () => {
     const { env, r } = await cover("2026-10-21", "dishwasher", "leaking");
     expect((r.structuredContent as any).missingProof).toHaveLength(1);

@@ -17,7 +17,8 @@ import {
   strList,
 } from "../format";
 import { findAsset } from "../resolve";
-import { ok } from "../result";
+import { ok, okFit } from "../result";
+import { maskNumbers } from "../speak";
 
 export const description =
   "Checks whether a broken or damaged item is covered: finds the warranty or insurance linked to it, checks it is still in term, and returns the coverage clause, any exclusion, the claim steps and the claim-by date, each with document and page. " +
@@ -93,7 +94,7 @@ export const checkCoverage: ToolHandler<Args> = async (ctx, args) => {
   const doc: Doc | null = agreement.docId ? await repo.getDoc(hh, agreement.docId) : null;
   const docName = agreement.docId ? docNameOf(doc) : null;
   const noun = agreement.kind === "warranty" ? "warranty" : "insurance";
-  const name = lowerGeneric(asset.name);
+  const name = lowerGeneric(asset.name).split(/\s+/).slice(0, 4).join(" ");
 
   // Claim window and the claim-by date. The incident is taken to be today (Q-007 part 2): claimByDate is called here
   // at check time, and severityFor is not, because a claim-by date is an answer, not a stored obligation or alert.
@@ -103,7 +104,7 @@ export const checkCoverage: ToolHandler<Args> = async (ctx, args) => {
   const claimSteps = active
     ? strList(agreement.fields, "claimSteps")
         .slice(0, 4)
-        .map((text, i) => ({ text: text.slice(0, 500), page: pageOf(agreement, "claimSteps", i) }))
+        .map((text, i) => ({ text: maskNumbers(text).slice(0, 500), page: pageOf(agreement, "claimSteps", i) }))
     : [];
 
   const missingProof: string[] = [];
@@ -173,36 +174,30 @@ export const checkCoverage: ToolHandler<Args> = async (ctx, args) => {
       end && end < today
         ? `ended on ${speakDate(end, today)}`
         : `starts on ${speakDate(term.startDate ?? today, today)}`;
-    return ok([`Your ${name} ${noun} ${when}, so it does not cover this.`, DISCLAIMER], structured);
+    return okFit(`Your ${name} ${noun} ${when}, so it does not cover this.`, [DISCLAIMER], structured);
   }
   if (term.inTerm === null) {
-    return ok([`I found your ${name} ${noun}, but I cannot tell if it is still active.`, DISCLAIMER], structured);
+    return okFit(`I found your ${name} ${noun}, but I cannot tell if it is still active.`, [DISCLAIMER], structured);
   }
   if (!term.confirmed) {
-    return ok(
-      [
-        `I found your ${name} ${noun}, but its dates are not confirmed yet. Please confirm them in the app.`,
-        DISCLAIMER,
-      ],
+    return okFit(
+      `I found your ${name} ${noun}, but its dates are not confirmed yet. Please confirm them in the app.`,
+      [DISCLAIMER],
       structured,
     );
   }
   if (badge === "unclear") {
     const lead = exclusion ? exclusionLead(exclusion, args.issue) : null;
     if (exclusion && lead) {
-      return ok(
-        [
-          `Your ${name} ${noun} runs to ${speakDate(end!, today)}, but page ${exclusion.page} excludes ${lead}, so I cannot say it is covered.`,
-          DISCLAIMER,
-        ],
+      return okFit(
+        `Your ${name} ${noun} runs to ${speakDate(end!, today)}, but page ${exclusion.page} excludes ${lead}, so I cannot say it is covered.`,
+        [DISCLAIMER],
         structured,
       );
     }
-    return ok(
-      [
-        `I found your ${name} ${noun}, which runs to ${speakDate(end!, today)}, but nothing relevant to that problem was found in it.`,
-        DISCLAIMER,
-      ],
+    return okFit(
+      `I found your ${name} ${noun}, which runs to ${speakDate(end!, today)}, but nothing relevant to that problem was found in it.`,
+      [DISCLAIMER],
       structured,
     );
   }
@@ -214,6 +209,5 @@ export const checkCoverage: ToolHandler<Args> = async (ctx, args) => {
   const receipt = missingProof.length > 0 ? (report ? "and upload your receipt" : "Upload your receipt") : "";
   const steps = [report, receipt].filter(Boolean).join(", ");
   const disclaimer = DISCLAIMER.charAt(0).toLowerCase() + DISCLAIMER.slice(1);
-  const second = steps ? `${steps}; ${disclaimer}` : DISCLAIMER;
-  return ok([first, second], structured);
+  return okFit(first, steps ? [`${steps}; ${disclaimer}`, DISCLAIMER] : [DISCLAIMER], structured);
 };
