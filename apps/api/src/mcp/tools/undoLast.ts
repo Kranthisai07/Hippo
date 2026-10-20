@@ -27,10 +27,19 @@ async function applyInverse(ctx: ToolContext, op: UndoOp): Promise<void> {
       }
       return;
     }
-    case "delete_event":
+    case "delete_event": {
       await repo.deleteEvent(hh, op.assetId, op.eventId);
-      await recomputeService(ctx, op.assetId);
+      const kept = new Set((await recomputeService(ctx, op.assetId)).map((o) => o.id));
+      // The service_due deadline raised by the logged service is gone, so its alert must not stay pending.
+      const plans = (await repo.listAgreements(hh, { assetId: op.assetId })).filter((a) => a.kind === "service_plan");
+      for (const alert of await repo.listAlerts(hh)) {
+        const ours = plans.some((p) => alert.refId.startsWith(`${p.id}:`));
+        if (ours && !kept.has(alert.refId) && (alert.status === "pending" || alert.status === "announced")) {
+          await repo.putAlert(hh, { ...alert, status: "dismissed" });
+        }
+      }
       return;
+    }
   }
 }
 
