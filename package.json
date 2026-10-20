@@ -11,7 +11,7 @@
     "test:latency": "pnpm --filter @hippo/api test:latency",
     "dev": "pnpm --filter @hippo/api dev",
     "ingest:fixture": "node scripts/not-built.mjs ingest:fixture T2.2",
-    "daily:run": "node scripts/not-built.mjs daily:run T3.4",
+    "daily:run": "pnpm --filter @hippo/workers daily:run",
     "inspect": "node scripts/not-built.mjs inspect T1.5",
     "deploy": "node scripts/not-built.mjs deploy T4.3",
     "format:check": "prettier --check apps scripts"
