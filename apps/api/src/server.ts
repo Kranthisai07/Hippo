@@ -4,6 +4,7 @@ import { createAuth } from "@hippo/auth";
 import { serve, type ServerType } from "@hono/node-server";
 import { createMemoryRepository } from "core/src/repository";
 import { createApp } from "./app";
+import { createLocalUploader, createMemoryObjectStore } from "./api/storage";
 import { createMemoryIndexSource } from "./mcp/indexCache";
 import { DEMO_HOUSEHOLD, seedHousehold } from "./seed";
 
@@ -78,7 +79,8 @@ export async function startServer(opts: ServerOptions = {}): Promise<Running> {
 
   const repo = createMemoryRepository();
   const indexSource = createMemoryIndexSource();
-  await seedHousehold(repo, { today, householdId: DEMO_HOUSEHOLD, indexSource });
+  const objectStore = createMemoryObjectStore();
+  await seedHousehold(repo, { today, householdId: DEMO_HOUSEHOLD, indexSource, pageStore: objectStore });
 
   const demoEmail = env.HIPPO_DEMO_EMAIL ?? "demo@hippo.example";
   const demoOn = demoEnabled(host, env);
@@ -89,7 +91,10 @@ export async function startServer(opts: ServerOptions = {}): Promise<Running> {
   const serviceId = env.HIPPO_SERVICE_CLIENT_ID;
   const serviceSecret = env.HIPPO_SERVICE_CLIENT_SECRET;
 
+  const allowedOrigins = list(env.HIPPO_ALLOWED_ORIGINS, ["http://localhost:5173", "http://localhost:3000"]);
   const auth = createAuth({
+    // The web dev server sends the cookie session calls (/oauth/session) from its own origin.
+    allowedOrigins: [new URL(issuer).origin, ...allowedOrigins],
     issuer,
     resource: `${issuer}/mcp`,
     signingKey,
@@ -109,7 +114,10 @@ export async function startServer(opts: ServerOptions = {}): Promise<Running> {
     repo,
     indexSource,
     now: clock,
-    allowedOrigins: list(env.HIPPO_ALLOWED_ORIGINS, ["http://localhost:5173", "http://localhost:3000"]),
+    allowedOrigins,
+    // Web API: files in memory, the PUT route of this server, and the fixture ingest (createApp's default hook) that
+    // only reads the demo documents. The web dev server may send the cookie from its own origin.
+    web: { objectStore, uploader: createLocalUploader(), origins: [new URL(issuer).origin, ...allowedOrigins] },
     log,
   });
 

@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import type { Agreement, Alert, Asset, Doc, Repository } from "core/src/contracts";
 import { chunkPages, buildIndex, serializeIndex, type Chunk } from "core/src/retrieval";
+import { pageTextKey } from "core/src/repository/shared";
 import { ExtractionSchemas, leavesToAgreementFields, type AgreementKind } from "obligation-kit";
 import { syncObligations } from "./obligations";
 
@@ -35,7 +36,7 @@ const DOCS = [
   "subscription_kestrel",
 ] as const;
 
-const PARTY_FIELD: Record<AgreementKind, string> = {
+export const PARTY_FIELD: Record<AgreementKind, string> = {
   warranty: "provider",
   insurance: "insurer",
   lease: "landlord",
@@ -49,6 +50,8 @@ export interface SeedOptions {
   householdId?: string;
   /** Receives the serialized clause index of the household. */
   indexSource?: { put(householdId: string, serialized: string): void };
+  /** Receives the page text of each document, so the web app can show a clause (the key is core pageTextKey). */
+  pageStore?: { put(key: string, bytes: Uint8Array): Promise<void> };
 }
 
 export interface SeedResult {
@@ -152,6 +155,10 @@ export async function seedHousehold(repo: Repository, opts: SeedOptions): Promis
     agreements.push(agreement);
 
     const pages = read<PagesFile>(`expected/pages/${key}.json`).pages.map((text, i) => ({ page: i + 1, text }));
+    await opts.pageStore?.put(
+      pageTextKey(hh, docId),
+      new TextEncoder().encode(JSON.stringify({ pages: pages.map((p) => p.text) })),
+    );
     const docChunks = chunkPages(docId, pages);
     chunks.push(...docChunks);
     await repo.putChunkMeta(hh, {

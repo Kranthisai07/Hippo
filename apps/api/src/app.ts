@@ -3,6 +3,9 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import type { Repository } from "core/src/contracts";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
+import { createFixtureIngest, type IndexStore, type OnUploaded } from "./api/fixtureIngest";
+import { createWebApi } from "./api/routes";
+import { createLocalUploader, createMemoryObjectStore, type ObjectStore, type Uploader } from "./api/storage";
 import { createIndexCache, type IndexSource } from "./mcp/indexCache";
 import { createMcpServer } from "./mcp/server";
 import type { ToolContext } from "./mcp/context";
@@ -20,6 +23,21 @@ export interface AppDeps {
   /** Request body limit for /mcp in bytes. */
   maxBodyBytes?: number;
   log?: (line: string) => void;
+  /** The web JSON API under /api (docs/WEB_API.md). Everything is optional: the defaults are in memory and local. */
+  web?: WebDeps;
+}
+
+export interface WebDeps {
+  /** Where uploaded files live. Default: in memory. */
+  objectStore?: ObjectStore;
+  /** How a browser sends a file. Default: the local PUT route of this server. */
+  uploader?: Uploader;
+  /** Runs after the bytes are stored. Default: the fixture ingest, which only reads the demo documents. */
+  onUploaded?: OnUploaded;
+  /** Where the clause index is written. Default: indexSource when it can be written to. */
+  indexStore?: IndexStore;
+  /** Browser origins other than the server's own that may send writes with the session cookie (the web dev server). */
+  origins?: string[];
 }
 
 /** What a client_credentials (service) token may do: set up and list, never call a tool or touch data. */
@@ -57,6 +75,25 @@ export function createApp(deps: AppDeps): Hono {
   const allowed = new Set(deps.allowedOrigins ?? []);
 
   app.route("/", deps.auth.app);
+
+  const web = deps.web ?? {};
+  const objectStore = web.objectStore ?? createMemoryObjectStore();
+  const indexStore = web.indexStore ?? ("put" in deps.indexSource ? (deps.indexSource as IndexStore) : undefined);
+  app.route(
+    "/api",
+    createWebApi({
+      auth: deps.auth,
+      repo: deps.repo,
+      objectStore,
+      uploader: web.uploader ?? createLocalUploader(),
+      onUploaded: web.onUploaded ?? createFixtureIngest({ repo: deps.repo, objectStore, indexStore, now, newId }),
+      indexStore,
+      indexes,
+      now,
+      newId,
+      origins: web.origins ?? [],
+    }),
+  );
 
   app.get("/healthz", (c) => c.json({ ok: true }));
 
