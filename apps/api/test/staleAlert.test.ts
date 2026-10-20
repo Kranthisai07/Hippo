@@ -1,3 +1,4 @@
+import type { Agreement } from "core/src/contracts";
 import { describe, expect, it } from "vitest";
 import { syncObligations } from "../src/obligations";
 import { A, seeded } from "./helpers";
@@ -54,6 +55,64 @@ describe("a changed date closes the alert for the old date", () => {
     const edited = { ...lease, fields: { ...lease.fields, endDate: "2027-12-31" } };
     await syncObligations(env.repo, A, edited, assets, "2026-10-21");
     expect(await mine()).toEqual(before);
+  });
+
+  // Round 2 review: a system dismissal looked like a person's, so fixing a typo hid the real alert for good.
+  it("reopens the alert when the date is corrected back", async () => {
+    const { env, lease, assets, alertsOf } = await setup();
+    const noticeId = (await alertsOf(lease.id)).find((a) => a.refId.includes("notice_by:2026-11-01"))!.id;
+
+    const typo = { ...lease, fields: { ...lease.fields, endDate: "2026-11-05" } };
+    await syncObligations(env.repo, A, typo, assets, "2026-10-21");
+    expect((await env.repo.getAlert(A, noticeId))!.status).toBe("dismissed");
+
+    await syncObligations(env.repo, A, lease, assets, "2026-10-21");
+    const again = (await env.repo.getAlert(A, noticeId))!;
+    expect(again.status).toBe("pending");
+    expect(again.closedBy).toBeUndefined();
+  });
+
+  it("never reopens an alert the person dismissed themselves", async () => {
+    const { env, lease, assets, alertsOf } = await setup();
+    const alert = (await alertsOf(lease.id)).find((a) => a.refId.includes("notice_by:2026-11-01"))!;
+    await env.repo.putAlert(A, { ...alert, status: "dismissed" });
+    await syncObligations(env.repo, A, lease, assets, "2026-10-21");
+    expect((await env.repo.getAlert(A, alert.id))!.status).toBe("dismissed");
+    const typo = { ...lease, fields: { ...lease.fields, endDate: "2026-11-05" } };
+    await syncObligations(env.repo, A, typo, assets, "2026-10-21");
+    await syncObligations(env.repo, A, lease, assets, "2026-10-21");
+    expect((await env.repo.getAlert(A, alert.id))!.status).toBe("dismissed");
+  });
+
+  it("does not mix up agreements whose ids are prefixes of each other", async () => {
+    const { env, lease, assets } = await setup();
+    const mk = (id: string, endDate: string): Agreement => ({
+      ...lease,
+      id,
+      docId: undefined,
+      fields: { ...lease.fields, endDate },
+      fieldStatus: { ...lease.fieldStatus },
+    });
+    const a = mk("zz", "2026-12-31");
+    const ab = mk("zz:b", "2026-12-31");
+    await syncObligations(env.repo, A, a, assets, "2026-10-21");
+    await syncObligations(env.repo, A, ab, assets, "2026-10-21");
+    const mineOf = async (prefixOk: (r: string) => boolean) =>
+      (await env.repo.listAlerts(A)).filter((x) => prefixOk(x.refId));
+    const abAlerts = await mineOf((r) => r.startsWith("zz:b:"));
+    expect(abAlerts.length).toBeGreaterThan(0);
+    await syncObligations(env.repo, A, { ...a, fields: { ...a.fields, endDate: "2027-12-31" } }, assets, "2026-10-21");
+    expect((await mineOf((r) => r.startsWith("zz:b:"))).every((x) => x.status === "pending")).toBe(true);
+  });
+
+  it("deleting the document also removes the alert of an old date", async () => {
+    const { env, lease, assets } = await setup();
+    const typo = { ...lease, fields: { ...lease.fields, endDate: "2026-11-05" } };
+    await env.repo.putAgreement(A, typo);
+    await syncObligations(env.repo, A, typo, assets, "2026-10-21");
+    expect((await env.repo.listAlerts(A)).some((x) => x.refId.startsWith(`${lease.id}:`))).toBe(true);
+    await env.repo.deleteDocumentCascade(A, lease.docId!);
+    expect((await env.repo.listAlerts(A)).filter((x) => x.refId.startsWith(`${lease.id}:`))).toEqual([]);
   });
 
   it("keeps an alert whose obligation is still there (running it twice changes nothing)", async () => {

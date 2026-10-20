@@ -1,5 +1,6 @@
 import type { Agreement, Alert, Asset, ObligationRecord, Repository } from "core/src/contracts";
 import { computeObligations, type ObligationType } from "obligation-kit";
+import { agreementIdOfRef } from "core/src/repository/shared";
 import { capitalize, lowerGeneric } from "./mcp/format";
 
 const PHRASE: Record<ObligationType, string> = {
@@ -70,12 +71,19 @@ export async function syncObligations(
 ): Promise<ObligationRecord[]> {
   const records = buildObligations(agreement, assets, today);
   await repo.replaceObligations(householdId, agreement.id, records);
-  // Alert ids include the due date, so a changed date leaves the alert for the old date behind. Close it unless the
-  // person already did (done and dismissed stay as they are).
+  // Alert ids include the due date, so a changed date leaves the alert for the old date behind. Close it and mark it
+  // as closed by the system (done and a person's own dismissal stay as they are). The agreement is found by dropping the
+  // last two segments of the ref, never by a prefix, so agreements "a" and "a:b" cannot be mixed up.
   const kept = new Set(records.map((o) => o.id));
-  for (const alert of await repo.listAlerts(householdId, { open: true })) {
-    if (alert.source === "deadline" && alert.refId.startsWith(`${agreement.id}:`) && !kept.has(alert.refId)) {
-      await repo.putAlert(householdId, { ...alert, status: "dismissed" });
+  for (const alert of await repo.listAlerts(householdId)) {
+    if (alert.source !== "deadline" || agreementIdOfRef(alert.refId) !== agreement.id) continue;
+    const open = alert.status === "pending" || alert.status === "announced";
+    if (!kept.has(alert.refId) && open) {
+      await repo.putAlert(householdId, { ...alert, status: "dismissed", closedBy: "stale" });
+    } else if (kept.has(alert.refId) && alert.status === "dismissed" && alert.closedBy === "stale") {
+      // The date is back to what it was (a typo was corrected): the real deadline must alert again.
+      const { closedBy: _closedBy, ...reopened } = alert;
+      await repo.putAlert(householdId, { ...reopened, status: "pending" });
     }
   }
   for (const o of records) {

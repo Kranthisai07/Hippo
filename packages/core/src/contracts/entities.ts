@@ -89,6 +89,11 @@ export interface Alert extends DigestAlert {
   announcedAt?: string | null;
   /** Hidden until this ISO timestamp (snooze_7d). */
   snoozedUntil?: string | null;
+  /**
+   * Set to "stale" when the system closed the alert because its date changed (never when a person did). Such an alert
+   * is reopened if the date changes back, a person's own dismissal never is. Optional, added after the contracts froze.
+   */
+  closedBy?: "stale";
 }
 
 /** A recall the person marked "not mine". Stops the same recall coming back for that asset. */

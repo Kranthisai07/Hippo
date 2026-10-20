@@ -40,7 +40,21 @@ export function s3KeysForDoc(householdId: string, doc: Doc, chunkS3Key: string |
   return [...new Set(keys)].sort();
 }
 
-/** The ids of everything derived from one document, given the household's agreements, obligations and alerts. */
+/**
+ * The agreement a deadline alert belongs to. An obligation id (an alert's refId) is `<agreementId>:<type>:<dueDate>`
+ * and an agreement id may itself hold colons, so the last two segments are dropped, never a prefix compared: agreements
+ * "a" and "a:b" must not be mixed up. Null when the id does not have that shape.
+ */
+export function agreementIdOfRef(refId: string): string | null {
+  const parts = refId.split(":");
+  return parts.length >= 3 ? parts.slice(0, -2).join(":") : null;
+}
+
+/**
+ * The ids of everything derived from one document, given the household's agreements, obligations and alerts. An alert
+ * is matched by its agreement, not by a current obligation: after a date changed, the alert of the old date has no
+ * obligation any more but still belongs to the document.
+ */
 export function derivedFromDoc(
   docId: string,
   agreements: Agreement[],
@@ -53,6 +67,12 @@ export function derivedFromDoc(
     .filter((o) => o.agreementId !== undefined && agSet.has(o.agreementId))
     .map((o) => o.id);
   const obSet = new Set(obligationIds);
-  const alertIds = alerts.filter((a) => a.source === "deadline" && obSet.has(a.refId)).map((a) => a.id);
+  const alertIds = alerts
+    .filter((a) => {
+      if (a.source !== "deadline") return false;
+      const owner = agreementIdOfRef(a.refId);
+      return obSet.has(a.refId) || (owner !== null && agSet.has(owner));
+    })
+    .map((a) => a.id);
   return { agreementIds, obligationIds, alertIds };
 }
