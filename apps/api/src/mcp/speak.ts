@@ -55,7 +55,8 @@ const isRealDate = (core: string): boolean => {
   const m = /^(\d{1,2})[/.](\d{1,2})[/.](?:\d{2}|\d{4})$/.exec(core);
   return !!m && (dayMonthOk(Number(m[1]), Number(m[2])) || dayMonthOk(Number(m[2]), Number(m[1])));
 };
-const isMoney = (core: string): boolean => /^\$\d{1,3}(?:,\d{3})+(?:\.\d+)?$/.test(core) || /^\$\d+(?:\.\d+)?$/.test(core);
+const isMoney = (core: string): boolean =>
+  /^\$\d{1,3}(?:,\d{3})+(?:\.\d+)?$/.test(core) || /^\$\d+(?:\.\d+)?$/.test(core);
 const isPhone = (core: string): boolean => /^(?:\+?1[-. ])?\(?\d{3}\)?[-. ]\d{3}[-. ]\d{4}$/.test(core);
 const isExempt = (core: string): boolean => isRealDate(core) || isMoney(core) || isPhone(core);
 

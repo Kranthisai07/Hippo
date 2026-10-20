@@ -15,7 +15,8 @@ export function ok(text: string | readonly string[], structured: Record<string, 
 export function okFit(first: string, seconds: readonly string[], structured: Record<string, unknown>): ToolResult {
   const minimal = speak(seconds[seconds.length - 1]!);
   const one = speak(first, Math.max(1, MAX_SPOKEN_WORDS - countWords(minimal)));
-  const second = seconds.map((s) => speak(s)).find((s) => countWords(one) + countWords(s) <= MAX_SPOKEN_WORDS) ?? minimal;
+  const second =
+    seconds.map((s) => speak(s)).find((s) => countWords(one) + countWords(s) <= MAX_SPOKEN_WORDS) ?? minimal;
   return { content: [{ type: "text", text: `${one} ${second}`.trim() }], structuredContent: structured };
 }
 

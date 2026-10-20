@@ -51,7 +51,9 @@ describe("the local demo login", () => {
       expect(joined).not.toContain("424242");
       const code = /with code (\d{6})/.exec(joined)?.[1];
       expect(code).toBeTruthy();
-      expect((await session(server.url, { email: server.demoUser.email, code: "424242" })).status).toBeGreaterThanOrEqual(400);
+      expect(
+        (await session(server.url, { email: server.demoUser.email, code: "424242" })).status,
+      ).toBeGreaterThanOrEqual(400);
       expect((await session(server.url, { email: server.demoUser.email, code })).status).toBe(200);
     } finally {
       await server.close();
@@ -85,7 +87,9 @@ describe("the local demo login", () => {
     try {
       expect(lines.join("\n")).toMatch(/demo login is off/i);
       expect((await session(server.url, { demo: true })).status).toBe(401);
-      expect((await session(server.url, { email: "demo@hippo.example", code: "987654" })).status).toBeGreaterThanOrEqual(400);
+      expect(
+        (await session(server.url, { email: "demo@hippo.example", code: "987654" })).status,
+      ).toBeGreaterThanOrEqual(400);
       const meta = await (await fetch(`${server.url}/.well-known/oauth-authorization-server`)).json();
       expect(meta).toBeTruthy();
     } finally {
