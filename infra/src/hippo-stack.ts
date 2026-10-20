@@ -12,13 +12,12 @@ import * as s3n from "aws-cdk-lib/aws-s3-notifications";
 import type { Construct } from "constructs";
 import { readConfig } from "./context.ts";
 
-// TODO(merge): another agent exports TABLE_DEFINITION from packages/core/src/repository/dynamo.ts.
-// Reconcile key and index names with it at merge time; this stack must not drift from the repository.
+// These names must match TABLE_DEFINITION and TTL_ATTRIBUTE in packages/core/src/repository. A test compares them.
 const TABLE = {
   partitionKey: "PK",
   sortKey: "SK",
   gsi1: { name: "GSI1", partitionKey: "GSI1PK", sortKey: "GSI1SK" },
-  ttlAttribute: "expiresAt",
+  ttlAttribute: "ttl",
 } as const;
 
 // Nothing here bills while idle except the customer managed KMS key (fixed monthly charge per key, price

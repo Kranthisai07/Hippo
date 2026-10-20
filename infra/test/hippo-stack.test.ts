@@ -2,6 +2,8 @@ import { App } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { describe, expect, it } from "vitest";
 import { HippoStack } from "../src/hippo-stack.ts";
+import { TABLE_DEFINITION, TTL_SPECIFICATION } from "../../packages/core/src/repository/dynamo";
+import { pageTextKey } from "../../packages/core/src/repository/shared";
 
 const CONTEXT = {
   "hippo:bedrockModelId": "TEST-MODEL-ID",
@@ -55,7 +57,7 @@ describe("cost: nothing bills while idle beyond pay per use", () => {
 });
 
 describe("DynamoDB table", () => {
-  it("has PK/SK, GSI1, on demand billing, TTL expiresAt, PITR and AWS managed SSE", () => {
+  it("has PK/SK, GSI1, on demand billing, TTL ttl, PITR and AWS managed SSE", () => {
     template.hasResourceProperties("AWS::DynamoDB::Table", {
       KeySchema: [
         { AttributeName: "PK", KeyType: "HASH" },
@@ -72,10 +74,34 @@ describe("DynamoDB table", () => {
           Projection: { ProjectionType: "ALL" },
         },
       ],
-      TimeToLiveSpecification: { AttributeName: "expiresAt", Enabled: true },
+      TimeToLiveSpecification: { AttributeName: "ttl", Enabled: true },
       PointInTimeRecoverySpecification: { PointInTimeRecoveryEnabled: true },
       SSESpecification: { SSEEnabled: true },
     });
+  });
+
+  // Review finding: the stack said expiresAt while the repository writes ttl, so undo records would never expire.
+  it("uses the same key, index and TTL names as the repository", () => {
+    const [table] = Object.values(template.findResources("AWS::DynamoDB::Table")) as { Properties: Record<string, any> }[];
+    const p = table!.Properties;
+    expect(p.KeySchema).toEqual(TABLE_DEFINITION.KeySchema);
+    expect(p.GlobalSecondaryIndexes).toHaveLength(1);
+    const gsi = p.GlobalSecondaryIndexes[0];
+    const want = TABLE_DEFINITION.GlobalSecondaryIndexes![0]!;
+    expect(gsi.IndexName).toBe(want.IndexName);
+    expect(gsi.KeySchema).toEqual(want.KeySchema);
+    expect(gsi.Projection).toEqual(want.Projection);
+    expect(p.BillingMode).toBe(TABLE_DEFINITION.BillingMode);
+    expect(p.TimeToLiveSpecification).toEqual({
+      AttributeName: TTL_SPECIFICATION.AttributeName,
+      Enabled: TTL_SPECIFICATION.Enabled,
+    });
+  });
+
+  // The delete cascade removes pageTextKey, and the ingest worker can only write under derived/. They must agree.
+  it("keeps the page text key under the only prefix the ingest worker may write", () => {
+    expect(pageTextKey("hh", "doc").startsWith("derived/")).toBe(true);
+    expect(JSON.stringify(template.findResources("AWS::IAM::Policy"))).toContain("/derived/*");
   });
 
   it("is retained by default and destroyed only with hippo:destroyable=true", () => {

@@ -30,7 +30,7 @@ export const isOpenAlert = (a: Alert): boolean => a.status === "pending" || a.st
  * The layout is our choice, kept here so the delete cascade and the worker agree on it.
  */
 export function pageTextKey(householdId: string, docId: string): string {
-  return `text/${householdId}/${docId}/pages.json`;
+  return `derived/${householdId}/${docId}/pages.json`;
 }
 
 /** Every S3 key a document owns: the original, its page text and its chunk file. Unique and sorted. */
