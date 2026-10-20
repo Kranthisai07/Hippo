@@ -2,7 +2,7 @@
 
 Hippo turns the paperwork a household never reads twice (warranties, insurance, a lease, subscriptions, recall notices) into dated obligations, and watches them while nobody is talking. It is an Alexa+ add-on with a web app for uploading and reviewing documents.
 
-> **Status: early build, Alexa+ hackathon.** Today the repo contains the demo fixtures, the deadline engine, the asset resolver, the source quote check, asset linking, recall matchers, PDF page text extraction and the daily digest builder, with 2684 passing tests. The MCP server, the Bedrock extraction step, the web app and the AWS deploy are planned and not written yet. [What exists today](#what-exists-today) is the honest list.
+> **Status: working build, Alexa+ hackathon.** Today the repo contains the demo fixtures, the deadline engine, the asset resolver, the source quote check, asset linking, recall matchers, PDF page text extraction, the daily digest builder and daily job, the repository (memory and DynamoDB), the clause index, an OAuth 2.1 server, the MCP server with its nine tools, the web JSON API and a CDK stack that has never been deployed, with 3000 passing tests. The Bedrock extraction step, the web app, the MCP Apps cards and the AWS deploy are not written yet (a dev fixture ingest reads the demo documents in their place). [What exists today](#what-exists-today) is the honest list.
 
 ## Why
 
