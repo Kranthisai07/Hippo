@@ -85,6 +85,16 @@ export function createApp(deps: AppDeps): Hono {
 
   app.post(
     MCP_PATH,
+    // First gate, before any body is read or parsed: no usable bearer (a user token or a service token) is a bare 401,
+    // so an unauthenticated caller learns nothing about the parser and cannot make the server read a large body.
+    // Which methods a service token may call is decided later, once the body is known.
+    async (c, next) => {
+      const header = c.req.header("authorization");
+      if (!(await deps.auth.verifyBearer(header)) && !(await deps.auth.verifyServiceBearer(header))) {
+        return unauthorized();
+      }
+      await next();
+    },
     bodyLimit({ maxSize: maxBody, onError: () => rpcError(413, -32000, "Payload too large") }),
     async (c) => {
       const text = await c.req.text();
