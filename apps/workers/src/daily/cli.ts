@@ -2,6 +2,7 @@ import { parseArgs } from "node:util";
 import { createMemoryRepository } from "core/src/repository";
 import { DEMO_HOUSEHOLD, seedDemoHousehold } from "./demo";
 import { recordedFetch } from "./recorded";
+import { parseToday, UsageError, wholeNumber } from "./options";
 import { runDaily } from "./runDaily";
 import { formatReport } from "./format";
 import type { EmailSender } from "./types";
@@ -19,7 +20,9 @@ async function main(): Promise<void> {
       "app-url": { type: "string", default: "http://localhost:5173" },
     },
   });
-  const today = values.today ?? new Date().toISOString().slice(0, 10);
+  const today = parseToday(values.today, new Date().toISOString().slice(0, 10));
+  const lookbackDays = wholeNumber("lookback-days", values["lookback-days"], 1, 365);
+  const maxNhtsa = wholeNumber("max-nhtsa", values["max-nhtsa"], 1, 100);
 
   const repository = createMemoryRepository();
   await seedDemoHousehold(repository, today);
@@ -39,8 +42,8 @@ async function main(): Promise<void> {
       now: () => Date.now(),
       appUrl: values["app-url"] as string,
       config: {
-        ...(values["lookback-days"] ? { lookbackDays: Number(values["lookback-days"]) } : {}),
-        ...(values["max-nhtsa"] ? { maxNhtsaRequests: Number(values["max-nhtsa"]) } : {}),
+        ...(lookbackDays !== undefined ? { lookbackDays } : {}),
+        ...(maxNhtsa !== undefined ? { maxNhtsaRequests: maxNhtsa } : {}),
       },
     },
     today,
@@ -52,6 +55,9 @@ async function main(): Promise<void> {
 }
 
 main().catch((e) => {
-  console.error(`daily job failed: ${e instanceof Error ? e.name : "unknown error"}`);
+  // A usage mistake gets its message; anything else prints only its name, because a message could hold document text.
+  console.error(
+    e instanceof UsageError ? e.message : `daily job failed: ${e instanceof Error ? e.name : "unknown error"}`,
+  );
   process.exitCode = 1;
 });
