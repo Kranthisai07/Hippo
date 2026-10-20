@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, randomInt } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { createAuth } from "@hippo/auth";
 import { serve, type ServerType } from "@hono/node-server";
@@ -12,7 +12,17 @@ import { DEMO_HOUSEHOLD, seedHousehold } from "./seed";
 
 /** The date every deadline in the fixtures is computed against (fixtures/README.md). */
 export const DEMO_TODAY = "2026-10-21";
-const DEFAULT_DEMO_CODE = "424242";
+const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
+
+/**
+ * The demo login has no real secret behind it, so it is only on when the server is reachable from this machine alone,
+ * or when someone says so (HIPPO_DEMO=1). HIPPO_DEMO=0 turns it off everywhere. Binding to 0.0.0.0 never enables it.
+ */
+export function demoEnabled(host: string, env: Record<string, string | undefined>): boolean {
+  if (env.HIPPO_DEMO === "1") return true;
+  if (env.HIPPO_DEMO === "0") return false;
+  return LOOPBACK_HOSTS.has(host.toLowerCase());
+}
 
 export interface ServerOptions {
   port?: number;
@@ -71,7 +81,9 @@ export async function startServer(opts: ServerOptions = {}): Promise<Running> {
   await seedHousehold(repo, { today, householdId: DEMO_HOUSEHOLD, indexSource });
 
   const demoEmail = env.HIPPO_DEMO_EMAIL ?? "demo@hippo.example";
-  const demoCode = env.HIPPO_DEMO_CODE ?? DEFAULT_DEMO_CODE;
+  const demoOn = demoEnabled(host, env);
+  // A fresh code on every start, so there is no public default. It is logged once, only for a local demo.
+  const demoCode = env.HIPPO_DEMO_CODE ?? String(randomInt(100_000, 1_000_000));
   const clientId = env.HIPPO_CLIENT_ID ?? "hippo-demo";
   const redirectUris = list(env.HIPPO_REDIRECT_URIS, ["http://localhost:5173/callback"]);
   const serviceId = env.HIPPO_SERVICE_CLIENT_ID;
@@ -87,7 +99,7 @@ export async function startServer(opts: ServerOptions = {}): Promise<Running> {
         ? DEMO_HOUSEHOLD
         : `hh_${createHash("sha256").update(email).digest("base64url").slice(0, 16)}`,
     log,
-    demoUser: { email: demoEmail, code: demoCode },
+    ...(demoOn ? { demoUser: { email: demoEmail, code: demoCode } } : {}),
     ...(serviceId && serviceSecret ? { serviceClient: { clientId: serviceId, clientSecret: serviceSecret } } : {}),
     now: clock,
   });
@@ -107,7 +119,9 @@ export async function startServer(opts: ServerOptions = {}): Promise<Running> {
   const url = issuer;
   log(`[hippo-api] listening on ${host}:${port}, MCP endpoint ${url}/mcp, demo date ${today}`);
   log(
-    `[hippo-api] demo login: ${demoEmail}${env.HIPPO_DEMO_CODE ? "" : ` with code ${DEFAULT_DEMO_CODE}`}, client id ${clientId}, redirect ${redirectUris[0]}`,
+    demoOn
+      ? `[hippo-api] demo login: ${demoEmail}${env.HIPPO_DEMO_CODE ? "" : ` with code ${demoCode}`}, client id ${clientId}, redirect ${redirectUris[0]}`
+      : `[hippo-api] demo login is off (host ${host}). Set HIPPO_DEMO=1 to turn it on. Client id ${clientId}, redirect ${redirectUris[0]}`,
   );
   return {
     url,
