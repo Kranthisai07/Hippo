@@ -30,6 +30,11 @@ export interface AuthOptions {
   /** Receives the one deliberate magic code line. Nothing else it receives is secret. */
   log: (line: string) => void;
   demoUser?: { email: string; code: string };
+  /**
+   * Whether the magic code is printed through `log` so a person at the terminal can read it (the demo, no mailer
+   * exists). Defaults to true. Turn it off anywhere the log is shared: the code is a login credential.
+   */
+  logMagicCodes?: boolean;
   /** Service credentials for the client_credentials grant (scope mcp:service only). */
   serviceClient?: { clientId: string; clientSecret: string };
   /** Origins allowed to call the cookie session endpoints. Defaults to the issuer origin. */
@@ -201,7 +206,7 @@ export function createAuth(opts: AuthOptions): Auth {
       attempts: 0,
     });
     // DELIBERATE: the only place a secret is logged. The demo has no mail provider, so the magic code goes to the server log.
-    opts.log(`[hippo-auth] magic code for ${email}: ${code}`);
+    if (opts.logMagicCodes !== false) opts.log(`[hippo-auth] magic code for ${email}: ${code}`);
     return null;
   };
 
