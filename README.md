@@ -2,7 +2,7 @@
 
 Hippo turns the paperwork a household never reads twice (warranties, insurance, a lease, subscriptions, recall notices) into dated obligations, and watches them while nobody is talking. It is an Alexa+ add-on with a web app for uploading and reviewing documents.
 
-> **Status: working build, Alexa+ hackathon.** Today the repo contains the demo fixtures, the deadline engine, the asset resolver, the source quote check, asset linking, recall matchers, PDF page text extraction, the daily digest builder and daily job, the repository (memory and DynamoDB), the clause index, an OAuth 2.1 server, the MCP server with its nine tools, the web JSON API and a CDK stack that has never been deployed, with 3030 passing tests. The Bedrock extraction step, the web app, the MCP Apps cards and the AWS deploy are not written yet (a dev fixture ingest reads the demo documents in their place). [What exists today](#what-exists-today) is the honest list.
+> **Status: working build, Alexa+ hackathon.** Today the repo contains the demo fixtures, the deadline engine, the asset resolver, the source quote check, asset linking, recall matchers, PDF page text extraction, the daily digest builder and daily job, the repository (memory and DynamoDB), the clause index, an OAuth 2.1 server, the MCP server with its nine tools, the web JSON API, the web app, the /ask demo client with its cards, the ingest pipeline and a CDK stack that has never been deployed, with 3030 passing tests. The ingest pipeline runs in fixture mode by default, so only the demo documents are read; its live Bedrock and Textract adapters exist and have only run against fakes. The cards are plain React, not the MCP Apps host bridge. Nothing is deployed. [What exists today](#what-exists-today) is the honest list.
 
 ## Why
 
@@ -56,10 +56,10 @@ Full detail is in [INTENT.md](INTENT.md) (why and principles) and [SPEC.md](SPEC
 | Daily digest email builder (`packages/core`): short plain and HTML email, numbers masked to the last 4, everything from documents escaped. Sending through SES is not built | Done, 159 tests |
 | Live docs check (`docs/VERIFIED.md`): what AWS, Alexa+, MCP, CPSC and Devpost documentation says against what this project assumed, checked twice | Done |
 | CI: both packages plus the fixture quote check on every push and PR | Added, runs on GitHub |
-| MCP server (`apps/api`): 9 tools and 3 card button tools over stateless Streamable HTTP, OAuth 2.1 with PKCE (`packages/auth`), in memory data seeded from the fixtures | Done, 298 tests, `pnpm test:latency` measured p95 under 150 ms locally. The 3 Echo Show cards are not started |
-| Ingestion pipeline: Bedrock extraction and retrieval (page text, the quote check and asset linking above are three of its steps) | Not started |
-| Web JSON API (`apps/api/src/api`, contract in `docs/WEB_API.md`): upload, review and confirm, Coming Up, assets, settings, with a dev fixture ingest for the demo documents | Done, 284 tests. The web app itself is not started (the OAuth login it needs is done) |
-| Daily job (`apps/workers`): deadline alerts, recall radar, digest and a dry run (`pnpm daily:run`) | Done, 155 tests, never run against live CPSC or NHTSA. SES sending and the AWS deploy are not built |
+| MCP server (`apps/api`): 9 tools and 3 card button tools over stateless Streamable HTTP, OAuth 2.1 with PKCE (`packages/auth`), in memory data seeded from the fixtures | Done, `pnpm test:latency` measured p95 under 150 ms locally. The /ask page draws the cards as plain React from the tool results, not through the MCP Apps host bridge |
+| Ingestion pipeline (`apps/workers/src/ingest`): page text, structured extraction, the quote check and asset linking | Built. Fixture mode is the default and reads only the demo documents (8 of 8 dates and 58 of 58 fields match the expected files). The live Bedrock and Textract adapters have only run against fakes |
+| Web JSON API (`apps/api/src/api`, contract in `docs/WEB_API.md`): upload, review and confirm, Coming Up, assets, settings, with a dev fixture ingest for the demo documents | Done. The web app (`apps/web`: sign in, upload, review, Coming up, Things, Settings) and the /ask demo client are built on top of it |
+| Daily job (`apps/workers`): deadline alerts, recall radar, digest and a dry run (`pnpm daily:run`) | Done, never run against live CPSC or NHTSA. The SES adapter exists (`--send-ses --yes-really`) and has only run against a fake client. The AWS deploy is not done |
 
 ### The deadline engine
 
@@ -78,6 +78,24 @@ On the demo fixtures at 2026-10-21 it produces:
 | Dishwasher warranty expires | Nov 12 | 22 | possible |
 
 An obligation whose source fields are not all confirmed always has severity `null`, so it cannot alert. Severity windows live in one table, `HIGH_WITHIN_DAYS` in [severity.ts](packages/obligation-kit/src/severity.ts).
+
+## Run the demo
+
+Needs Node 22.13 or newer and pnpm (the version is pinned in `package.json`). No AWS account, no Docker and no keys: everything runs on your machine with a synthetic household.
+
+```bash
+pnpm install --frozen-lockfile
+pnpm dev        # terminal 1: API, OAuth and MCP server on http://localhost:8787 (in memory, seeded from the fixtures)
+pnpm dev:web    # terminal 2: the web app on http://localhost:5173
+```
+
+Open http://localhost:5173 (use `localhost`, not `127.0.0.1`) and press the demo sign in button.
+
+1. **Upload to deadline.** Settings, delete `lease.pdf` (it is pre loaded), then Upload and drop `fixtures/docs/lease.pdf`. Coming up shows "Give notice by 2026-11-01" waiting for you. Open "Review and confirm", click the page 4 quote, press "Confirm all dates": only now does it become a reminder.
+2. **Coverage by voice.** Open http://localhost:5173/ask, press "Sign in as the demo account" and click "My dishwasher is leaking, am I covered?". This page is a real MCP client (OAuth with PKCE, then `tools/call` over Streamable HTTP). It shows the spoken answer and the Coverage card: the page 3 exclusion, the claim steps and the claim by date.
+3. **Proactive catch.** The first answer after the server starts begins with "Before that, your car insurance renews in 9 days." Click "What is coming up?" for the Coming Up and Recall cards. `pnpm daily:run` prints the daily digest (a dry run).
+
+`pnpm --filter @hippo/api demo` walks the same moments in a terminal. The server clock is pinned to 2026-10-21 so the dates in the fixtures are always "in the window"; set `HIPPO_TODAY=now` to use the real date. The demo reads only the sample documents in `fixtures/docs` (see the limits below). The browser tests need their browser once: `pnpm --filter @hippo/web exec playwright install chromium`, then `pnpm --filter @hippo/web test:e2e` with ports 8787 and 5173 free.
 
 ## Run it
 

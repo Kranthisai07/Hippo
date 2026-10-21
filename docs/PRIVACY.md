@@ -30,9 +30,9 @@ Today "the database" and "the object store" are both in memory when you run the 
 
 ## Numbers are masked
 
-Policy and account numbers are shown as the last 4 digits only: by voice, on cards, in email and in page text. The extraction schema keeps only the last 4 of a policy number (`policyNumberLast4`). Any run of 5 or more digits in text that comes from a document is masked, even when split by spaces, dots, dashes or invisible characters. Real dates, phone numbers and dollar amounts stay readable. The mask errs on the side of hiding: "Dec 5, 2026" inside document text can show as "Dec ****2026".
+Policy and account numbers are shown as the last 4 digits only ("ending 4821"): by voice, on cards, in email, in page text, and in the labels, names and file names the web API returns. The extraction schema keeps only the last 4 of a policy number (`policyNumberLast4`) and of a serial number. Any number of 5 or more digits in text that comes from a document is masked, also when it is written in groups or split by spaces, dots, dashes, bullets or invisible characters. Real dates, dollar amounts and phone numbers stay readable. A phone shape is kept only when a phone word (call, tel, phone, fax) comes before it or it is written with parentheses or a country code, so a 10 digit account number written 3-3-4 is still masked. The mask errs on the side of hiding: two numbers written side by side with spaces, such as "2026 2027", are masked.
 
-Known gap: the review screen's data (`GET /api/docs/<id>`) returns the source quote exactly as it appears in the document. For the demo insurance policy that quote is "Policy number: HM-AU-0048-4821", so the full number reaches the signed-in owner's browser. Page text and everything spoken, carded or emailed is masked. The quote is only shown to the person who uploaded the document.
+The review screen is masked too: `GET /api/docs/<id>` returns the source quote with numbers masked ("Policy number: ending 4821"), and the page text route does the same. A quote is checked against the page text first and masked afterwards, so the check still compares the real words.
 
 ## Encryption
 
@@ -67,7 +67,7 @@ A document can say "ignore your instructions". Hippo treats all text from docume
 - Strings from documents come back from the JSON API as plain strings. The web app must show them as text, never as HTML. The email digest escapes HTML, strips links and emails, caps length and masks numbers (`packages/core/src/digest`).
 - Uploads: PDF, JPEG, PNG only; HEIC is refused with a message. At most 15 MB. The first bytes must match the declared type. At most 30 announced uploads per household per hour. PDFs are limited to 40 pages and refused if the page count cannot be verified or the file would expand too far when unpacked (`packages/core/src/pages`).
 - Hidden or white text in a PDF cannot be told apart from visible text, so page text is always treated as untrusted.
-- The model prompt that will read documents (Bedrock extraction) is not written yet. When it is, it must wrap the text and state that instructions inside are data. Source quotes will then be checked against the page.
+- The ingest prompt wraps the document text in tags and says that anything inside is data, never instructions. Tag lookalikes in a document (fullwidth brackets, invisible characters, an `answer` tag) are neutralised. Extracted values are validated against a strict schema and every quote is checked against the page before it is kept. This has only run against fake model clients so far.
 
 ## Deleting your data
 
