@@ -26,7 +26,11 @@ export interface AgreementView {
 
 export type DocView = Omit<Doc, "s3Key">;
 /** The storage key holds the household id and is of no use to the browser. */
-export const docView = ({ s3Key: _s3Key, ...rest }: Doc): DocView => rest;
+// The file name is the person's own text and may hold a number; it is masked like every other answer.
+export const docView = ({ s3Key: _s3Key, ...rest }: Doc): DocView => ({
+  ...rest,
+  filename: maskNumbers(rest.filename),
+});
 
 type Def = { type: string; innerType?: Def; element?: Def; shape?: Record<string, Def> };
 type Schema = { def: Def; shape?: Record<string, Schema> };

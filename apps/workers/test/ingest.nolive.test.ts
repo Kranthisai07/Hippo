@@ -68,7 +68,11 @@ describe("nothing live is called by default", () => {
     const base = { repo: createMemoryRepository(), objectStore: createMemoryObjectStore(), now: () => NOW };
     createPipelineIngest(base, { HIPPO_LIVE_AI: "true", HIPPO_BEDROCK_MODEL_ID: "m" });
     expect(built).toEqual([]);
-    createPipelineIngest(base, { HIPPO_LIVE_AI: "1", HIPPO_BEDROCK_MODEL_ID: "m" });
+    createPipelineIngest(base, {
+      HIPPO_LIVE_AI: "1",
+      HIPPO_BEDROCK_MODEL_ID: "m",
+      HIPPO_MAX_BEDROCK_CALLS_PER_DAY: "3",
+    });
     expect(built.sort()).toEqual(["bedrock", "textract"]);
   });
 });

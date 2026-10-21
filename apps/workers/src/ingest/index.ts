@@ -28,9 +28,18 @@ export interface PipelineBase {
  *  - HIPPO_MAX_PAGES (pages per document) and HIPPO_MAX_BEDROCK_CALLS_PER_DAY are the cost guards.
  */
 export function createPipelineIngest(base: PipelineBase, env: Env): OnUploaded {
-  const positive = (name: string): number | undefined => {
-    const n = Number(env[name]);
-    return env[name] !== undefined && Number.isInteger(n) && n > 0 ? n : undefined;
+  // A cost guard that cannot be read must stop the start, never switch itself off: a typo in HIPPO_MAX_BEDROCK_CALLS_PER_DAY
+  // used to mean "no limit". Unset is allowed only where there is a default or nothing to limit.
+  const positive = (name: string, required = false): number | undefined => {
+    const raw = env[name];
+    if (raw === undefined) {
+      if (required)
+        throw new Error(`${name} must be set to a whole number of 1 or more in live mode (it is the cost guard).`);
+      return undefined;
+    }
+    const text = raw.trim();
+    if (!/^[0-9]{1,9}$/.test(text) || Number(text) < 1) throw new Error(`${name} must be a whole number of 1 or more.`);
+    return Number(text);
   };
   const maxPages = positive("HIPPO_MAX_PAGES");
   const common = { ...base, ...(maxPages === undefined ? {} : { maxPages }) };
@@ -39,7 +48,7 @@ export function createPipelineIngest(base: PipelineBase, env: Env): OnUploaded {
   }
   const modelId = env.HIPPO_BEDROCK_MODEL_ID?.trim();
   if (!modelId) throw new Error(MODEL_ID_MISSING);
-  const maxCallsPerDay = positive("HIPPO_MAX_BEDROCK_CALLS_PER_DAY");
+  const maxCallsPerDay = positive("HIPPO_MAX_BEDROCK_CALLS_PER_DAY", true);
   return createIngest({
     ...common,
     ocr: createTextractOcr(createLiveTextractClient(env.AWS_REGION)),

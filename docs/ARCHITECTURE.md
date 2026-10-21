@@ -187,8 +187,8 @@ Unverified: whether a real Alexa+ client accepts all this. No such client is ava
 ## What is not built or not proven
 
 - **No deployment.** No Lambda, S3 bucket, table or email has been created. Nothing is hosted.
-- **Real ingest is not wired.** Today only the demo files are readable. No Bedrock call and no Textract call has ever been made.
-- **No SES adapter.** The digest is built and printed, never emailed.
+- **Live reading is off by default and unproven.** The ingest pipeline is built and runs in fixture mode, so only the demo files are readable. The Bedrock and Textract adapters exist (`HIPPO_LIVE_AI=1`, with a required model id and a required daily call cap) and have only run against fake clients. No Bedrock call and no Textract call has ever been made.
+- **No email has been sent.** The SES adapter exists (`--send-ses --yes-really`) and has only run against a fake client. The digest is otherwise built and printed.
 - **No real Alexa+ client** has talked to the server (D-035). How Alexa+ treats `structuredContent` versus `content` is unverified.
 - **No presigned S3 upload**, and the clause index has no S3 source.
 - **Auth state is in memory.** Codes, sessions and refresh tokens are lost on restart; a DynamoDB auth store is not built (D-040). Magic codes are printed to the server log in the demo because there is no mailer.

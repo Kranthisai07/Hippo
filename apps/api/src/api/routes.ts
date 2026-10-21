@@ -12,6 +12,7 @@ import type { IndexCache } from "../mcp/indexCache";
 import { agreementView, allReviewed, docView, isKnownField, valueSchemaOf } from "./agreements";
 import { readPages, updateIndex, type IndexStore, type OnUploaded } from "./fixtureIngest";
 import { ApiError, errorBody, notFound, readBytes, readJson } from "./http";
+import { maskAlert, maskAsset, maskEvent, maskObligation } from "./mask";
 import {
   isUploadType,
   MAX_UPLOAD_BYTES,
@@ -300,7 +301,7 @@ export function createWebApi(deps: WebApiDeps): Hono<{ Variables: { hh: string; 
       const docId = obligation.agreementId ? docOf.get(obligation.agreementId) : undefined;
       return {
         // An unconfirmed date never carries a severity, whatever was stored.
-        obligation: obligation.confirmed ? obligation : { ...obligation, severity: null },
+        obligation: maskObligation(obligation.confirmed ? obligation : { ...obligation, severity: null }),
         needsConfirmation: !obligation.confirmed,
         ...(docId ? { docId } : {}),
         ...(obligation.assetId ? { assetId: obligation.assetId } : {}),
@@ -318,7 +319,7 @@ export function createWebApi(deps: WebApiDeps): Hono<{ Variables: { hh: string; 
     if (open === "false") alerts = alerts.filter((a) => !isOpenAlert(a));
     // A snoozed alert stays out of the open list until its date.
     if (open === "true") alerts = alerts.filter((a) => !a.snoozedUntil || a.snoozedUntil.slice(0, 10) <= today());
-    return c.json({ alerts: alerts.slice(0, MAX_LIST) });
+    return c.json({ alerts: alerts.slice(0, MAX_LIST).map(maskAlert) });
   });
 
   api.post("/alerts/:id/resolve", async (c) => {
@@ -333,10 +334,13 @@ export function createWebApi(deps: WebApiDeps): Hono<{ Variables: { hh: string; 
       action,
     );
     if (result.isError) throw new ApiError(400, "Not mine only applies to recalls. Dismiss it instead.");
-    return c.json({ alert: await repo.getAlert(hh, id) });
+    const updated = await repo.getAlert(hh, id);
+    return c.json({ alert: updated ? maskAlert(updated) : updated });
   });
 
-  api.get("/assets", async (c) => c.json({ assets: (await repo.listAssets(c.var.hh)).slice(0, MAX_LIST) }));
+  api.get("/assets", async (c) =>
+    c.json({ assets: (await repo.listAssets(c.var.hh)).slice(0, MAX_LIST).map(maskAsset) }),
+  );
 
   api.get("/assets/:id", async (c) => {
     const hh = c.var.hh;
@@ -348,13 +352,13 @@ export function createWebApi(deps: WebApiDeps): Hono<{ Variables: { hh: string; 
       repo.listEvents(hh, asset.id, HISTORY_LIMIT),
     ]);
     return c.json({
-      asset,
+      asset: maskAsset(asset),
       docs: docs
         .filter((d) => d.assetIds.includes(asset.id))
         .slice(0, MAX_LIST)
         .map(docView),
       agreements: agreements.slice(0, MAX_LIST).map(agreementView),
-      history,
+      history: history.map(maskEvent),
     });
   });
 
