@@ -74,10 +74,10 @@ Model tools: `whats_coming_up`, `check_coverage`, `ask_documents`, `get_agreemen
 ### Moment 1: upload to deadline
 
 1. The browser announces a file (`POST /api/uploads`), then sends the bytes. Type (PDF, JPEG, PNG), size (15 MB) and the file's first bytes are checked.
-2. A reader turns it into an Agreement with every field marked `extracted`, none confirmed. Today the reader is a dev stand-in that recognises the demo files byte for byte and fails any other file with a plain reason. <!-- PENDING: real ingest worker -->The real reader (page text extraction, Bedrock extraction, quote check) exists as separate tested modules and is being wired in. <!-- /PENDING -->
+2. A reader turns it into an Agreement with every field marked `extracted`, none confirmed. Today the reader is a dev stand-in that recognises the demo files byte for byte and fails any other file with a plain reason. Starting the server with `HIPPO_INGEST=pipeline` swaps the stand-in for the real pipeline in `apps/workers/src/ingest`: page text extraction, classification, an injected extractor, the quote check, and the save. The extractor and the picture reader are fixture stand-ins by default; the Bedrock and Textract adapters only run with `HIPPO_LIVE_AI=1` and a model id, and have never been run against AWS.
 3. The review screen shows each value with its quote and page. The person confirms or edits. Only then does the deadline engine give an obligation a severity, and only then can an alert exist.
 
-<!-- PENDING: web app -->The review screen is the React web app, which is being built in parallel. Until it is merged, the same steps run through the JSON API (see `docs/WEB_API.md`).<!-- /PENDING -->
+The review screen is the React web app in `apps/web`. The same steps are available over the JSON API (see `docs/WEB_API.md`).
 
 ### Moment 2: coverage check
 
@@ -120,13 +120,13 @@ What it proves: the quoted words are on the cited page. What it does not prove (
 - A quote that starts mid-sentence is still on the page.
 - It throws on cyclic input (model JSON is acyclic).
 
-<!-- PENDING: real ingest worker -->`verifySourceRefs` is not called by the running app yet. Nothing in `apps/` imports it, because the dev stand-in reads hand-written expected extractions. It is tested on its own (71 tests, per README) and is meant for the ingest worker.<!-- /PENDING -->
+`verifySourceRefs` runs in the ingest pipeline (`apps/workers/src/ingest`), so every stored quote has been found on its cited page. Stored quotes are then masked to the last 4 digits.
 
 ## Retrieval
 
 Document questions are answered by an in-process clause index, `packages/core/src/retrieval`, built on MiniSearch 7.2.0 (D-039). Documents are split into clauses of about 120 words at section headings, ALL CAPS lines, colon-ended lines and blank lines, with page numbers kept. Matching uses light stemming, a heading boost, prefix matching from 4 letters, no fuzzy matching, and one synonym table (leak, water damage, flood; break the lease, early termination; cancel; renew; claim; deductible). Scores below 2.25 return nothing, so an off-topic question gets "nothing relevant" instead of a guess. That cutoff was tuned on 17 fixture chunks. Scores depend on corpus size (G-028), so it is conservative for larger households.
 
-Caching: the index is serialized per household. `createIndexCache` (`apps/api/src/mcp/indexCache.ts`) keeps it in memory keyed by household and an index version made from each active document's chunk metadata, and reloads only when the version changes. Today the only index source is in memory. <!-- PENDING: real ingest worker -->The S3 source described in SPEC section 2 is not built.<!-- /PENDING -->
+Caching: the index is serialized per household. `createIndexCache` (`apps/api/src/mcp/indexCache.ts`) keeps it in memory keyed by household and an index version made from each active document's chunk metadata, and reloads only when the version changes. Today the only index source is in memory. The S3 source described in SPEC section 2 is not built.
 
 Numbers recorded in MEMORY.md (D-039, D-042):
 
@@ -157,7 +157,7 @@ The recall radar runs in the daily job only (`apps/workers/src/daily/recalls.ts`
 | DynamoDB | Used by code through the `Repository` interface (`packages/core/src/repository/dynamo.ts`). The 271 case shared suite passes on DynamoDB Local, run in CI. Never run against real AWS DynamoDB (D-048). Local differs from the service on index consistency, throttling, the 400 KB item limit and TTL deletion. |
 | S3 | Modelled by the `ObjectStore` and `Uploader` interfaces. The only implementation is in memory. The presigned URL code is not written. |
 | KMS, Lambda (with Function URLs), EventBridge, SSM, IAM, CloudWatch Logs | Defined in the CDK stack (`infra/src/hippo-stack.ts`). The stack synthesizes and 25 tests check the template. **It has never been deployed and no AWS call has been made from it** (D-037). Lambda handlers in the stack are placeholders that return 501. |
-| SES | The stack grants `ses:SendEmail`. The digest builder is done and sends through an injected sender; the only sender is a console sender. <!-- PENDING: SES adapter -->No SES adapter yet (D-045).<!-- /PENDING --> |
+| SES | The stack grants `ses:SendEmail`. The digest builder is done and sends through an injected sender; the only sender is a console sender. An SES sender exists (`apps/workers/src/daily/ses.ts`) and is off by default; it needs `--send-ses`, `--yes-really` and a verified sender, and has only been tested against a fake client (D-045). |
 | Bedrock, Textract | Granted in the stack's ingest role. No code calls either. Page text extraction has an OCR interface with no implementation. No model id is chosen. |
 
 Fixture mode: documents, expected extractions and recorded CPSC and NHTSA responses live in `fixtures/`. AWS credits ran out before this project started (G-025), so any live AWS call needs an explicit yes from the team.
@@ -179,7 +179,7 @@ Unverified: whether a real Alexa+ client accepts all this. No such client is ava
 
 ## Constraints we found
 
-- Alexa+ developer tools (CLI, Local Inspector, Web Simulator) are for select partners only and cannot be applied for. K's attempt got `AccessDenied` (G-019, G-024, D-035). So the demo surface is a web page acting as a real MCP client (initialize, tools/list, tools/call over Streamable HTTP) against our server. <!-- PENDING: /ask demo page -->That page is being built and is not on main yet. Today `pnpm --filter @hippo/api demo` does the same walk from a terminal with the official SDK client.<!-- /PENDING -->
+- Alexa+ developer tools (CLI, Local Inspector, Web Simulator) are for select partners only and cannot be applied for. K's attempt got `AccessDenied` (G-019, G-024, D-035). So the demo surface is a web page acting as a real MCP client (initialize, tools/list, tools/call over Streamable HTTP) against our server. The page is `/ask` in `apps/web`. It signs in with OAuth and PKCE, calls the tools through the official SDK client, and draws the Coverage, Coming Up and Recall cards from the tool result as plain React (not the MCP Apps host bridge). `pnpm --filter @hippo/api demo` does the same walk from a terminal.
 - No documented push API for add-ons. Reminders arrive at the next interaction or in the daily email, not as device push (G-006).
 - Alexa+ may initialize with protocol 2025-03-26 while the docs say 2025-11-25 (Q-010), so the server has to negotiate down.
 - Lambda Function URLs created since late 2025 need both `lambda:InvokeFunctionUrl` and `lambda:InvokeFunction` (G-022). The stack grants both and a test proves it.
