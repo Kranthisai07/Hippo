@@ -16,7 +16,7 @@ export interface SesSenderDeps {
   from: string;
   sleep: (ms: number) => Promise<void>;
   now: () => number;
-  /** Sandbox cap: 200 messages per 24 hours (docs/VERIFIED.md section 6). Default 200. */
+  /** Sandbox cap: 200 messages per 24 hours (docs/VERIFIED.md section 6). Default 200. Counted per process only: each daily run starts fresh. */
   maxPerDay?: number;
   /** Sandbox rate: 1 message per second. Default 1000. */
   minIntervalMs?: number;
@@ -49,7 +49,7 @@ function safeName(e: unknown): string {
 // ThrottlingException and InternalServiceErrorException are not declared for this command but are the SDK's generic and
 // service names for the same conditions. Every other declared error (MessageRejected, BadRequestException,
 // NotFoundException, SendingPausedException, AccountSuspendedException, LimitExceededException,
-// MailFromDomainNotVerifiedException) is permanent.
+// MailFromDomainNotVerifiedException) is permanent. Unverified against a live account; a retry after a 5xx can duplicate an email if the first request landed.
 const RETRYABLE = new Set(["TooManyRequestsException", "ThrottlingException", "InternalServiceErrorException"]);
 function retryable(e: unknown): boolean {
   if (!(e instanceof Error)) return false;

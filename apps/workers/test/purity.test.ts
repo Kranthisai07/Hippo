@@ -44,7 +44,8 @@ describe("the clock and the network are injected", () => {
 
   it("no LLM client and no AWS SDK in the job", () => {
     // ses.ts is the one place the SES SDK is imported (the SDK itself stays out of the CLI-free logic).
-    for (const [f, src] of logic) if (f !== "ses.ts") expect(src, f).not.toMatch(/@aws-sdk|anthropic|bedrock/i);
+    for (const [f, src] of logic) expect(src, f).not.toMatch(/@aws-sdk\/(?!client-sesv2)|anthropic|bedrock/i);
+    for (const [f, src] of logic) if (f !== "ses.ts") expect(src, f).not.toMatch(/client-sesv2/);
   });
 });
 
