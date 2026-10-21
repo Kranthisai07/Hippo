@@ -76,7 +76,7 @@ test("every page: accessibility check and screenshots", async ({ page }) => {
   await snap(page, "settings");
 
   await page.goto("/ask");
-  await expect(page.locator("main h1")).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await snap(page, "ask");
 
   await page.goto("/privacy");
