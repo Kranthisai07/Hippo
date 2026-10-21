@@ -4,10 +4,14 @@
 // gets here (see `ocrReadsPdfPages`). Tested with a fake client only.
 import { DetectDocumentTextCommand, TextractClient } from "@aws-sdk/client-textract";
 import type { Ocr } from "core/src/pages";
+import { DEFAULT_CALL_TIMEOUT_MS, isTimeout } from "./bedrock";
 import { IngestFailure } from "./types";
 
 export interface TextractLike {
-  send(command: DetectDocumentTextCommand): Promise<{ Blocks?: { BlockType?: string; Text?: string }[] }>;
+  send(
+    command: DetectDocumentTextCommand,
+    options?: { abortSignal?: AbortSignal },
+  ): Promise<{ Blocks?: { BlockType?: string; Text?: string }[] }>;
 }
 
 export const TEXTRACT_MAX_BYTES = 10 * 1024 * 1024;
@@ -18,7 +22,7 @@ const isReadable = (b: Uint8Array) =>
   startsWith(b, [0x89, 0x50, 0x4e, 0x47]) ||
   startsWith(b, [0x25, 0x50, 0x44, 0x46]);
 
-export function createTextractOcr(client: TextractLike): Ocr {
+export function createTextractOcr(client: TextractLike, opts: { timeoutMs?: number } = {}): Ocr {
   return async ({ image }) => {
     if (!image) throw new IngestFailure("We could not read this file. Try uploading it again.");
     if (image.length > TEXTRACT_MAX_BYTES)
@@ -27,7 +31,15 @@ export function createTextractOcr(client: TextractLike): Ocr {
       throw new IngestFailure(
         "We can only read JPEG, PNG and PDF files. Convert this photo to JPEG and upload it again.",
       );
-    const out = await client.send(new DetectDocumentTextCommand({ Document: { Bytes: image } }));
+    // Abandoned after the timeout so a hung call cannot leave the upload or the document waiting forever.
+    const out = await client
+      .send(new DetectDocumentTextCommand({ Document: { Bytes: image } }), {
+        abortSignal: AbortSignal.timeout(opts.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS),
+      })
+      .catch((e: unknown) => {
+        if (isTimeout(e)) throw new IngestFailure("Reading this document took too long. Try again.");
+        throw e;
+      });
     return (out.Blocks ?? [])
       .filter((b) => b.BlockType === "LINE" && typeof b.Text === "string")
       .map((b) => b.Text)
@@ -37,4 +49,5 @@ export function createTextractOcr(client: TextractLike): Ocr {
 
 /** Builds the real client. Called only by code that has checked the live flag. */
 export const createLiveTextractClient = (region?: string): TextractLike =>
-  new TextractClient(region ? { region } : {}) as unknown as TextractLike;
+  // One attempt: the SDK's own retries would be extra paid calls nobody counted.
+  new TextractClient({ ...(region ? { region } : {}), maxAttempts: 1 }) as unknown as TextractLike;
