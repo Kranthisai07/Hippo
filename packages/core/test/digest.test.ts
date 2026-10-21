@@ -489,3 +489,45 @@ describe("second review: hostile length, wider separators, caps, urls, types", (
     expect(d.text).toContain("Untitled");
   });
 });
+
+describe("recalls rank below deadlines and never crowd them out (Q-012)", () => {
+  const recalls = (k: number) =>
+    Array.from({ length: k }, (_, i) => mk({ source: "recall", severity: "high", label: `Honda CR-V recall ${i + 1}`, dueDate: null }));
+  const possibles = (k: number) =>
+    Array.from({ length: k }, (_, i) => mk({ severity: "possible", label: `Deadline ${i + 1}`, dueDate: `2026-11-0${i + 1}` }));
+  it("a high recall does not outrank a possible deadline", () => {
+    const d = must([...recalls(1), ...possibles(2)]);
+    expect(d.text.indexOf("Deadline 1")).toBeGreaterThan(-1);
+    expect(d.text.indexOf("Deadline 2")).toBeLessThan(d.text.indexOf("Honda CR-V recall 1"));
+  });
+  it("lists high deadlines, then possible deadlines, then recalls", () => {
+    const d = must([...recalls(1), ...possibles(1), mk({ label: "Lease notice", dueDate: "2026-11-01" })]);
+    const at = (s: string) => d.text.indexOf(s);
+    expect(at("Lease notice")).toBeLessThan(at("Deadline 1"));
+    expect(at("Deadline 1")).toBeLessThan(at("Honda CR-V recall 1"));
+  });
+  it("shows at most 3 recalls, so four campaigns for one car cannot fill the digest", () => {
+    const d = must([...recalls(5), ...possibles(2)]);
+    expect(d.alertIds).toHaveLength(5);
+    expect(d.text).toContain("Honda CR-V recall 3");
+    expect(d.text).not.toContain("Honda CR-V recall 4");
+    expect(d.text).toContain("and 2 more in the app");
+  });
+  it("the recall limit does not take room from deadlines when the cap is tight", () => {
+    const d = must([...recalls(4), ...possibles(3)], { maxItems: 4 });
+    expect(d.text).toContain("Deadline 3");
+    expect(d.alertIds).toHaveLength(4);
+  });
+  it("the cut recalls are not marked emailed, so they come in a later digest", () => {
+    const list = [...recalls(5), ...possibles(1)];
+    const first = must(list);
+    const sentIds = new Set(first.alertIds);
+    const left = list.filter((a) => !sentIds.has(a.id)).map((a) => ({ ...a }));
+    expect(left.length).toBe(2);
+    expect(must(left).alertIds).toHaveLength(2);
+  });
+  it("is the same whatever order the alerts arrive in", () => {
+    const list = [...recalls(4), ...possibles(3)];
+    expect(must([...list].reverse()).alertIds).toEqual(must(list).alertIds);
+  });
+});

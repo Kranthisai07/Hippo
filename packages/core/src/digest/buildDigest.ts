@@ -39,6 +39,8 @@ const MAX_RAW = 2000;
 const MAX_NORMALIZED = 4000;
 /** The most items one digest may list, whatever the caller asks for. */
 const MAX_ITEMS = 50;
+/** One digest lists at most this many recalls, so a car with several open campaigns cannot fill it. */
+const MAX_RECALLS = 3;
 /** 5 or more digits, split by at most 3 characters that are not letters or digits (spaces, punctuation, symbols, emoji). */
 const NUMBER_RUN = /\p{Nd}(?:[^\p{L}\p{Nd}]{0,3}\p{Nd}){4,}/u;
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -150,14 +152,28 @@ export function buildDigest(input: DigestInput): Digest | null {
   if (today === null) throw new Error(`today must be an ISO date (YYYY-MM-DD), got: ${JSON.stringify(input.today)}`);
   if (input.digestOn === false) return null;
 
+  // Deadlines come before recalls. A recall has no due date and a car can have several open campaigns, so a "high" recall
+  // must not outrank a deadline that is about to pass.
   const picked = input.alerts
     .filter(eligible)
-    .sort((a, b) => Number(b.severity === "high") - Number(a.severity === "high") || order(a, b));
+    .sort(
+      (a, b) =>
+        Number(a.source === "recall") - Number(b.source === "recall") ||
+        Number(b.severity === "high") - Number(a.severity === "high") ||
+        order(a, b),
+    );
   if (picked.length === 0) return null;
 
   const asked = Number.isFinite(input.maxItems) && (input.maxItems as number) >= 1 ? Math.floor(input.maxItems as number) : 10;
   const cap = Math.min(asked, MAX_ITEMS);
-  const shown = picked.slice(0, cap);
+  // At most MAX_RECALLS recall lines per digest; the rest stay unsent and come in a later digest.
+  const shown: DigestAlert[] = [];
+  let recalls = 0;
+  for (const a of picked) {
+    if (shown.length >= cap) break;
+    if (a.source === "recall" && ++recalls > MAX_RECALLS) continue;
+    shown.push(a);
+  }
   const more = picked.length - shown.length;
 
   const items = shown.map((a) => {
