@@ -8,6 +8,7 @@ import {
   type SourceRefTree,
 } from "obligation-kit";
 import type { z } from "zod";
+import { maskNumbers } from "../mcp/speak";
 
 export interface FieldView {
   name: string;
@@ -70,6 +71,17 @@ export function dateFieldNames(agreement: Agreement): Set<string> {
   return names;
 }
 
+/**
+ * Masks every string inside a value or a source quote tree, so the browser never gets a full policy or account number
+ * (hard rule, WEB_API.md). Only what is returned changes: the stored agreement keeps the real quote for verification.
+ */
+function maskDeep<T>(v: T): T {
+  if (typeof v === "string") return maskNumbers(v) as T;
+  if (Array.isArray(v)) return v.map(maskDeep) as T;
+  if (v && typeof v === "object") return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, maskDeep(x)])) as T;
+  return v;
+}
+
 export function agreementView(agreement: Agreement): AgreementView {
   const dates = dateFieldNames(agreement);
   const known = schemaFieldNames(agreement.kind).filter((n) => Object.hasOwn(agreement.fields, n));
@@ -79,10 +91,10 @@ export function agreementView(agreement: Agreement): AgreementView {
     kind: agreement.kind,
     fields: [...known, ...extra].map((name) => ({
       name,
-      value: agreement.fields[name],
+      value: maskDeep(agreement.fields[name]),
       // Anything not listed counts as unconfirmed (core contract).
       status: agreement.fieldStatus[name] ?? "extracted",
-      sourceRef: Object.hasOwn(agreement.sourceRefs, name) ? (agreement.sourceRefs[name] ?? null) : null,
+      sourceRef: Object.hasOwn(agreement.sourceRefs, name) ? maskDeep(agreement.sourceRefs[name] ?? null) : null,
       isDate: dates.has(name),
     })),
   };
