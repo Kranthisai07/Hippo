@@ -10,7 +10,7 @@
     "typecheck": "pnpm -r --if-present typecheck",
     "test:latency": "pnpm --filter @hippo/api test:latency",
     "dev": "pnpm --filter @hippo/api dev",
-    "ingest:fixture": "node scripts/not-built.mjs ingest:fixture T2.2",
+    "ingest:fixture": "pnpm --filter @hippo/workers ingest:fixture",
     "daily:run": "pnpm --filter @hippo/workers daily:run",
     "inspect": "node scripts/not-built.mjs inspect T1.5",
     "deploy": "node scripts/not-built.mjs deploy T4.3",

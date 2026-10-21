@@ -10,12 +10,16 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "daily:run": "tsx src/daily/cli.ts"
+    "daily:run": "tsx src/daily/cli.ts",
+    "ingest:fixture": "tsx src/ingest/cli.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "3.1152.0",
     "@aws-sdk/client-sesv2": "3.1152.0",
+    "@aws-sdk/client-textract": "3.1152.0",
     "core": "workspace:*",
-    "obligation-kit": "workspace:*"
+    "obligation-kit": "workspace:*",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@types/node": "26.6.5",
