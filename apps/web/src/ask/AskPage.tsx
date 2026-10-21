@@ -133,7 +133,9 @@ export default function AskPage() {
         )}
       </main>
 
-      <footer className="ha-foot">Cards are rendered from the tool's structured result.</footer>
+      <footer className="ha-foot">
+        Cards are plain React drawn from the tool's structured result. They are not the MCP Apps host bridge.
+      </footer>
     </div>
   );
 }

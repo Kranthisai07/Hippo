@@ -81,38 +81,55 @@ export async function signInDemo(d?: Deps): Promise<void> {
   const verifier = makeVerifier();
   const state = makeState();
   sessionStorage.setItem(KEY, JSON.stringify({ verifier, state }));
-  const params: Record<string, string> = {
-    client_id: CLIENT_ID,
-    redirect_uri: REDIRECT_URI,
-    response_type: "code",
-    scope: SCOPE,
-    state,
-    code_challenge: await challengeFor(verifier),
-    code_challenge_method: "S256",
-    resource: RESOURCE,
-  };
-  const page = await f(d)(`/oauth/authorize?${new URLSearchParams(params)}`);
-  if (page.status !== 200) throw new Error(`The sign-in page returned ${page.status}.`);
-  const csrf = hidden(await page.text(), "csrf");
-  const res = await f(d)("/oauth/authorize", {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ ...params, csrf, action: "demo" }),
-  });
-  const final = new URL(res.url, window.location.origin);
-  if (!final.searchParams.get("code")) throw new Error("The demo sign-in was refused. Is the demo account turned on?");
-  await completeExchange(final.search, d);
+  try {
+    const params: Record<string, string> = {
+      client_id: CLIENT_ID,
+      redirect_uri: REDIRECT_URI,
+      response_type: "code",
+      scope: SCOPE,
+      state,
+      code_challenge: await challengeFor(verifier),
+      code_challenge_method: "S256",
+      resource: RESOURCE,
+    };
+    const page = await f(d)(`/oauth/authorize?${new URLSearchParams(params)}`);
+    if (page.status !== 200) throw new Error(`The sign-in page returned ${page.status}.`);
+    const csrf = hidden(await page.text(), "csrf");
+    const res = await f(d)("/oauth/authorize", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ ...params, csrf, action: "demo" }),
+    });
+    const final = new URL(res.url, window.location.origin);
+    if (!final.searchParams.get("code"))
+      throw new Error("The demo sign-in was refused. Is the demo account turned on?");
+    await completeExchange(final.search, d);
+  } catch (e) {
+    // Whatever went wrong, the verifier and state of this attempt must not stay in the tab.
+    sessionStorage.removeItem(KEY);
+    throw e;
+  }
 }
 
-async function refresh(d?: Deps): Promise<void> {
+// One refresh at a time. The refresh token rotates, and the server revokes the whole family when an old one is shown
+// again, so two callers must never present the same token: they share this promise instead.
+let inflight: Promise<void> | null = null;
+
+function refresh(d?: Deps): Promise<void> {
+  if (inflight) return inflight;
   const rt = tokens?.refresh;
-  if (!rt) throw new SessionEndedError();
-  try {
-    await tokenRequest({ grant_type: "refresh_token", refresh_token: rt }, d);
-  } catch {
-    tokens = null;
-    throw new SessionEndedError();
-  }
+  if (!rt) return Promise.reject(new SessionEndedError());
+  inflight = (async () => {
+    try {
+      await tokenRequest({ grant_type: "refresh_token", refresh_token: rt }, d);
+    } catch {
+      tokens = null;
+      throw new SessionEndedError();
+    } finally {
+      inflight = null;
+    }
+  })();
+  return inflight;
 }
 
 /** The current access token, refreshed first when it has under 30 seconds left. */
