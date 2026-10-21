@@ -61,7 +61,17 @@ const isMoney = (core: string): boolean =>
 const isPhone = (core: string): boolean => /^(?:\+?1[-. ])?\(?\d{3}\)?[-. ]\d{3}[-. ]\d{4}$/.test(core);
 /** "25,000": one thousands group is a quantity, two or more ("1,234,567") look like an account number. */
 const isThousands = (core: string): boolean => /^\d{1,3},\d{3}(?:\.\d+)?$/.test(core);
-const isExempt = (core: string): boolean => isRealDate(core) || isMoney(core) || isPhone(core) || isThousands(core);
+// A phone shape is handled before the word pass (see maskNumbers), so a 10 digit account number written 3-3-4 is not
+// mistaken for a phone number just because of how it is grouped.
+const isExempt = (core: string): boolean => isRealDate(core) || isMoney(core) || isThousands(core);
+
+/** Words that say a number is a phone number. Without one, or a country code or parentheses, a 3-3-4 number is masked. */
+const PHONE_CUE = /\b(?:tel|telephone|phone|call|fax|cell|mobile|dial|text|contact|reach|ph)\b[^\p{Nd}]{0,12}$/iu;
+const phoneKept = (match: string, before: string): boolean =>
+  /^\+?1[-. ]/.test(match) || match.includes("(") || PHONE_CUE.test(before);
+
+const MONTH_BEFORE =
+  /\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\s*$/iu;
 
 const LEAD = /^[("'[“]+/;
 
@@ -72,8 +82,13 @@ const splitToken = (token: string): { lead: string; core: string; trail: string 
   return { lead, core: trail ? rest.slice(0, rest.length - trail.length) : rest, trail };
 };
 
-/** A number written in groups ("1234 - 5678 - 9012", "4111, 1111", "123 4567") is one number when it has this many digits. */
-const MIN_GROUPED_DIGITS = 7;
+/**
+ * A number written in groups is one number. Joined by punctuation ("1234 - 5678 - 9012", "4111, 1111") it needs 7 digits,
+ * so "Oct 21, 2026" stays a date. Joined by spaces only ("12 345", "123 4567") it needs 5, each group at least 2 digits,
+ * and a month name right before it ("Oct 21 2026") means it is a date.
+ */
+const MIN_PUNCTUATED_DIGITS = 7;
+const MIN_SPACED_DIGITS = 5;
 
 /**
  * Digit groups joined by spaces or by punctuation (dash, slash, dot, comma, bullet, bar, with or without spaces around
@@ -83,9 +98,15 @@ const MIN_GROUPED_DIGITS = 7;
 const DIGIT_RUN = /(?<![\p{L}\p{Nd}$])(?<!\p{L}-)\p{Nd}+(?:(?:\s*[-–—/.,;•|·]\s*|\s+)\p{Nd}+)+(?!\p{Nd})/gu;
 
 const maskDigitRuns = (s: string): string =>
-  s.replace(DIGIT_RUN, (run) => {
+  s.replace(DIGIT_RUN, (run, offset: number) => {
     const digits = run.match(/\p{Nd}/gu) ?? [];
-    return digits.length < MIN_GROUPED_DIGITS ? run : `ending ${digits.slice(-4).join("")}`;
+    const spacesOnly = !/[^\p{Nd}\s]/u.test(run);
+    const enough = spacesOnly
+      ? digits.length >= MIN_SPACED_DIGITS &&
+        (run.match(/\p{Nd}+/gu) ?? []).every((g) => g.length >= 2) &&
+        !MONTH_BEFORE.test(s.slice(0, offset))
+      : digits.length >= MIN_PUNCTUATED_DIGITS;
+    return enough ? `ending ${digits.slice(-4).join("")}` : run;
   });
 
 /** One word with 5 or more digits (policy, account, card numbers) becomes "ending" plus its last 4 digits. */
@@ -123,7 +144,8 @@ export function maskNumbers(input: string): string {
   let out = "";
   let last = 0;
   for (const m of text.matchAll(PROTECTED)) {
-    if (!(isRealDate(m[0]) || isMoney(m[0]) || isPhone(m[0]))) continue;
+    const before = text.slice(Math.max(0, m.index - 25), m.index);
+    if (!(isRealDate(m[0]) || isMoney(m[0]) || (isPhone(m[0]) && phoneKept(m[0], before)))) continue;
     out += maskPlain(text.slice(last, m.index)) + m[0];
     last = m.index + m[0].length;
   }

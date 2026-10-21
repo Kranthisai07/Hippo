@@ -91,7 +91,7 @@ describe("maskNumbers", () => {
     it("still leaves real dates, money and phones alone", () => {
       const keep =
         "Due 2026-10-21 or 10/21/2026 or 2026-10-21 2026-11-12, $1,950 a month, $100,000 limit, " +
-        "call 1-800-555-0142 or 800-555-0142 or 800.555.0142, in 2026, page 3, 30 days, Dec 5 2026";
+        "call 1-800-555-0142 or phone 800-555-0142 or fax 800.555.0142, in 2026, page 3, 30 days, Dec 5 2026";
       expect(maskNumbers(keep)).toBe(keep);
     });
 
@@ -133,6 +133,37 @@ describe("maskNumbers", () => {
 
     it("still masks digits split by an invisible character inside one word", () => {
       expect(maskNumbers("ref 1234­5678​9012")).toBe("ref ending 9012");
+    });
+
+    // Round 3 review: a 10 digit account number written 3-3-4 passed as a phone number, and 5 or 6 digits grouped by
+    // spaces stayed readable although PRIVACY.md says any run of 5 or more digits is masked.
+    it.each([
+      ["acct 123 456 7890", "acct ending 7890"],
+      ["acct 800-123-4567 end", "acct ending 4567 end"],
+      ["account number 800.123.4567.", "account number ending 4567."],
+      ["policy 555-123-4567", "policy ending 4567"],
+      ["12 345", "ending 2345"],
+      ["123 456", "ending 3456"],
+      ["ref 12 345 closed", "ref ending 2345 closed"],
+    ])("%j is masked", (input, out) => {
+      expect(maskNumbers(input)).toBe(out);
+    });
+
+    it.each([
+      "Call 800-123-4567 today",
+      "phone: 800 123 4567",
+      "Tel 800.123.4567",
+      "Fax: (555) 123-4567",
+      "Office (555) 123-4567",
+      "Reach us at 1-800-123-4567",
+      "Dial +1 800 123 4567 now",
+      "contact 800-123-4567",
+      "Due Oct 21 2026 and Dec 5 2026",
+      "since March 12 2025 and Sept. 30 2025",
+      "page 12 of 345",
+      "Section 3, page 12, items 4 and 5",
+    ])("%j stays readable", (input) => {
+      expect(maskNumbers(input)).toBe(input);
     });
 
     it("stays linear on joiner heavy hostile input", () => {
