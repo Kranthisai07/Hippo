@@ -1,19 +1,24 @@
 import { parseArgs } from "node:util";
+import { SESv2Client } from "@aws-sdk/client-sesv2";
 import { createMemoryRepository } from "core/src/repository";
 import { DEMO_HOUSEHOLD, seedDemoHousehold } from "./demo";
 import { recordedFetch } from "./recorded";
 import { parseToday, UsageError, wholeNumber } from "./options";
 import { runDaily } from "./runDaily";
 import { formatReport } from "./format";
+import { resolveSesSender } from "./ses";
 import type { EmailSender } from "./types";
 
 // Composition root: the only file allowed to read the real clock, the network and the console.
-// No SES sender exists yet (it needs an AWS decision), so --send uses a console sender that only prints.
+// --send uses a console sender that only prints. The real SES sender needs --send-ses AND --yes-really AND HIPPO_SES_FROM
+// AND a region; the SESv2Client is constructed only then, so a default run never touches AWS.
 async function main(): Promise<void> {
   const { values } = parseArgs({
     options: {
       today: { type: "string" },
       send: { type: "boolean", default: false },
+      "send-ses": { type: "boolean", default: false },
+      "yes-really": { type: "boolean", default: false },
       "live-recalls": { type: "boolean", default: false },
       "lookback-days": { type: "string" },
       "max-nhtsa": { type: "string" },
@@ -28,9 +33,20 @@ async function main(): Promise<void> {
   await seedDemoHousehold(repository, today);
 
   const live = values["live-recalls"] === true;
-  const sender: EmailSender | undefined = values.send
-    ? { send: async (e) => void console.log(`[console sender] to ${e.to}: ${e.subject}`) }
-    : undefined;
+  const sesSender = resolveSesSender({
+    sendSes: values["send-ses"] === true,
+    yesReally: values["yes-really"] === true,
+    send: values.send === true,
+    env: process.env,
+    // maxAttempts 1: the SDK retries by default, and the sender does its own bounded retries.
+    makeClient: (region) => new SESv2Client({ region, maxAttempts: 1 }),
+    warn: (line) => console.error(line),
+    now: () => Date.now(),
+    sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  });
+  const sender: EmailSender | undefined =
+    sesSender ??
+    (values.send ? { send: async (e) => void console.log(`[console sender] to ${e.to}: ${e.subject}`) } : undefined);
   const report = await runDaily(
     {
       repository,
@@ -49,7 +65,7 @@ async function main(): Promise<void> {
     today,
   );
   console.log(
-    `recalls: ${live ? "LIVE CPSC and NHTSA" : "recorded fixtures"}; email: ${sender ? "console sender" : "dry run"}`,
+    `recalls: ${live ? "LIVE CPSC and NHTSA" : "recorded fixtures"}; email: ${sesSender ? "LIVE SES" : sender ? "console sender" : "dry run"}`,
   );
   console.log(formatReport(report));
 }

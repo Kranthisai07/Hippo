@@ -1,0 +1,38 @@
+{
+  "tool": "ui_show_claim_steps",
+  "args": {
+    "agreement_id": "agr-warranty_dishwasher"
+  },
+  "isError": false,
+  "text": "Here are the 4 claim steps.",
+  "structuredContent": {
+    "kind": "claim_steps",
+    "agreementId": "agr-warranty_dishwasher",
+    "docName": "warranty_dishwasher.pdf",
+    "steps": [
+      {
+        "text": "Stop using the dishwasher and shut off the water supply.",
+        "page": 3
+      },
+      {
+        "text": "Find your sales receipt, model number, and serial number.",
+        "page": 3
+      },
+      {
+        "text": "Call Northwind Warranty Service or email warranty@northwind-appliances.example.",
+        "page": 3
+      },
+      {
+        "text": "A technician visit is scheduled within five business days.",
+        "page": 3
+      }
+    ],
+    "claimWindowDays": 30,
+    "contact": {
+      "phone": "1-800-555-0142",
+      "email": "warranty@northwind-appliances.example",
+      "url": "www.northwind-appliances.example/warranty"
+    },
+    "quotedFromDocument": true
+  }
+}

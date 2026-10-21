@@ -1,0 +1,25 @@
+{
+  "tool": "get_history",
+  "args": {
+    "asset": "car"
+  },
+  "isError": false,
+  "text": "Last service on your car: service, October 21.",
+  "structuredContent": {
+    "kind": "history",
+    "asset": {
+      "id": "A-car",
+      "name": "Car"
+    },
+    "events": [
+      {
+        "id": "event-c9f50a68-f686-406d-bb57-66d509b3a6eb",
+        "ts": "2026-10-21T12:00:00.375Z",
+        "action": "service",
+        "note": null,
+        "source": "voice"
+      }
+    ],
+    "nextServiceDue": null
+  }
+}

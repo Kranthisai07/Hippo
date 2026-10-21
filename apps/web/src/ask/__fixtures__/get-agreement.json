@@ -1,0 +1,69 @@
+{
+  "tool": "get_agreement",
+  "args": {
+    "about": "car insurance"
+  },
+  "isError": false,
+  "text": "Your car insurance with Harbor Mutual Insurance Company, policy ending 4821, runs from April 30 to October 30 and renews automatically.",
+  "structuredContent": {
+    "kind": "agreement",
+    "agreement": {
+      "id": "agr-insurance_auto",
+      "kind": "insurance",
+      "party": "Harbor Mutual Insurance Company",
+      "title": "insurance",
+      "docId": "doc-insurance_auto",
+      "docName": "insurance_auto.pdf",
+      "assetIds": ["A-car"]
+    },
+    "terms": [
+      {
+        "label": "Insurer",
+        "value": "Harbor Mutual Insurance Company",
+        "page": 1
+      },
+      {
+        "label": "Policy type",
+        "value": "auto",
+        "page": 1
+      },
+      {
+        "label": "Policy number",
+        "value": "ending 4821",
+        "page": 1
+      },
+      {
+        "label": "Starts",
+        "value": "April 30",
+        "page": 1
+      },
+      {
+        "label": "Ends",
+        "value": "October 30",
+        "page": 1
+      },
+      {
+        "label": "Renewal",
+        "value": "auto",
+        "page": 1
+      },
+      {
+        "label": "Premium",
+        "value": "$684 semiannual",
+        "page": null
+      },
+      {
+        "label": "Deductibles",
+        "value": "collision 500; comprehensive 250",
+        "page": 1
+      },
+      {
+        "label": "Claim report window",
+        "value": "14 days",
+        "page": 2
+      }
+    ],
+    "datesConfirmed": true,
+    "quotedFromDocument": true
+  }
+}

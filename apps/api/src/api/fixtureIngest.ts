@@ -1,10 +1,10 @@
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
-import type { Agreement, Doc, Repository } from "core/src/contracts";
+import type { Agreement, Doc, DocType, Repository } from "core/src/contracts";
 import { linkAssetHint, linkVehicleHint, type AssetRecord } from "core/src/linking";
 import { pageTextKey } from "core/src/repository/shared";
 import { buildIndex, chunkPages, loadIndex, serializeIndex, type Chunk } from "core/src/retrieval";
-import { ExtractionSchemas, leavesToAgreementFields, type AgreementKind } from "obligation-kit";
+import { ExtractionSchemas, leavesToAgreementFields, type AgreementFields, type AgreementKind } from "obligation-kit";
 import { syncObligations } from "../obligations";
 import { PARTY_FIELD } from "../seed";
 import type { IndexSource } from "../mcp/indexCache";
@@ -70,7 +70,7 @@ const readJsonFile = <T>(path: string): T => JSON.parse(readFileSync(new URL(pat
 export const NOT_A_DEMO_DOC = "This build can only read the demo documents until the real reader is connected.";
 
 /** The asset a document is about, only when there is exactly one sure match. Anything less is left for the person. */
-function linkedAssets(kind: AgreementKind, fields: Record<string, unknown>, assets: AssetRecord[]): string[] {
+export function linkedAssets(kind: AgreementKind, fields: Record<string, unknown>, assets: AssetRecord[]): string[] {
   const hint = fields.assetHint as { brand?: string; model?: string; serial?: string } | undefined;
   if ((kind === "warranty" || kind === "service_plan") && hint) {
     const link = linkAssetHint(hint, assets);
@@ -82,6 +82,62 @@ function linkedAssets(kind: AgreementKind, fields: Record<string, unknown>, asse
     return link.status === "match" ? [link.asset.id] : [];
   }
   return [];
+}
+
+export interface SavedIngest {
+  householdId: string;
+  doc: Doc;
+  kind: DocType;
+  /** Null for a document that is not an agreement (kind "other"): stored and searchable, no agreement. */
+  flat: AgreementFields | null;
+  pages: string[];
+  agreementId: string;
+}
+
+/**
+ * The save half of every ingest, shared by the fixture ingest and the real pipeline: the agreement with every field
+ * as the caller gives it (the ingest passes only `extracted`, so nothing is confirmed and no alert can exist), the
+ * obligations, the page text under derived/, the clause chunks and index, then the Doc as needs_review.
+ */
+export async function saveIngested(deps: Omit<FixtureIngestDeps, "newId">, a: SavedIngest): Promise<void> {
+  const { repo, objectStore } = deps;
+  const { householdId: hh, doc, kind, flat, pages } = a;
+  const nowMs = deps.now();
+  let assetIds: string[] = [];
+  if (flat && kind !== "other") {
+    const assets = await repo.listAssets(hh);
+    assetIds = linkedAssets(kind, flat.fields, assets);
+    const party = flat.fields[PARTY_FIELD[kind]];
+    const agreement: Agreement = {
+      id: a.agreementId,
+      kind,
+      ...(typeof party === "string" ? { party } : {}),
+      title: typeof flat.fields.plan === "string" ? flat.fields.plan : kind,
+      assetIds,
+      docId: doc.id,
+      fields: flat.fields,
+      fieldStatus: flat.fieldStatus,
+      sourceRefs: flat.sourceRefs,
+      createdAt: new Date(nowMs).toISOString(),
+    };
+    await repo.putAgreement(hh, agreement);
+    // Nothing is confirmed, so these are timeline entries without a severity and raise no alert (INTENT principle 2).
+    await syncObligations(repo, hh, agreement, assets, new Date(nowMs).toISOString().slice(0, 10));
+  }
+  await objectStore.put(pageTextKey(hh, doc.id), pagesObject(pages));
+  const chunks = chunkPages(
+    doc.id,
+    pages.map((text, i) => ({ page: i + 1, text })),
+  );
+  await repo.putChunkMeta(hh, {
+    docId: doc.id,
+    s3Key: `derived/${hh}/${doc.id}/chunks.json`,
+    indexVersion: 1,
+    chunkCount: chunks.length,
+  });
+  await updateIndex(deps.indexStore, hh, { add: chunks });
+  const { failureReason: _gone, ...rest } = doc;
+  await repo.putDoc(hh, { ...rest, docType: kind, status: "needs_review", pages: pages.length, assetIds });
 }
 
 export interface FixtureIngestDeps {
@@ -112,40 +168,6 @@ export function createFixtureIngest(deps: FixtureIngestDeps): OnUploaded {
     const parsed = ExtractionSchemas[kind].parse(expected.fields) as Record<string, unknown>;
     const flat = leavesToAgreementFields(kind, parsed);
     const pages = readJsonFile<{ pages: string[] }>(`expected/pages/${stem}.json`).pages;
-    const assets = await repo.listAssets(hh);
-    const assetIds = linkedAssets(kind, flat.fields, assets);
-    const nowMs = deps.now();
-
-    const party = flat.fields[PARTY_FIELD[kind]];
-    const agreement: Agreement = {
-      id: `agr-${deps.newId()}`,
-      kind,
-      ...(typeof party === "string" ? { party } : {}),
-      title: typeof flat.fields.plan === "string" ? flat.fields.plan : kind,
-      assetIds,
-      docId,
-      fields: flat.fields,
-      fieldStatus: flat.fieldStatus,
-      sourceRefs: flat.sourceRefs,
-      createdAt: new Date(nowMs).toISOString(),
-    };
-    await repo.putAgreement(hh, agreement);
-    // Nothing is confirmed, so these are timeline entries without a severity and raise no alert (INTENT principle 2).
-    await syncObligations(repo, hh, agreement, assets, new Date(nowMs).toISOString().slice(0, 10));
-
-    await objectStore.put(pageTextKey(hh, docId), pagesObject(pages));
-    const chunks = chunkPages(
-      docId,
-      pages.map((text, i) => ({ page: i + 1, text })),
-    );
-    await repo.putChunkMeta(hh, {
-      docId,
-      s3Key: `derived/${hh}/${docId}/chunks.json`,
-      indexVersion: 1,
-      chunkCount: chunks.length,
-    });
-    await updateIndex(deps.indexStore, hh, { add: chunks });
-    const next: Doc = { ...doc, docType: kind, status: "needs_review", pages: pages.length, assetIds };
-    await repo.putDoc(hh, next);
+    await saveIngested(deps, { householdId: hh, doc, kind, flat, pages, agreementId: `agr-${deps.newId()}` });
   };
 }

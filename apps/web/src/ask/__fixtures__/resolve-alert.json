@@ -1,0 +1,17 @@
+{
+  "tool": "ui_resolve_alert",
+  "args": {
+    "alert_id": "alert-agr-subscription_kestrel:cancel_by:2026-10-26",
+    "action": "dismiss"
+  },
+  "isError": false,
+  "text": "Okay, dismissed. I will not bring it up again.",
+  "structuredContent": {
+    "kind": "alert_resolved",
+    "alertId": "alert-agr-subscription_kestrel:cancel_by:2026-10-26",
+    "action": "dismiss",
+    "snoozedUntil": null,
+    "suppressed": false,
+    "status": "dismissed"
+  }
+}

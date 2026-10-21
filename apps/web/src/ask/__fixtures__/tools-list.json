@@ -1,0 +1,236 @@
+[
+  {
+    "name": "whats_coming_up",
+    "description": "Lists what is coming up for the household: confirmed deadlines such as renewals, notice dates, cancel-by dates and warranty ends, plus open alerts, most urgent first. Use it for questions about dates and what needs attention. Do not use it to check coverage for a broken item (use check_coverage) or to read a document (use ask_documents). Examples: \"what is coming up this month\", \"anything due soon\", \"what do I need to cancel\". window_days is how far ahead to look, 30 by default.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "window_days": {
+          "default": 30,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 365
+        }
+      },
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "check_coverage",
+    "description": "Checks whether a broken or damaged item is covered: finds the warranty or insurance linked to it, checks it is still in term, and returns the coverage clause, any exclusion, the claim steps and the claim-by date, each with document and page. Use it when something is broken, leaking or damaged. Do not use it for general document questions (use ask_documents) or for upcoming dates (use whats_coming_up). Examples: \"my dishwasher is leaking, am I covered\", \"the car got dented\". Pass only the thing as asset (for example dishwasher), not the whole sentence, and the problem as issue (for example leaking).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "asset": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "issue": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        }
+      },
+      "required": ["asset", "issue"],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "ask_documents",
+    "description": "Finds the passages in the household's own documents that answer a question, and returns the top 3 with document name and page. You then compose the answer from them and cite the page. Use it for questions about what a document says: leases, policies, warranties, subscriptions. Do not use it for a broken item (use check_coverage) or for dates (use whats_coming_up). Examples: \"what does my lease say about breaking it early\", \"what is my car insurance deductible\". Pass the question as question. Pass only the thing or document (for example lease) as about, not the whole sentence.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "question": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "about": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        }
+      },
+      "required": ["question"],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "get_agreement",
+    "description": "Reads the key terms of one agreement: a warranty, insurance policy, lease or subscription, with dates, amounts, notice period and who to contact. Numbers are masked to the last 4. Use it when the person asks about one agreement in general. Do not use it for a specific clause question (use ask_documents) or for a broken item (use check_coverage). Examples: \"tell me about my car insurance\", \"when does my lease end\", \"how much is Kestrel\". Pass only the agreement (for example car insurance), not the whole sentence.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "about": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        }
+      },
+      "required": ["about"],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "add_record",
+    "description": "Adds something the person tells you about: a thing they own (asset) or a simple subscription with its cost and billing day. Dates they say count as confirmed. Use it when they say they bought or signed up for something. Do not use it to log service on an item they already have (use log_service). Examples: \"I bought a Bosch dishwasher\", \"I signed up for a gym membership, 40 dollars monthly, on the 5th\". For a subscription give vendor, amount, cycle and either next_charge_date (YYYY-MM-DD) or day_of_month.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "log_service",
+    "description": "Logs that a service or maintenance job was done on one of the household's things, and updates its next service date. Use it when the person says they just did or had something serviced. Do not use it to add a new item (use add_record) or to read past entries (use get_history). Examples: \"I just had the furnace serviced\", \"I changed the water filter on the fridge yesterday\". Pass only the thing as asset (for example furnace), what was done as action, and date as YYYY-MM-DD only if they said one.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "asset": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "action": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "date": {
+          "type": "string"
+        }
+      },
+      "required": ["asset", "action"],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "get_history",
+    "description": "Reads back the last service or maintenance entries for one of the household's things and when its next service is due. Use it for questions about past service. Do not use it to record a new service (use log_service) or to read a warranty (use get_agreement). Examples: \"when did I last service the furnace\", \"what is the history on my car\". Pass only the thing as asset (for example furnace), not the whole sentence.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "asset": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        }
+      },
+      "required": ["asset"],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "resolve_alert",
+    "description": "Marks one alert as done, dismissed, not mine (recalls only) or snoozed for 7 days. Use it when the person responds to something you just told them, with the alert_id from the earlier answer. Do not use it to undo an add or a log entry (use undo_last). Examples: \"dismiss that\", \"that recall is not mine\", \"remind me next week\". action is one of done, dismiss, not_mine, snooze_7d.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "alert_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "action": {
+          "type": "string",
+          "enum": ["done", "dismiss", "not_mine", "snooze_7d"]
+        }
+      },
+      "required": ["alert_id", "action"],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "undo_last",
+    "description": "Reverts the most recent thing the person added or logged by voice, if it was in the last 24 hours. Use it only after add_record or log_service when they say it was a mistake. Do not use it to dismiss an alert (use resolve_alert). Examples: \"undo that\", \"never mind, remove it\", \"that was wrong\".",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "ui_resolve_alert",
+    "description": "Card button: marks an alert done, dismissed, not mine or snoozed. Called by the card, not by the model.",
+    "_meta": {
+      "ui": {
+        "visibility": ["app"]
+      }
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "alert_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "action": {
+          "type": "string",
+          "enum": ["done", "dismiss", "not_mine", "snooze_7d"]
+        }
+      },
+      "required": ["alert_id", "action"],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "ui_show_clause",
+    "description": "Card button: shows the quoted clauses on one page of one document. Called by the card, not by the model.",
+    "_meta": {
+      "ui": {
+        "visibility": ["app"]
+      }
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "doc_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "page": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": ["doc_id", "page"],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "ui_show_claim_steps",
+    "description": "Card button: shows the claim steps and contact of one agreement. Called by the card, not by the model.",
+    "_meta": {
+      "ui": {
+        "visibility": ["app"]
+      }
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "agreement_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        }
+      },
+      "required": ["agreement_id"],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    }
+  }
+]

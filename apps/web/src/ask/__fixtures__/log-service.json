@@ -1,0 +1,19 @@
+{
+  "tool": "log_service",
+  "args": {
+    "asset": "car",
+    "action": "service"
+  },
+  "isError": false,
+  "text": "Logged: service on your car, October 21. You can say undo if that was a mistake.",
+  "structuredContent": {
+    "kind": "service_logged",
+    "assetId": "A-car",
+    "assetName": "Car",
+    "eventId": "event-c9f50a68-f686-406d-bb57-66d509b3a6eb",
+    "action": "service",
+    "date": "2026-10-21",
+    "nextServiceDue": null,
+    "undoAvailable": true
+  }
+}

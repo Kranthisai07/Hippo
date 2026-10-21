@@ -121,6 +121,15 @@ export async function startServer(opts: ServerOptions = {}): Promise<Running> {
     // only reads the demo documents. The web dev server may send the cookie from its own origin.
     web: {
       objectStore,
+      // HIPPO_INGEST=pipeline swaps the demo-only fixture ingest for the real pipeline (apps/workers, fixture mode unless HIPPO_LIVE_AI=1).
+      ...(env.HIPPO_INGEST === "pipeline"
+        ? {
+            onUploaded: (await import("../../workers/src/ingest")).createPipelineIngest(
+              { repo, objectStore, indexStore: indexSource, now: clock, log },
+              env,
+            ),
+          }
+        : {}),
       uploader: createLocalUploader({ now: clock }),
       origins: [new URL(issuer).origin, ...allowedOrigins],
     },

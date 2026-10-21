@@ -1,0 +1,28 @@
+{
+  "tool": "add_record",
+  "args": {
+    "kind": "subscription",
+    "vendor": "Gym",
+    "amount": 40,
+    "cycle": "monthly",
+    "next_charge_date": "2026-11-05"
+  },
+  "isError": false,
+  "text": "Added Gym, $40 monthly. The next charge is November 5.",
+  "structuredContent": {
+    "kind": "record_added",
+    "created": true,
+    "recordKind": "subscription",
+    "id": "agr-3a5a8bd9-281e-4828-85a2-62c8ce7f0084",
+    "name": "Gym",
+    "obligations": [
+      {
+        "id": "agr-3a5a8bd9-281e-4828-85a2-62c8ce7f0084:charge:2026-11-05",
+        "type": "charge",
+        "dueDate": "2026-11-05",
+        "label": "Gym next charge"
+      }
+    ],
+    "undoAvailable": true
+  }
+}
