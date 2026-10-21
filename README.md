@@ -2,7 +2,7 @@
 
 Hippo turns the paperwork a household never reads twice (warranties, insurance, a lease, subscriptions, recall notices) into dated obligations, and watches them while nobody is talking. It is an Alexa+ add-on with a web app for uploading and reviewing documents.
 
-> **Status: working build, Alexa+ hackathon.** Today the repo contains the demo fixtures, the deadline engine, the asset resolver, the source quote check, asset linking, recall matchers, PDF page text extraction, the daily digest builder and daily job, the repository (memory and DynamoDB), the clause index, an OAuth 2.1 server, the MCP server with its nine tools, the web JSON API, the web app, the /ask demo client with its cards, the ingest pipeline and a CDK stack that has never been deployed, with 3030 passing tests. The ingest pipeline runs in fixture mode by default, so only the demo documents are read; its live Bedrock and Textract adapters exist and have only run against fakes. The cards are plain React, not the MCP Apps host bridge. Nothing is deployed. [What exists today](#what-exists-today) is the honest list.
+> **Status: working build, Alexa+ hackathon.** Today the repo contains the demo fixtures, the deadline engine, the asset resolver, the source quote check, asset linking, recall matchers, PDF page text extraction, the daily digest builder and daily job, the repository (memory and DynamoDB), the clause index, an OAuth 2.1 server, the MCP server with its nine tools, the web JSON API, the web app, the /ask demo client with its cards, the ingest pipeline and a CDK stack that has never been deployed, with 3090 passing tests (3361 in CI, which adds the DynamoDB Local suite). The ingest pipeline runs in fixture mode by default, so only the demo documents are read; its live Bedrock and Textract adapters exist and have only run against fakes. The cards are plain React, not the MCP Apps host bridge. Nothing is deployed. [What exists today](#what-exists-today) is the honest list.
 
 ## Why
 
@@ -103,7 +103,7 @@ Needs Node 22.13 or newer (the PDF library requires it), pnpm (version pinned in
 
 ```bash
 git clone https://github.com/Kranthisai07/Hippo.git && cd Hippo
-pnpm install --frozen-lockfile && pnpm test && pnpm typecheck   # 531, 1048 (1319 in CI with DynamoDB Local), 306, 665, 184 and 25 tests
+pnpm install --frozen-lockfile && pnpm test && pnpm typecheck   # obligation-kit 531, core 1054 (1325 in CI with DynamoDB Local), auth 306, api 693, workers 363, web 118, infra 25
 pnpm --filter @hippo/api demo   # walks the demo moments through a real MCP client
 pip install reportlab pypdf pillow && python fixtures/tools/generate.py
 ```
