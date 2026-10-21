@@ -81,6 +81,6 @@ describe("real MCP client over a fake Streamable HTTP server", () => {
     expect(everything.toLowerCase()).not.toContain("bearer");
     expect(localStorage.length).toBe(0);
     expect(JSON.stringify({ ...sessionStorage })).not.toContain(TOKEN);
-    expect(REDIRECT_URI).toBe("http://localhost:5173/callback");
+    expect(REDIRECT_URI).toBe(`${window.location.origin}/callback`);
   });
 });

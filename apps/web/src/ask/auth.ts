@@ -1,11 +1,13 @@
 // OAuth 2.1 authorization code with PKCE S256 against our own server (same origin through the dev proxy).
 // The verifier and state live in sessionStorage only across the redirect. Tokens live in this module's memory only.
+import { askConfig } from "./config";
 import { challengeFor, makeState, makeVerifier, stateMatches } from "./pkce";
 import { SessionEndedError } from "./types";
 
-export const CLIENT_ID = "hippo-demo";
-export const REDIRECT_URI = "http://localhost:5173/callback";
-export const RESOURCE = "http://localhost:8787/mcp";
+const cfg = askConfig(import.meta.env, window.location.origin);
+export const CLIENT_ID = cfg.clientId;
+export const REDIRECT_URI = cfg.redirectUri;
+export const RESOURCE = cfg.resource;
 export const SCOPE = "mcp:tools";
 const KEY = "hippo-ask-pkce";
 
