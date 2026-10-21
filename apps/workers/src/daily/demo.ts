@@ -30,9 +30,15 @@ interface ExpectedFile {
   fields: Record<string, unknown>;
 }
 
-export async function seedDemoHousehold(repo: Repository, today: string, householdId = DEMO_HOUSEHOLD): Promise<void> {
+export async function seedDemoHousehold(
+  repo: Repository,
+  today: string,
+  householdId = DEMO_HOUSEHOLD,
+  // A live SES send in the sandbox only reaches a verified address, so the CLI can swap the placeholder.
+  email = DEMO_EMAIL,
+): Promise<void> {
   const createdAt = `${today}T00:00:00.000Z`;
-  await repo.putHousehold(householdId, { id: householdId, email: DEMO_EMAIL, digestOn: true, createdAt });
+  await repo.putHousehold(householdId, { id: householdId, email, digestOn: true, createdAt });
 
   const linked = new Map<string, string[]>();
   for (const raw of read<(Record<string, unknown> & { id: string; linkedDoc?: string | null })[]>(

@@ -41,7 +41,11 @@ async function main(): Promise<number> {
     uploadedAt: new Date().toISOString(),
     assetIds: [],
   });
-  const ingest = createPipelineIngest({ repo, objectStore, indexStore, now: Date.now }, process.env);
+  // The pipeline logs error class names and field paths only, never document text, so it is safe to show here.
+  const ingest = createPipelineIngest(
+    { repo, objectStore, indexStore, now: Date.now, log: console.error },
+    process.env,
+  );
   await ingest({ householdId: hh, docId });
 
   const doc = await repo.getDoc(hh, docId);

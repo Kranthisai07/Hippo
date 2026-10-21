@@ -59,7 +59,7 @@ Full detail is in [INTENT.md](INTENT.md) (why and principles) and [SPEC.md](SPEC
 | MCP server (`apps/api`): 9 tools and 3 card button tools over stateless Streamable HTTP, OAuth 2.1 with PKCE (`packages/auth`), in memory data seeded from the fixtures | Done, `pnpm test:latency` measured p95 under 150 ms locally. The /ask page draws the cards as plain React from the tool results, not through the MCP Apps host bridge |
 | Ingestion pipeline (`apps/workers/src/ingest`): page text, structured extraction, the quote check and asset linking | Built. Fixture mode is the default and reads only the demo documents (8 of 8 dates and 58 of 58 fields match the expected files). The live Bedrock and Textract adapters have only run against fakes |
 | Web JSON API (`apps/api/src/api`, contract in `docs/WEB_API.md`): upload, review and confirm, Coming Up, assets, settings, with a dev fixture ingest for the demo documents | Done. The web app (`apps/web`: sign in, upload, review, Coming up, Things, Settings) and the /ask demo client are built on top of it |
-| Daily job (`apps/workers`): deadline alerts, recall radar, digest and a dry run (`pnpm daily:run`) | Done, never run against live CPSC or NHTSA. The SES adapter exists (`--send-ses --yes-really`) and has only run against a fake client. The AWS deploy is not done |
+| Daily job (`apps/workers`): deadline alerts, recall radar, digest and a dry run (`pnpm daily:run`) | Done, never run against live CPSC or NHTSA. The SES adapter (`--send-ses --yes-really`) sent one real digest on 2026-10-21 from a sandbox account to a verified address; tests use a fake client. The AWS deploy is not done |
 
 ### The deadline engine
 
