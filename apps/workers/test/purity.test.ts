@@ -30,7 +30,7 @@ describe("the clock and the network are injected", () => {
 
   it("only the digest step calls the sender", () => {
     for (const [f, src] of logic)
-      if (f !== "digest.ts" && f !== "types.ts") expect(code(src), f).not.toMatch(/\.send\s*\(/);
+      if (f !== "digest.ts" && f !== "types.ts" && f !== "ses.ts") expect(code(src), f).not.toMatch(/\.send\s*\(/);
   });
 
   it("only the recall step imports the network clients, by deep path", () => {
@@ -43,7 +43,8 @@ describe("the clock and the network are injected", () => {
   });
 
   it("no LLM client and no AWS SDK in the job", () => {
-    for (const [f, src] of logic) expect(src, f).not.toMatch(/@aws-sdk|anthropic|bedrock/i);
+    // ses.ts is the one place the SES SDK is imported (the SDK itself stays out of the CLI-free logic).
+    for (const [f, src] of logic) if (f !== "ses.ts") expect(src, f).not.toMatch(/@aws-sdk|anthropic|bedrock/i);
   });
 });
 

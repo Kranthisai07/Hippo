@@ -13,6 +13,7 @@
     "daily:run": "tsx src/daily/cli.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-sesv2": "3.1152.0",
     "core": "workspace:*",
     "obligation-kit": "workspace:*"
   },
