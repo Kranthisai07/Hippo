@@ -7,6 +7,3 @@ packages:
 # pnpm install does not rewrite this file asking.
 allowBuilds:
   esbuild: false
-
-minimumReleaseAgeExclude:
-  - lucide-react@1.60.0
