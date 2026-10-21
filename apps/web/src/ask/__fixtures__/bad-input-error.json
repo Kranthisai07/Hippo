@@ -1,0 +1,14 @@
+{
+  "tool": "log_service",
+  "args": {
+    "asset": "car",
+    "action": "service",
+    "date": "2999-01-01"
+  },
+  "isError": true,
+  "text": "I cannot log a service that has not happened yet. Tell me the date it was done.",
+  "structuredContent": {
+    "kind": "error",
+    "code": "bad_input"
+  }
+}

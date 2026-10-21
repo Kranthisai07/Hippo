@@ -1,0 +1,14 @@
+{
+  "tool": "ask_documents",
+  "args": {
+    "question": "anything",
+    "about": "spaceship"
+  },
+  "isError": false,
+  "text": "I could not find spaceship among your things. Try just the name, like dishwasher.",
+  "structuredContent": {
+    "kind": "not_found",
+    "what": "asset",
+    "query": "spaceship"
+  }
+}

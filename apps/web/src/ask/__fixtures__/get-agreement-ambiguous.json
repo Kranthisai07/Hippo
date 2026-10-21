@@ -1,0 +1,23 @@
+{
+  "tool": "get_agreement",
+  "args": {
+    "about": "subscription"
+  },
+  "isError": false,
+  "text": "Which one do you mean, the Fernwood Streaming subscription or the Kestrel Learning subscription?",
+  "structuredContent": {
+    "kind": "ambiguous",
+    "what": "agreement",
+    "question": "Which one do you mean, the Fernwood Streaming subscription or the Kestrel Learning subscription?",
+    "options": [
+      {
+        "id": "agr-subscription_fernwood",
+        "label": "Fernwood Streaming subscription"
+      },
+      {
+        "id": "agr-subscription_kestrel",
+        "label": "Kestrel Learning subscription"
+      }
+    ]
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "tool": "check_coverage",
+  "args": {
+    "asset": "dishwasher",
+    "issue": "leaking"
+  },
+  "isError": false,
+  "text": "Before that, your car insurance renews in 9 days. Yes, your dishwasher warranty runs to November 12, but page 3 excludes damage caused by improper installation, including water damage. Report within 30 days, by November 20, and upload your receipt; this is what your document says, not a claim decision.",
+  "structuredContent": {
+    "kind": "coverage",
+    "badge": "covered",
+    "asset": {
+      "id": "A-dishwasher",
+      "name": "Dishwasher"
+    },
+    "issue": "leaking",
+    "agreement": {
+      "id": "agr-warranty_dishwasher",
+      "kind": "warranty",
+      "provider": "Northwind Appliances, Inc.",
+      "docId": "doc-warranty_dishwasher",
+      "docName": "warranty_dishwasher.pdf"
+    },
+    "term": {
+      "startDate": "2025-11-12",
+      "endDate": "2026-11-12",
+      "asOf": "2026-10-21",
+      "inTerm": true,
+      "datesConfirmed": true
+    },
+    "topClause": {
+      "docId": "doc-warranty_dishwasher",
+      "docName": "warranty_dishwasher.pdf",
+      "page": 2,
+      "heading": "Section 1. What is covered",
+      "text": "Section 1. What is covered\nDuring the warranty period, the Warrantor will repair or replace, at its option, any part that fails because of a defect in materials or workmanship under normal household use. Covered parts include the circulation pump, the drain motor, the main control board, the door latch, and the door seals.\nLabor for covered repairs is included when performed by a Northwind authorized technician.",
+      "quotedFromDocument": true
+    },
+    "exclusionClause": {
+      "docId": "doc-warranty_dishwasher",
+      "docName": "warranty_dishwasher.pdf",
+      "page": 3,
+      "heading": "Section 3. What is not covered",
+      "text": "Section 3. What is not covered\nThis warranty does not cover damage caused by improper installation, including water damage resulting from improperly connected supply or drain lines.\nThis warranty also does not cover cosmetic damage, damage from commercial use, or damage from repairs made by anyone other than a Northwind authorized technician.",
+      "quotedFromDocument": true
+    },
+    "claimSteps": [
+      {
+        "text": "Stop using the dishwasher and shut off the water supply.",
+        "page": 3
+      },
+      {
+        "text": "Find your sales receipt, model number, and serial number.",
+        "page": 3
+      },
+      {
+        "text": "Call Northwind Warranty Service or email warranty@northwind-appliances.example.",
+        "page": 3
+      },
+      {
+        "text": "A technician visit is scheduled within five business days.",
+        "page": 3
+      }
+    ],
+    "claimWindowDays": 30,
+    "claimByDate": "2026-11-20",
+    "missingProof": ["Dated sales receipt (proof of purchase). No receipt has been uploaded."],
+    "disclaimer": "This is what your document says, not a claim decision.",
+    "proactive": {
+      "alertId": "alert-agr-insurance_auto:renews:2026-10-30",
+      "sentence": "Before that, your car insurance renews in 9 days."
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "tool": "ui_show_clause",
+  "args": {
+    "doc_id": "doc-warranty_dishwasher",
+    "page": 3
+  },
+  "isError": false,
+  "text": "Page 3 of warranty dishwasher.",
+  "structuredContent": {
+    "kind": "clause_view",
+    "docId": "doc-warranty_dishwasher",
+    "docName": "warranty_dishwasher.pdf",
+    "page": 3,
+    "clauses": [
+      {
+        "docId": "doc-warranty_dishwasher",
+        "docName": "warranty_dishwasher.pdf",
+        "page": 3,
+        "heading": "Section 3. What is not covered",
+        "text": "Section 3. What is not covered\nThis warranty does not cover damage caused by improper installation, including water damage resulting from improperly connected supply or drain lines.\nThis warranty also does not cover cosmetic damage, damage from commercial use, or damage from repairs made by anyone other than a Northwind authorized technician.",
+        "quotedFromDocument": true
+      },
+      {
+        "docId": "doc-warranty_dishwasher",
+        "docName": "warranty_dishwasher.pdf",
+        "page": 3,
+        "heading": "Section 4. How to make a claim",
+        "text": "Section 4. How to make a claim\nYou must report a defect within thirty (30) days of discovering it.\n1. Stop using the dishwasher and shut off the water supply.\n2. Find your sales receipt, model number, and serial number.\n3. Call Northwind Warranty Service at 1-800-555-0142 or email warranty@northwind-appliances.example.\n4. A technician visit is scheduled within five (5) business days.\nOnline: www.northwind-appliances.example/warranty",
+        "quotedFromDocument": true
+      }
+    ]
+  }
+}

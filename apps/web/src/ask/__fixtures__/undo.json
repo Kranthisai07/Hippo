@@ -1,0 +1,11 @@
+{
+  "tool": "undo_last",
+  "args": {},
+  "isError": false,
+  "text": "Okay, I removed the car service you just logged.",
+  "structuredContent": {
+    "kind": "undone",
+    "undone": true,
+    "summary": "the car service you just logged"
+  }
+}

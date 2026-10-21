@@ -1,0 +1,114 @@
+{
+  "tool": "whats_coming_up",
+  "args": {},
+  "isError": false,
+  "text": "Coming up: your Kestrel Learning cancel-by date is in 5 days, your car insurance renews in 9 days, and your lease notice deadline is in 11 days. 4 more are in the app.",
+  "structuredContent": {
+    "kind": "coming_up",
+    "asOf": "2026-10-21",
+    "windowDays": 30,
+    "items": [
+      {
+        "id": "agr-subscription_kestrel:cancel_by:2026-10-26",
+        "source": "deadline",
+        "type": "cancel_by",
+        "label": "Kestrel Learning cancel-by date",
+        "dueDate": "2026-10-26",
+        "daysAway": 5,
+        "severity": "high",
+        "alertId": "alert-agr-subscription_kestrel:cancel_by:2026-10-26",
+        "obligationId": "agr-subscription_kestrel:cancel_by:2026-10-26",
+        "agreementId": "agr-subscription_kestrel",
+        "assetId": null,
+        "detail": null
+      },
+      {
+        "id": "agr-subscription_kestrel:trial_end:2026-10-28",
+        "source": "deadline",
+        "type": "trial_end",
+        "label": "Kestrel Learning trial ends",
+        "dueDate": "2026-10-28",
+        "daysAway": 7,
+        "severity": "high",
+        "alertId": "alert-agr-subscription_kestrel:trial_end:2026-10-28",
+        "obligationId": "agr-subscription_kestrel:trial_end:2026-10-28",
+        "agreementId": "agr-subscription_kestrel",
+        "assetId": null,
+        "detail": null
+      },
+      {
+        "id": "agr-insurance_auto:renews:2026-10-30",
+        "source": "deadline",
+        "type": "renews",
+        "label": "Car insurance renews",
+        "dueDate": "2026-10-30",
+        "daysAway": 9,
+        "severity": "high",
+        "alertId": "alert-agr-insurance_auto:renews:2026-10-30",
+        "obligationId": "agr-insurance_auto:renews:2026-10-30",
+        "agreementId": "agr-insurance_auto",
+        "assetId": "A-car",
+        "detail": null
+      },
+      {
+        "id": "agr-lease:notice_by:2026-11-01",
+        "source": "deadline",
+        "type": "notice_by",
+        "label": "Lease notice deadline",
+        "dueDate": "2026-11-01",
+        "daysAway": 11,
+        "severity": "high",
+        "alertId": "alert-agr-lease:notice_by:2026-11-01",
+        "obligationId": "agr-lease:notice_by:2026-11-01",
+        "agreementId": "agr-lease",
+        "assetId": null,
+        "detail": null
+      },
+      {
+        "id": "agr-subscription_fernwood:cancel_by:2026-11-02",
+        "source": "deadline",
+        "type": "cancel_by",
+        "label": "Fernwood Streaming cancel-by date",
+        "dueDate": "2026-11-02",
+        "daysAway": 12,
+        "severity": "high",
+        "alertId": "alert-agr-subscription_fernwood:cancel_by:2026-11-02",
+        "obligationId": "agr-subscription_fernwood:cancel_by:2026-11-02",
+        "agreementId": "agr-subscription_fernwood",
+        "assetId": null,
+        "detail": null
+      }
+    ],
+    "totalCount": 10,
+    "recalls": [
+      {
+        "id": "alert-recall-26530",
+        "source": "recall",
+        "type": null,
+        "label": "Boon NURSH baby bottles recall",
+        "dueDate": null,
+        "daysAway": null,
+        "severity": "high",
+        "alertId": "alert-recall-26530",
+        "obligationId": null,
+        "agreementId": null,
+        "assetId": "A-baby-bottles",
+        "detail": "Hazard: The hard plastic outer shell can bubble or partially peel off, resulting in loose pieces of film-like plastic that pose a choking hazard to young children. Remedy: Consumers should stop using the recalled baby bottles immediately and contact TOMY to receive a refund in the form of a $22 booninc.com store credit or a replacement set of three bottles in a different color."
+      },
+      {
+        "id": "alert-recall-26V332000",
+        "source": "recall",
+        "type": null,
+        "label": "Honda CR-V recall",
+        "dueDate": null,
+        "daysAway": null,
+        "severity": "high",
+        "alertId": "alert-recall-26V332000",
+        "obligationId": null,
+        "agreementId": null,
+        "assetId": "A-car",
+        "detail": "May affect your car. Hazard: air bags:sensor:occupant classification:front passenger. Remedy: Dealers will replace the seat weight sensors, free of charge."
+      }
+    ]
+  }
+}

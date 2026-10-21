@@ -1,0 +1,17 @@
+{
+  "tool": "ui_resolve_alert",
+  "args": {
+    "alert_id": "alert-recall-26530",
+    "action": "not_mine"
+  },
+  "isError": false,
+  "text": "Okay, I will not show that recall again.",
+  "structuredContent": {
+    "kind": "alert_resolved",
+    "alertId": "alert-recall-26530",
+    "action": "not_mine",
+    "snoozedUntil": null,
+    "suppressed": true,
+    "status": "dismissed"
+  }
+}
