@@ -41,7 +41,7 @@ export default defineConfig({
     },
   },
   preview: { port: 5173 },
-  build: { sourcemap: false },
+  build: { sourcemap: false, assetsInlineLimit: 0 },
   test: {
     environment: "jsdom",
     setupFiles: ["./test/setup.ts"],

@@ -1,0 +1,130 @@
+/* Hippo design tokens: the single source for the web app, the landing page and /ask.
+   Light first, dark through prefers-color-scheme (the e2e axe check runs both). Status colors are state, not accent.
+   Only one accent exists. Existing names (--bg, --surface, --ink, --accent ...) are kept so older rules keep working. */
+
+:root {
+  color-scheme: light dark;
+  --font: "Geist Variable", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: "Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* spacing */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 24px;
+  --s6: 32px;
+  --s7: 48px;
+  --s8: 64px;
+  --s9: 96px;
+  --s10: 144px;
+
+  /* one radius system: inner 10, controls 12, containers 20, pill for chips and buttons */
+  --r1: 10px;
+  --r2: 14px;
+  --r3: 20px;
+  --r-pill: 999px;
+
+  /* layout */
+  --page-max: 1040px;
+  --wide-max: 1280px;
+  --nav-h: 64px;
+
+  /* z-index scale, nothing else may invent a value */
+  --z-base: 0;
+  --z-sticky: 20;
+  --z-nav: 40;
+  --z-overlay: 60;
+  --z-toast: 80;
+
+  /* motion */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: linear(0, 0.19 3%, 0.58 8%, 0.87 14%, 1.03 21%, 1.06 27%, 1.04 34%, 1.01 45%, 0.995 58%, 1);
+  --t: 180ms var(--ease-out);
+  --t-slow: 520ms var(--ease-out);
+
+  /* surfaces: cool neutral paper, deep green-black ink, one deep teal accent */
+  --bg: #f3f6f5;
+  --surface: #ffffff;
+  --surface-2: #e9efed;
+  --surface-3: #dde6e3;
+  --line: #d3dcd9;
+  --ink: #0d1a18;
+  --ink-2: #405450;
+  --accent: #0b6b61;
+  --accent-hover: #07554d;
+  --on-accent: #ffffff;
+  --accent-soft: #d9eeea;
+  --accent-wash: #eaf6f4;
+  --focus: #0b57d0;
+
+  /* glass: used for the top bar and a few floating panels, with a solid fallback */
+  --glass-bg: rgb(255 255 255 / 0.72);
+  --glass-line: rgb(255 255 255 / 0.65);
+  --glass-edge: rgb(13 26 24 / 0.08);
+  --glass-blur: 18px;
+
+  /* tinted shadows (hue of the ink, never pure black) */
+  --shadow1: 0 1px 2px rgb(13 42 38 / 0.06), 0 1px 1px rgb(13 42 38 / 0.04);
+  --shadow2: 0 10px 30px rgb(13 42 38 / 0.1), 0 2px 8px rgb(13 42 38 / 0.06);
+  --shadow3: 0 28px 70px rgb(13 42 38 / 0.18), 0 6px 18px rgb(13 42 38 / 0.08);
+
+  /* state colors */
+  --urgent: #a1261c;
+  --urgent-soft: #fbe9e6;
+  --warn: #7a4a00;
+  --warn-soft: #fdf0d5;
+  --ok: #1d6b3a;
+  --ok-soft: #e1f3e6;
+  --info: #0b6b61;
+  --info-soft: #d9eeea;
+  --mark: #ffe58a;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0a1311;
+    --surface: #111d1a;
+    --surface-2: #182622;
+    --surface-3: #21332e;
+    --line: #2b3f3a;
+    --ink: #e8f1ef;
+    --ink-2: #a8bdb8;
+    --accent: #5fd0c0;
+    --accent-hover: #86e0d2;
+    --on-accent: #04201c;
+    --accent-soft: #123430;
+    --accent-wash: #0f2623;
+    --focus: #8ab4ff;
+
+    --glass-bg: rgb(17 29 26 / 0.7);
+    --glass-line: rgb(255 255 255 / 0.1);
+    --glass-edge: rgb(0 0 0 / 0.5);
+
+    --shadow1: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow2: 0 12px 34px rgb(0 0 0 / 0.5);
+    --shadow3: 0 30px 80px rgb(0 0 0 / 0.6);
+
+    --urgent: #ff9d92;
+    --urgent-soft: #3d1c19;
+    --warn: #f3c46d;
+    --warn-soft: #3a2c0f;
+    --ok: #86d9a0;
+    --ok-soft: #173223;
+    --info: #5fd0c0;
+    --info-soft: #123430;
+    --mark: #6b5600;
+  }
+}
+
+/* Without backdrop-filter support or with reduced transparency the glass becomes a solid surface. */
+@supports not (backdrop-filter: blur(1px)) {
+  :root {
+    --glass-bg: var(--surface);
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --glass-bg: var(--surface);
+  }
+}

@@ -195,7 +195,7 @@ export function Review() {
         </p>
       </div>
 
-      {working && <Skeleton lines={4} label="Reading your document" />}
+      {working && <Skeleton variant="fields" lines={3} label="Reading your document" />}
       {doc.status === "failed" && <ErrorState message={doc.failureReason ?? "We could not read this file."} />}
       {!working && doc.status !== "failed" && !agreement && (
         <EmptyState icon={FileSearch} title="No details were found in this document">
@@ -240,7 +240,7 @@ export function Review() {
             ) : sel && page instanceof Error ? (
               <ErrorState message={page.message} />
             ) : sel ? (
-              <Skeleton lines={6} label="Loading the page" />
+              <Skeleton variant="fields" lines={2} label="Loading the page" />
             ) : (
               <EmptyState icon={FileSearch} title="Pick a page">
                 Choose a page chip on a field to see where it came from.

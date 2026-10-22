@@ -116,7 +116,7 @@ export function SettingsPage() {
         {docs.error ? (
           <ErrorState message={docs.error} onRetry={docs.reload} />
         ) : !docs.data ? (
-          <Skeleton lines={3} label="Loading your documents" />
+          <Skeleton variant="rows" lines={3} label="Loading your documents" />
         ) : docs.data.docs.length === 0 ? (
           <p className="muted">
             You have no documents. <Link to="/upload">Upload one</Link> to get started.
@@ -158,7 +158,7 @@ export function SettingsPage() {
         )}
       </section>
 
-      <section className="card stack" aria-labelledby="wipe-h">
+      <section className="card stack danger-zone" aria-labelledby="wipe-h">
         <h2 id="wipe-h">Delete all data</h2>
         <p className="muted">
           This removes every document and file, the page text, extracted fields, dates, reminders and things. It cannot

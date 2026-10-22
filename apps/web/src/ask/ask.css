@@ -1,80 +1,31 @@
-/* Everything the /ask page needs, scoped under .hippo-ask. System fonts only. One accent. */
+/* The /ask page on the shared design system (src/tokens.css). Local names below are only aliases onto shared tokens. */
 .hippo-ask {
-  --bg: #f4f3ef;
-  --surface: #ffffff;
-  --surface-2: #f0f2f2;
-  --text: #1b2328;
-  --muted: #56606a;
-  --border: #d3d7da;
-  --accent: #0b5f5c;
-  --on-accent: #ffffff;
-  --accent-soft: #dff0ef;
-  --focus: #1d4ed8;
-  --ok-bg: #e2f4e8;
-  --ok-fg: #12502a;
-  --bad-bg: #fde6e3;
-  --bad-fg: #7d1d12;
-  --warn-bg: #fff1cc;
-  --warn-fg: #5e4200;
-  --mark-bg: #ffe8a3;
-  --mark-fg: #3b2d00;
-  --s1: 4px;
-  --s2: 8px;
-  --s3: 12px;
-  --s4: 16px;
-  --s5: 24px;
-  --s6: 32px;
-  --s7: 48px;
-  --r1: 8px;
-  --r2: 14px;
-  --r3: 20px;
-  --shadow: 0 1px 2px rgba(20, 30, 35, 0.08), 0 8px 24px rgba(20, 30, 35, 0.08);
+  --text: var(--ink);
+  --muted: var(--ink-2);
+  --border: var(--line);
+  --ok-bg: var(--ok-soft);
+  --ok-fg: var(--ok);
+  --bad-bg: var(--urgent-soft);
+  --bad-fg: var(--urgent);
+  --warn-bg: var(--warn-soft);
+  --warn-fg: var(--warn);
+  --mark-bg: var(--mark);
+  --mark-fg: var(--ink);
+  --shadow: var(--shadow2);
   --t-sm: 0.875rem;
   --t-md: 1rem;
   --t-lg: 1.25rem;
   --t-xl: 1.5rem;
   --t-2xl: 2rem;
-  --ease: 180ms ease-out;
-  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  --ease: 200ms var(--ease-out);
 
-  color-scheme: light dark;
   background: var(--bg);
   color: var(--text);
-  font-family:
-    system-ui,
-    -apple-system,
-    "Segoe UI",
-    Roboto,
-    "Helvetica Neue",
-    Arial,
-    sans-serif;
+  font-family: var(--font);
   font-size: var(--t-md);
   line-height: 1.5;
   font-variant-numeric: tabular-nums;
   min-height: 100vh;
-}
-@media (prefers-color-scheme: dark) {
-  .hippo-ask {
-    --bg: #0f1416;
-    --surface: #182024;
-    --surface-2: #1f2a2f;
-    --text: #e8eef0;
-    --muted: #a6b2b8;
-    --border: #33424a;
-    --accent: #5fd0c8;
-    --on-accent: #04201f;
-    --accent-soft: #14342f;
-    --focus: #8ab4ff;
-    --ok-bg: #173a25;
-    --ok-fg: #9fe6b8;
-    --bad-bg: #4a1c17;
-    --bad-fg: #ffb8ad;
-    --warn-bg: #4a3a0c;
-    --warn-fg: #ffdf8a;
-    --mark-bg: #5a4608;
-    --mark-fg: #ffeaa8;
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.35);
-  }
 }
 .hippo-ask *,
 .hippo-ask *::before,
@@ -970,5 +921,188 @@
   .hippo-ask *::after {
     animation: none !important;
     transition: none !important;
+  }
+}
+
+/* redesign layer */
+.ha-top {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  border-bottom-color: var(--glass-edge);
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+}
+.ha-logo {
+  border-radius: var(--r1);
+  box-shadow: var(--shadow1);
+}
+.ha-brand h1 {
+  letter-spacing: -0.02em;
+}
+.ha-btn,
+.ha-chip,
+.ha-badge {
+  border-radius: var(--r-pill);
+}
+.ha-btn {
+  min-width: 44px;
+  box-shadow: var(--shadow1);
+  transition:
+    background var(--ease),
+    border-color var(--ease),
+    box-shadow var(--ease),
+    transform 360ms var(--ease-spring);
+}
+.ha-btn:hover:not(:disabled) {
+  box-shadow: var(--shadow2);
+  transform: translateY(-1px);
+}
+.ha-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.ha-btn--primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  filter: none;
+}
+.ha-btn--small {
+  min-height: 44px;
+}
+.ha-btn--phrase {
+  border-radius: var(--r2);
+  min-height: 44px;
+  background: var(--surface);
+}
+.ha-error,
+.ha-error-text {
+  border: 1px solid var(--bad-fg);
+  border-radius: var(--r2);
+}
+.ha-empty {
+  background: var(--accent-wash);
+  border-radius: var(--r3);
+  text-align: center;
+  padding: var(--s6) var(--s5);
+}
+.ha-bubble {
+  border-radius: var(--r3);
+  box-shadow: var(--shadow1);
+  animation: ha-rise 420ms var(--ease-spring) both;
+}
+.ha-bubble--user {
+  border-bottom-right-radius: var(--s1);
+}
+.ha-bubble--assistant {
+  border-color: var(--line);
+  border-bottom-left-radius: var(--s1);
+}
+.ha-skel {
+  border-radius: var(--r1);
+  background: linear-gradient(90deg, var(--surface-2), var(--surface-3), var(--surface-2));
+  background-size: 200% 100%;
+}
+.ha-details,
+.ha-log,
+.ha-card,
+.ha-row,
+.ha-recall,
+.ha-notice,
+.ha-fact {
+  border-radius: var(--r3);
+}
+.ha-details,
+.ha-log {
+  box-shadow: var(--shadow1);
+}
+.ha-card {
+  box-shadow: var(--shadow2);
+}
+.ha-row,
+.ha-fact,
+.ha-notice,
+.ha-recall {
+  border-radius: var(--r2);
+}
+.ha-row {
+  background: var(--surface);
+  box-shadow: var(--shadow1);
+}
+.ha-date {
+  border-radius: var(--r1);
+}
+.ha-quote {
+  border-left-color: var(--accent);
+  border-radius: 0 var(--r1) var(--r1) 0;
+}
+.ha-log__list {
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+.ha-log__n,
+.ha-log__ms {
+  color: var(--muted);
+}
+.ha-advanced select,
+.ha-advanced textarea {
+  min-height: 44px;
+  background: var(--surface);
+}
+.ha-details > summary,
+.ha-log > summary,
+.ha-log__list > li > details > summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+.ha-log__list > li > details > summary {
+  display: grid;
+}
+.ha-side {
+  min-width: 0;
+}
+@media (min-width: 1100px) {
+  .ha-layout {
+    grid-template-columns: minmax(0, 1fr) 340px;
+    gap: var(--s6);
+  }
+  .ha-side {
+    position: sticky;
+    top: calc(var(--nav-h) + var(--s3));
+  }
+  .ha-stage {
+    grid-template-columns: 300px minmax(0, 1fr);
+  }
+}
+@media (max-width: 767px) {
+  .ha-phrases {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ha-stage {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ha-stage > .ha-card-wrap {
+    grid-column: 1;
+    grid-row: auto;
+  }
+}
+@media (max-width: 400px) {
+  .ha-main {
+    padding: var(--s3);
+  }
+  .ha-top {
+    padding: var(--s3);
+  }
+  .ha-card {
+    padding: var(--s3);
+  }
+}
+
+/* The Coming up card holds a list and a recalls column. Beside the 340px log there is only about 530px for the card,
+   so below 1500px it stacks instead of squeezing each row into 230px. */
+@media (min-width: 1000px) and (max-width: 1499px) {
+  .ha-two--wide {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

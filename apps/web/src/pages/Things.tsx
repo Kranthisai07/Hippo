@@ -13,7 +13,7 @@ export function Things() {
     return (
       <>
         <h1>Things</h1>
-        <Skeleton lines={4} label="Loading your things" />
+        <Skeleton variant="tiles" lines={4} label="Loading your things" />
       </>
     );
   }
@@ -34,10 +34,12 @@ export function Things() {
           Upload a warranty or an insurance policy and the item it covers shows up here.
         </EmptyState>
       ) : (
-        <ul className="list">
+        <ul className="tiles">
           {data.assets.map((a) => (
-            <li key={a.id} className="card row">
-              <Package size={22} aria-hidden="true" color="var(--accent)" />
+            <li key={a.id} className="card tile">
+              <span className="tile-icon" aria-hidden="true">
+                <Package size={22} strokeWidth={1.75} />
+              </span>
               <div className="grow">
                 <h2>
                   <Link to={`/things/${encodeURIComponent(a.id)}`}>{a.name}</Link>

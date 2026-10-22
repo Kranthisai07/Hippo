@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Navigate, useLocation, useNavigate } from "react-router";
+import { Link, Navigate, useLocation, useNavigate } from "react-router";
 import { Brand, Footer } from "../components/Layout";
 import { ApiError, api } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -53,77 +53,90 @@ export function SignIn() {
 
   return (
     <div className="page">
-      <div className="card stack signin">
-        <Brand />
-        <h1>Sign in</h1>
-        <p className="muted">Hippo turns your paperwork into dates you can trust.</p>
+      <div className="signin">
+        <aside className="signin-panel stack">
+          <Brand />
+          <p className="signin-lede">Your paperwork, turned into dates you can trust.</p>
+          <ul className="signin-points">
+            <li>Every date shows the exact words it came from.</li>
+            <li>Nothing alerts you until you confirm it.</li>
+            <li>Delete everything with one button, any time.</li>
+          </ul>
+          <Link to="/welcome" className="signin-about">
+            What is Hippo?
+          </Link>
+        </aside>
+        <div className="card stack signin-form">
+          <h1>Sign in</h1>
+          <p className="muted">Pick up where your documents left off.</p>
 
-        <button
-          type="button"
-          className="btn btn-primary"
-          disabled={busy || waiting}
-          onClick={() => void run(async () => (await api.demoSession(), await finish()), true)}
-        >
-          Use the demo account
-        </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={busy || waiting}
+            onClick={() => void run(async () => (await api.demoSession(), await finish()), true)}
+          >
+            Use the demo account
+          </button>
 
-        <p className="muted small">Or sign in with your email.</p>
-        <form
-          className="stack"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void run(async () => {
-              if (!sent) {
-                await api.magicCode(email.trim());
-                setSent(true);
-              } else {
-                await api.session(email.trim(), code.trim());
-                await finish();
-              }
-            });
-          }}
-        >
-          <div>
-            <label className="field-label" htmlFor="email">
-              Email
-            </label>
-            <input
-              id="email"
-              className="input"
-              type="email"
-              autoComplete="email"
-              required
-              value={email}
-              onChange={(e) => (setEmail(e.target.value), setSent(false))}
-            />
-          </div>
-          {sent && (
+          <p className="muted small">Or sign in with your email.</p>
+          <form
+            className="stack"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void run(async () => {
+                if (!sent) {
+                  await api.magicCode(email.trim());
+                  setSent(true);
+                } else {
+                  await api.session(email.trim(), code.trim());
+                  await finish();
+                }
+              });
+            }}
+          >
             <div>
-              <label className="field-label" htmlFor="code">
-                Code from your email
+              <label className="field-label" htmlFor="email">
+                Email
               </label>
               <input
-                id="code"
-                className="input num"
-                inputMode="numeric"
-                autoComplete="one-time-code"
+                id="email"
+                className="input"
+                type="email"
+                autoComplete="email"
                 required
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
+                value={email}
+                onChange={(e) => (setEmail(e.target.value), setSent(false))}
               />
-              <p className="muted small">In this demo build the code is printed in the server log.</p>
             </div>
-          )}
-          <button type="submit" className="btn" disabled={busy || waiting}>
-            {sent ? "Sign in" : "Send me a code"}
-          </button>
-        </form>
-        <div aria-live="assertive">
-          {error && (
-            <p role="alert" className="banner banner-error">
-              {error}
-            </p>
-          )}
+            {sent && (
+              <div>
+                <label className="field-label" htmlFor="code">
+                  Code from your email
+                </label>
+                <input
+                  id="code"
+                  className="input num"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  required
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                />
+                <p className="muted small">In this demo build the code is printed in the server log.</p>
+              </div>
+            )}
+            <button type="submit" className="btn" disabled={busy || waiting}>
+              {sent ? "Sign in" : "Send me a code"}
+            </button>
+          </form>
+          <div aria-live="assertive">
+            {error && (
+              <p role="alert" className="banner banner-error">
+                {error}
+              </p>
+            )}
+          </div>
         </div>
       </div>
       <Footer />

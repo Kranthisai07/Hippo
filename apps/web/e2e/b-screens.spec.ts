@@ -31,6 +31,12 @@ async function snap(page: Page, name: string) {
 
 test("every page: accessibility check and screenshots", async ({ page }) => {
   test.setTimeout(240_000);
+  await page.goto("/welcome");
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await snap(page, "welcome");
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.emulateMedia({ colorScheme: "light", reducedMotion: "reduce" });
+  await page.screenshot({ path: `${OUT}web-welcome-full-light.png`, fullPage: true });
   await page.goto("/signin");
   await snap(page, "signin");
 
@@ -40,6 +46,19 @@ test("every page: accessibility check and screenshots", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Coming up" })).toBeVisible();
   await expect(page.getByTestId("confirmed-item").first()).toBeVisible();
   await snap(page, "coming-up");
+  // Single cards, used as crops on the public landing page (copy them to public/landing when the design changes).
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.emulateMedia({ colorScheme: "light", reducedMotion: "reduce" });
+  await page
+    .getByTestId("confirmed-item")
+    .filter({ hasText: "Renews on" })
+    .first()
+    .screenshot({ path: `${OUT}card-renews.png` });
+  await page
+    .getByTestId("confirmed-item")
+    .filter({ hasText: "Trial ends on" })
+    .first()
+    .screenshot({ path: `${OUT}card-trial.png` });
 
   await page.goto("/upload");
   await snap(page, "upload");
@@ -78,6 +97,30 @@ test("every page: accessibility check and screenshots", async ({ page }) => {
   await page.goto("/ask");
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await snap(page, "ask");
+
+  // The signed in demo client: the coverage answer and the Coming up card, as cards.
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.emulateMedia({ colorScheme: "light", reducedMotion: "reduce" });
+  await page.addStyleTag({ content: ".ha-top{position:static !important}" });
+  await page.getByRole("button", { name: /Sign in as the demo account/ }).click();
+  await page.getByRole("button", { name: /My dishwasher is leaking, am I covered\?/ }).click();
+  await expect(page.getByTestId("result-card").first()).toBeVisible({ timeout: 20_000 });
+  await page.waitForTimeout(600);
+  await page
+    .getByTestId("result-card")
+    .first()
+    .screenshot({ path: `${OUT}web-ask-coverage.png` });
+  await page.getByRole("button", { name: /What is coming up\?/ }).click();
+  await expect(page.getByTestId("recall-card").first()).toBeVisible({ timeout: 20_000 });
+  await page.waitForTimeout(600);
+  await page
+    .getByTestId("result-card")
+    .first()
+    .screenshot({ path: `${OUT}web-ask-coming.png` });
+  await page
+    .getByTestId("recall-card")
+    .first()
+    .screenshot({ path: `${OUT}card-recall.png` });
 
   await page.goto("/privacy");
   await snap(page, "privacy");
