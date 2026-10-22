@@ -904,6 +904,12 @@ html:has(.lp) {
       animation: lp-swap linear both;
       animation-range: cover 0% cover 100%;
     }
+    /* tall card screenshots are anchored at their top and never taller than the space under the header */
+    .lp-visual .lp-frame img {
+      max-height: calc(100dvh - var(--nav-h) - var(--s9));
+      object-fit: cover;
+      object-position: top;
+    }
     .lp-visual .lp-frame:nth-child(1) {
       animation-name: lp-swap-first;
       animation-timeline: --st1;
