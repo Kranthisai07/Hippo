@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ApiError, api } from "./api";
+import { HOSTED } from "./hosted";
 import type { Me } from "./types";
 
 type Status = "loading" | "in" | "out";
@@ -29,6 +30,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [me, setMe] = useState<Me | null>(null);
 
   const refresh = useCallback(async () => {
+    if (HOSTED) {
+      // No API on the static site, so there is no session to look for.
+      setMe(null);
+      setStatus("out");
+      return;
+    }
     try {
       setMe(await api.me());
       setStatus("in");

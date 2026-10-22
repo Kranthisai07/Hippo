@@ -1,5 +1,6 @@
 import { CalendarCheck } from "lucide-react";
 import { Link } from "react-router";
+import { DemoLink } from "./DemoLink";
 
 export function Header() {
   return (
@@ -17,9 +18,7 @@ export function Header() {
           <nav aria-label="Main" className="lp-nav-links">
             <a href="#story">How it works</a>
             <a href="#planned">Roadmap</a>
-            <Link to="/signin" className="lp-btn">
-              Try the demo
-            </Link>
+            <DemoLink className="lp-btn" label="Try the demo" />
           </nav>
         </div>
       </header>
