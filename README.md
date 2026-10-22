@@ -11,12 +11,12 @@ Hippo turns the paperwork a household never reads twice (warranties, insurance, 
 | `apps/api` | The MCP server (nine tools), the OAuth endpoints and the web JSON API, on Hono. Data is in memory, seeded from the fixtures |
 | `apps/web` | The React web app (upload, review, Coming up, Things, Settings) and the `/ask` demo MCP client |
 | `apps/workers` | The ingest pipeline and the daily job (deadline alerts, recall radar, digest email) |
-| `packages/obligation-kit` | Deadline engine, extraction schemas, source quote check and CPSC and NHTSA matchers. No dependencies, no network |
+| `packages/obligation-kit` | Deadline engine, extraction schemas, source quote check and CPSC and NHTSA matchers. One dependency (zod); network access only through an injected fetch |
 | `packages/core` | Asset resolver and linking, the repository (memory and DynamoDB), clause index, PDF page text, digest builder |
 | `packages/auth` | OAuth 2.1 server, sessions and tokens |
 | `infra` | CDK stack. Synthesized and template tested, never deployed |
 | `fixtures` | Synthetic demo documents, expected extractions and saved real recall responses |
-| `docs` | Architecture, privacy, web API, demo script, verified docs check, product feedback and friction log |
+| `docs` | Architecture, privacy, web API, tool results, demo script, verified docs check, product feedback and friction log |
 | `.github/workflows`, `docker-compose.yml`, `scripts` | CI, DynamoDB Local for the repository tests, and stubs for commands that are not built |
 
 ## Why
