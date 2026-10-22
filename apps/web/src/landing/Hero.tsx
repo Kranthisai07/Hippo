@@ -1,5 +1,5 @@
 import { ArrowRight, BadgeCheck, CalendarClock, FileText } from "lucide-react";
-import { Link } from "react-router";
+import { DemoLink } from "./DemoLink";
 
 export function Hero() {
   return (
@@ -14,10 +14,11 @@ export function Hero() {
             asking.
           </p>
           <div className="lp-actions">
-            <Link to="/signin" className="lp-btn lp-btn-lg">
-              Try the demo
-              <ArrowRight size={18} strokeWidth={1.75} aria-hidden="true" />
-            </Link>
+            <DemoLink
+              className="lp-btn lp-btn-lg"
+              label="Try the demo"
+              icon={<ArrowRight size={18} strokeWidth={1.75} aria-hidden="true" />}
+            />
             <a className="lp-textlink" href="#story">
               See how it works
             </a>

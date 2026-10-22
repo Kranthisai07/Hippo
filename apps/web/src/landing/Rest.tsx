@@ -1,5 +1,6 @@
 import { ArrowRight, FileCheck2, FilePlus2, Hash, KeyRound, Mail, Puzzle, Trash2 } from "lucide-react";
 import { Link } from "react-router";
+import { DemoLink, HOSTED, REPO_URL } from "./DemoLink";
 
 const rules = [
   {
@@ -73,10 +74,11 @@ export function Closing() {
     <section className="lp-closing" aria-labelledby="close-h">
       <h2 id="close-h">Give your paperwork a memory</h2>
       <p className="lp-lead">Upload one document and see the first date it finds.</p>
-      <Link to="/signin" className="lp-btn lp-btn-lg">
-        Try the demo
-        <ArrowRight size={18} strokeWidth={1.75} aria-hidden="true" />
-      </Link>
+      <DemoLink
+        className="lp-btn lp-btn-lg"
+        label="Try the demo"
+        icon={<ArrowRight size={18} strokeWidth={1.75} aria-hidden="true" />}
+      />
     </section>
   );
 }
@@ -89,7 +91,7 @@ export function Footer() {
         <nav aria-label="Footer">
           <Link to="/privacy">Privacy</Link>
           <Link to="/terms">Terms</Link>
-          <Link to="/signin">Sign in</Link>
+          {HOSTED ? <a href={REPO_URL}>Source</a> : <Link to="/signin">Sign in</Link>}
         </nav>
       </div>
     </footer>
