@@ -1,4 +1,4 @@
-import { ArrowRight, FileCheck2, Hash, KeyRound, Trash2 } from "lucide-react";
+import { ArrowRight, FileCheck2, FilePlus2, Hash, KeyRound, Mail, Puzzle, Trash2 } from "lucide-react";
 import { Link } from "react-router";
 
 const rules = [
@@ -24,7 +24,9 @@ export function Trust() {
         <ul className="lp-rules">
           {rules.map(({ icon: Icon, h, p }) => (
             <li key={h}>
-              <Icon size={22} strokeWidth={1.75} aria-hidden="true" />
+              <span className="lp-tile">
+                <Icon size={26} strokeWidth={1.75} aria-hidden="true" />
+              </span>
               <h3>{h}</h3>
               <p>{p}</p>
             </li>
@@ -44,6 +46,24 @@ export function Planned() {
         Save a file from any page and get a reminder by email when it matters. This is on the roadmap. Today, Hippo
         works through Alexa+ and the web app.
       </p>
+      <div className="lp-browser" aria-hidden="true">
+        <div className="lp-browser-bar">
+          <span className="lp-browser-url">Any page</span>
+          <span className="lp-browser-ext">
+            <Puzzle size={18} strokeWidth={1.75} />
+          </span>
+        </div>
+        <div className="lp-browser-menu">
+          <span>
+            <FilePlus2 size={18} strokeWidth={1.75} />
+            Save to Hippo
+          </span>
+          <span>
+            <Mail size={18} strokeWidth={1.75} />
+            Reminder by email
+          </span>
+        </div>
+      </div>
     </section>
   );
 }

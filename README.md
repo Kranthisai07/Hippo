@@ -104,7 +104,7 @@ pnpm dev        # terminal 1: API, OAuth and MCP server on http://localhost:8787
 pnpm dev:web    # terminal 2: the web app on http://localhost:5173
 ```
 
-Open http://localhost:5173 (use `localhost`, not `127.0.0.1`) and press the demo sign in button.
+Open http://localhost:5173 (use `localhost`, not `127.0.0.1`) and press the demo sign in button. The public landing page, a scroll story of what Hippo does, is at http://localhost:5173/welcome.
 
 1. **Upload to deadline.** Settings, delete `lease.pdf` (it is pre loaded), then Upload and drop `fixtures/docs/lease.pdf`. Coming up shows "Give notice by 2026-11-01" waiting for you. Open "Review and confirm", click the page 4 quote, press "Confirm all dates": only now does it become a reminder.
 2. **Coverage by voice.** Open http://localhost:5173/ask, press "Sign in as the demo account" and click "My dishwasher is leaking, am I covered?". This page is a real MCP client (OAuth with PKCE, then `tools/call` over Streamable HTTP). It shows the spoken answer and the Coverage card: the page 3 exclusion, the claim steps and the claim by date.

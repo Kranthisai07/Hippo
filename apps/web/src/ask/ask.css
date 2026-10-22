@@ -1098,3 +1098,11 @@
     padding: var(--s3);
   }
 }
+
+/* The Coming up card holds a list and a recalls column. Beside the 340px log there is only about 530px for the card,
+   so below 1500px it stacks instead of squeezing each row into 230px. */
+@media (min-width: 1000px) and (max-width: 1499px) {
+  .ha-two--wide {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

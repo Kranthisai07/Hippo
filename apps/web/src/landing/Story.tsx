@@ -8,14 +8,14 @@ const steps = [
   {
     h: "Ask while your hands are full.",
     p: '"My dishwasher is leaking, am I covered?" Yes, you are in warranty. Water damage from improper installation is excluded (page 3). File the claim within 30 days.',
-    src: "/landing/ask.png",
+    src: "/landing/ask-coverage.png",
     alt: "The Ask page answering a coverage question, with the warranty document and page cited under the answer.",
   },
   {
     h: "Hear it before you ask.",
     p: 'Your next question starts with one sentence: "Before that, your car insurance renews in 9 days." A daily email digest and a recall radar cover the days you never open the app.',
-    src: "/landing/things.png",
-    alt: "The Things screen listing the household's tracked items, such as appliances and policies.",
+    src: "/landing/ask-coming.png",
+    alt: "The Ask page answering what is coming up: dated items and recalls that may affect the household.",
   },
 ];
 

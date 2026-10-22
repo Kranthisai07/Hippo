@@ -221,6 +221,57 @@ html:has(.lp) {
   gap: var(--s5);
 }
 
+.lp-hero-wrap {
+  position: relative;
+  overflow: clip;
+  background:
+    radial-gradient(55% 60% at 82% 28%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 72%),
+    radial-gradient(45% 50% at 6% 92%, color-mix(in srgb, var(--ink-2) 12%, transparent), transparent 70%);
+}
+.lp-em {
+  color: var(--accent);
+  font-weight: 750;
+}
+.lp-stage {
+  position: relative;
+}
+.lp-chip {
+  position: absolute;
+  z-index: var(--z-sticky);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  padding: var(--s2) var(--s4);
+  border-radius: var(--r-pill);
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-line);
+  outline: 1px solid var(--glass-edge);
+  outline-offset: -1px;
+  box-shadow: var(--shadow2);
+}
+.lp-chip svg {
+  color: var(--accent);
+}
+.lp-chip-a {
+  top: -16px;
+  left: -20px;
+}
+.lp-chip-b {
+  top: 38%;
+  right: -16px;
+}
+.lp-chip-c {
+  bottom: -16px;
+  left: 8%;
+}
+
 /* story */
 .lp-story {
   padding-block: var(--s9) var(--s7);
@@ -293,19 +344,40 @@ html:has(.lp) {
 .lp-cell-text p {
   color: var(--ink-2);
 }
-.lp-cell img {
-  width: 100%;
+.lp-shot {
   height: 190px;
-  object-fit: cover;
+  overflow: hidden;
   border-radius: var(--r2);
   border: 1px solid var(--line);
+  background: var(--surface);
   box-shadow: var(--shadow2);
+  -webkit-mask-image: linear-gradient(to bottom, #000 62%, transparent);
+  mask-image: linear-gradient(to bottom, #000 62%, transparent);
+}
+.lp-shot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+/* these three show one real card each, at its natural proportions, with no zoom or offset guessing */
+.b-renew .lp-shot,
+.b-trial .lp-shot,
+.b-recall .lp-shot {
+  height: auto;
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+.b-renew .lp-shot img,
+.b-trial .lp-shot img,
+.b-recall .lp-shot img {
+  height: auto;
+  object-fit: contain;
 }
 .b-warranty {
   grid-column: span 4;
 }
 .b-warranty img {
-  object-position: 0 0;
+  object-position: 0 20%;
 }
 .b-lease img {
   object-position: 100% 30%;
@@ -347,18 +419,35 @@ html:has(.lp) {
   gap: 0;
 }
 .lp-rules li {
+  position: relative;
   display: grid;
   gap: var(--s2);
   align-content: start;
-  padding: 0 var(--s5);
+  padding: var(--s5) var(--s5) 0;
   border-left: 1px solid var(--line);
 }
 .lp-rules li:first-child {
   padding-left: 0;
   border-left: 0;
 }
-.lp-rules svg {
+.lp-rules li::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2px;
+  background: var(--accent);
+  transform-origin: 0 50%;
+}
+.lp-tile {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  margin-bottom: var(--s2);
+  border-radius: var(--r2);
+  background: var(--accent-soft);
   color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--glass-line);
 }
 .lp-rules p {
   color: var(--ink-2);
@@ -383,6 +472,63 @@ html:has(.lp) {
 .lp-planned .lp-lead {
   max-width: 52ch;
 }
+.lp-browser {
+  width: min(100%, 460px);
+  margin-top: var(--s5);
+  padding: var(--s3);
+  display: grid;
+  gap: var(--s3);
+  text-align: left;
+  background: var(--surface);
+  border: 1px dashed var(--ink-2);
+  border-radius: var(--r3);
+  box-shadow: var(--shadow2);
+}
+.lp-browser-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+}
+.lp-browser-url {
+  flex: 1;
+  padding: var(--s2) var(--s4);
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-size: 0.9rem;
+}
+.lp-browser-ext {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-pill);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.lp-browser-menu {
+  display: grid;
+  gap: var(--s2);
+  margin-left: auto;
+  width: min(100%, 260px);
+  padding: var(--s2);
+  border-radius: var(--r2);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+}
+.lp-browser-menu span {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s2) var(--s3);
+  border-radius: var(--r1);
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+.lp-browser-menu svg {
+  color: var(--accent);
+}
 
 /* closing + footer */
 .lp-closing {
@@ -390,8 +536,16 @@ html:has(.lp) {
   gap: var(--s4);
   justify-items: center;
   text-align: center;
-  padding: var(--s9) var(--s5);
-  background: linear-gradient(180deg, var(--bg), var(--accent-wash));
+  padding: var(--s10) var(--s5);
+  background:
+    radial-gradient(60% 70% at 50% 100%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 75%),
+    linear-gradient(180deg, var(--bg), var(--accent-wash));
+}
+.lp-closing h2 {
+  font-size: clamp(2rem, 5vw, 3.4rem);
+}
+.lp-closing .lp-lead {
+  font-size: clamp(1.1rem, 1.8vw, 1.35rem);
 }
 .lp-closing .lp-btn {
   margin-top: var(--s3);
@@ -472,6 +626,19 @@ html:has(.lp) {
   .lp-closing {
     padding-block: var(--s8);
   }
+  .lp-chip {
+    font-size: 0.82rem;
+    padding: var(--s1) var(--s3);
+  }
+  .lp-chip-a {
+    left: -8px;
+  }
+  .lp-chip-b {
+    right: -8px;
+  }
+  .lp-chip-c {
+    left: 4%;
+  }
 }
 
 /* motion: scroll-driven where the browser supports it, otherwise the plain layout above is the final state */
@@ -493,6 +660,20 @@ html:has(.lp) {
   }
   .lp-hero-shot {
     animation: lp-rise 900ms var(--ease-spring) 200ms backwards;
+  }
+  @keyframes lp-bob {
+    to {
+      transform: translateY(-6px);
+    }
+  }
+  .lp-chip {
+    animation: lp-bob 4.5s ease-in-out infinite alternate;
+  }
+  .lp-chip-b {
+    animation-delay: -1.5s;
+  }
+  .lp-chip-c {
+    animation-delay: -3s;
   }
 }
 
@@ -516,20 +697,136 @@ html:has(.lp) {
         transform: scaleX(1);
       }
     }
+    /* neighbouring steps sit 46% apart on the cover range: one fades out over 58-72% while the next fades in over 12-26% */
     @keyframes lp-swap {
-      0% {
+      0%,
+      12% {
         opacity: 0;
-        transform: translateY(24px) scale(0.97);
+        transform: translateY(16px);
+      }
+      26%,
+      58% {
+        opacity: 1;
+        transform: none;
+      }
+      72%,
+      100% {
+        opacity: 0;
+        transform: translateY(-16px);
+      }
+    }
+    @keyframes lp-swap-first {
+      0%,
+      58% {
+        opacity: 1;
+        transform: none;
+      }
+      72%,
+      100% {
+        opacity: 0;
+        transform: translateY(-16px);
+      }
+    }
+    @keyframes lp-swap-last {
+      0%,
+      12% {
+        opacity: 0;
+        transform: translateY(16px);
+      }
+      26%,
+      100% {
+        opacity: 1;
+        transform: none;
+      }
+    }
+    /* dimmed text stays above AA contrast: the heading is large text, the paragraph only dips to 0.88 */
+    @keyframes lp-dim-h {
+      0%,
+      100% {
+        opacity: 0.55;
       }
       35%,
       65% {
         opacity: 1;
+      }
+    }
+    @keyframes lp-dim-p {
+      0%,
+      100% {
+        opacity: 0.88;
+      }
+      35%,
+      65% {
+        opacity: 1;
+      }
+    }
+    @keyframes lp-bar {
+      0%,
+      100% {
+        transform: scaleY(0.15);
+      }
+      35%,
+      65% {
+        transform: scaleY(1);
+      }
+    }
+    @keyframes lp-tilt {
+      from {
+        transform: perspective(1400px) rotateY(-9deg) rotateX(4deg);
+      }
+      to {
         transform: none;
       }
-      100% {
-        opacity: 0;
-        transform: translateY(-24px) scale(0.97);
-      }
+    }
+
+    .lp-hero-shot .lp-frame {
+      animation: lp-tilt linear both;
+      animation-timeline: scroll(root);
+      animation-range: 0 50vh;
+    }
+    .lp-rules li::before {
+      animation: lp-grow linear both;
+      animation-timeline: view();
+      animation-range: entry 20% entry 100%;
+    }
+    .lp-step-body {
+      position: relative;
+      padding-left: var(--s5);
+    }
+    .lp-step-body::before {
+      content: "";
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 3px;
+      border-radius: var(--r-pill);
+      background: var(--accent);
+      transform-origin: 50% 50%;
+    }
+    .lp-step-body h3,
+    .lp-step-body p,
+    .lp-step-body::before {
+      animation-timeline: var(--st);
+      animation-range: cover 0% cover 100%;
+      animation-fill-mode: both;
+      animation-timing-function: linear;
+    }
+    .lp-step-body h3 {
+      animation-name: lp-dim-h;
+    }
+    .lp-step-body p {
+      animation-name: lp-dim-p;
+    }
+    .lp-step-body::before {
+      animation-name: lp-bar;
+    }
+    .lp-step:nth-child(1) .lp-step-body {
+      --st: --st1;
+    }
+    .lp-step:nth-child(2) .lp-step-body {
+      --st: --st2;
+    }
+    .lp-step:nth-child(3) .lp-step-body {
+      --st: --st3;
     }
 
     .lp-progress {
@@ -608,7 +905,11 @@ html:has(.lp) {
       animation-range: cover 0% cover 100%;
     }
     .lp-visual .lp-frame:nth-child(1) {
+      animation-name: lp-swap-first;
       animation-timeline: --st1;
+    }
+    .lp-visual .lp-frame:nth-child(3) {
+      animation-name: lp-swap-last;
     }
     .lp-visual .lp-frame:nth-child(2) {
       animation-timeline: --st2;
