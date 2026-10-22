@@ -88,6 +88,33 @@ Feedback on every tool, API and SDK we used to build Hippo for the Build, Ship, 
 - Onboarding: A few hours.
 - Would build with it again: Yes.
 
+## Amazon Bedrock (Converse API, Claude Haiku 4.5, Amazon Nova Lite)
+- Used for: Designed as the model that reads uploaded documents into structured fields (`apps/workers/src/ingest/bedrock.ts`, Converse API, zod validation, one retry, a call cap, a 60 second timeout). Tested with fake clients only.
+- Worked well: The model id, the `us.` inference profile and the IAM action are documented clearly: one action, `bedrock:InvokeModel`, covers Converse. `list-inference-profiles` showed the Nova profiles in seconds. We did not get to judge output quality.
+- Needs work: We never got a model answer. First the call was denied for a Marketplace subscription while the availability API said "available" (FL-019). Then every call failed as throttling because every daily token quota on the account was 0.0 and not adjustable (FL-020), also for the Amazon owned Nova Lite. An AWS Support case was open at the deadline.
+- Onboarding: Not achieved in about two hours of trying with a free plan account, one plan upgrade and one support case. We measured the quotas and the errors, not a model.
+- Would build with it again: Yes for the design (the adapter is small), but only on an account that already has quota. A hackathon entrant on the free plan should expect to be blocked.
+
+## Amazon Textract (`DetectDocumentText`)
+- Used for: OCR for picture pages, as a fallback behind the pdf.js text layer. Tested with fakes in the repo.
+- Worked well: Once the account could use it, one synchronous call read a 1 page JPEG (the warranty photo fixture) into 15 lines in a few seconds. This was one call through the AWS CLI, not through our adapter.
+- Needs work: Before the plan upgrade it returned `SubscriptionRequiredException` with no hint about what to subscribe to (FL-021).
+- Onboarding: Minutes once unblocked, an hour lost before.
+- Would build with it again: Yes. We did not measure accuracy, cost or HEIC (not accepted by the sync API).
+
+## Amazon SES (SESv2 `SendEmail`)
+- Used for: The daily digest email (`apps/workers/src/daily/ses.ts`, three guards: `--send-ses`, `--yes-really`, a sender env variable, plus a 200 per day cap).
+- Worked well: One real digest was sent on 2026-10-21 from a sandbox account to a verified address: `email: sent (10 alerts)` from `pnpm daily:run --send-ses --yes-really`. Verifying one address in the console took a click on the emailed link. It worked with an IAM user that may only call `ses:SendEmail` on that one identity.
+- Needs work: The sandbox only delivers to verified recipients, so a live send needed a recipient override (`HIPPO_DIGEST_TO`). We did not check how the message looked in every mail client, did not measure delivery time or cost, and did not leave the sandbox.
+- Onboarding: About ten minutes including the verification email.
+- Would build with it again: Yes.
+
+## AWS console, IAM and CloudShell
+- Used for: Creating the least privilege user, policy and SES identity, and reading quotas.
+- Worked well: CloudShell with the AWS CLI is the fast path (policy, user, quota listing in one terminal). Service Quotas can be listed read only from the CLI.
+- Needs work: The IAM JSON policy editor did not accept pasted JSON (FL-022). Where the Free plan upgrade lives (the Free Tier page, not the account page) was hard to find.
+- Would build with it again: Yes, with CloudShell first.
+
 ## The hackathon platform (Devpost) and rules
 - Used for: Rules, the FAQ and the submission.
 - Worked well: The FAQ is where the real answers are (partner only tools, a web page as MCP client counts, a local repo is enough).

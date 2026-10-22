@@ -168,3 +168,39 @@ Source of truth for each entry: `MEMORY.md` gotchas (G-nnn). The G number is giv
 - Severity: minor
 - Workaround: Threshold 2.25 chosen from the real fixture chunks (off topic queries match nothing), same options in build and load.
 - Suggestion: Document the score scale.
+
+---
+
+## AWS (Bedrock, Textract, SES, IAM console)
+
+### FL-019: Bedrock says a model is available, and the first call is then denied for a Marketplace subscription
+- Area: Amazon Bedrock, Converse API with Claude Haiku 4.5 (hit; G-046)
+- Task attempted: Make one real extraction call from a least privilege IAM user.
+- Actual: `get-foundation-model-availability` reported the model `AUTHORIZED` and `AVAILABLE`, and the inference profile was `ACTIVE`. The first Converse call returned `AccessDeniedException` saying the user lacks `aws-marketplace:ViewSubscriptions` and `aws-marketplace:Subscribe`. The subscription is created on first use by an identity that may subscribe. The same error also appeared in the console playground until the account was ready.
+- Severity: major
+- Workaround: Opened the model once in the Bedrock console playground as the account owner. A runtime user should not hold Marketplace permissions.
+- Suggestion: Make the availability call say that a first use subscription is still pending, and name who can complete it.
+
+### FL-020: Every Bedrock call fails with a throttling error because the account's daily token quotas are zero
+- Area: Amazon Bedrock quotas, Service Quotas (hit; G-047, G-050)
+- Task attempted: A 5 token test call to Claude Haiku 4.5 and to Amazon Nova Lite in us-east-1.
+- Actual: `ThrottlingException: Too many tokens per day`, after two automatic retries, on every call. Service Quotas (read only) showed all 41 quotas with "tokens per day" in the name at 0.0, and every row that reports the flag showed `Adjustable: False`, so the console offered no increase button. The account was on the AWS Free plan. After the user upgraded to the paid plan and waited, the values were still 0.0 and the call still failed. An AWS Support case (account and billing, 179260044300224) was filed; no answer arrived before the deadline.
+- Severity: blocker for the live Bedrock call (it was never made)
+- Workaround: None found in time. The live extraction path was tested only against fake clients, and the docs say so.
+- Suggestion: Say "this account has no quota" in the error instead of "throttling", show the quota and the plan restriction in the console next to the model, and tell free plan users what to do before they build on Bedrock.
+
+### FL-021: Textract returns a subscription error that names no action, and it cleared after the plan upgrade
+- Area: Amazon Textract `DetectDocumentText` (hit; G-048)
+- Task attempted: OCR one JPEG page.
+- Actual: `SubscriptionRequiredException: The AWS Access Key Id needs a subscription for the service`, with a valid IAM policy. After the account moved from the Free plan to the paid plan the same call succeeded: 1 page and 15 lines read from the dishwasher photo fixture (one call through the AWS CLI; the repo's own adapter was not run live because the model call that follows it was blocked).
+- Severity: major
+- Workaround: Upgrade the plan.
+- Suggestion: Name the plan or the activation step in the message.
+
+### FL-022: The IAM console JSON policy editor ignores text that is not typed key by key
+- Area: AWS console, IAM "Create policy" JSON editor (hit; G-049)
+- Task attempted: Create a three statement least privilege policy.
+- Actual: Setting the editor text from outside, or inserting it as one paste, showed the JSON in the editor but the page still said "No actions specified" and Next stayed blocked. The same policy created at once with `aws iam create-policy` in CloudShell.
+- Severity: minor
+- Workaround: CloudShell, or the visual editor.
+- Suggestion: Validate what the editor holds, not what was typed.
