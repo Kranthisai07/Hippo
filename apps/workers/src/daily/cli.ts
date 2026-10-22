@@ -30,7 +30,7 @@ async function main(): Promise<void> {
   const maxNhtsa = wholeNumber("max-nhtsa", values["max-nhtsa"], 1, 100);
 
   const repository = createMemoryRepository();
-  await seedDemoHousehold(repository, today);
+  await seedDemoHousehold(repository, today, DEMO_HOUSEHOLD, process.env.HIPPO_DIGEST_TO?.trim() || undefined);
 
   const live = values["live-recalls"] === true;
   const sesSender = resolveSesSender({

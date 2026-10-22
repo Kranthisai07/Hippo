@@ -3,7 +3,7 @@ import type { DigestAlert } from "../digest";
 import type { AssetRecord } from "../linking";
 import type { AgreementLike } from "../resolver";
 
-// Entity types for SPEC section 3. Frozen by T1.1: changing a shape needs a Decision in MEMORY.md and a heads up to the
+// Entity types (spec section 3). Frozen by T1.1: changing a shape needs a logged decision and a heads up to the
 // other dev. Every record lives under one household; the repository takes the household id from the auth token and
 // never from tool arguments, so no entity carries its own household id.
 

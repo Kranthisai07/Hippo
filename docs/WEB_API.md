@@ -1,6 +1,6 @@
 # Web JSON API (T3.1)
 
-Status: built in `apps/api/src/api/` and tested (`apps/api/test/webApi.*.test.ts`). This file describes what the code does. If a route or shape must change, say so in MEMORY.md and tell K.
+Status: built in `apps/api/src/api/` and tested (`apps/api/test/webApi.*.test.ts`). This file describes what the code does. If a route or shape must change, record the change in the team's decision log and tell K.
 
 Run it locally: `pnpm --filter @hippo/api dev` (port 8787). Everything is in memory and nothing talks to AWS.
 
@@ -127,7 +127,7 @@ The demo household (`hh_demo`) already has the five seeded documents, so it has 
 
 ## Not in this API
 
-- Reading email or bank data, filing claims, cancelling subscriptions (out of scope, INTENT.md).
+- Reading email or bank data, filing claims, cancelling subscriptions (out of scope).
 - Anything that takes a household id.
 - Recall lookups from the browser: recalls come from the daily job and arrive as alerts.
 - A presigned S3 upload (`createS3Presigner`) is not built yet; the `Uploader` interface (`prepare({ key, contentType, size }) -> { method, url, headers, expiresInSeconds }`) is where it plugs in.

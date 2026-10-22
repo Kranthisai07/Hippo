@@ -88,7 +88,7 @@ Both delete files and index entries first and records last. If storage fails, yo
 What delete does not reach:
 
 - Your login email, sessions and refresh tokens in the auth store. They expire (see below) or vanish when the process restarts.
-- Any copy of a digest email already sent. No email has ever been sent by this code.
+- Any copy of a digest email already sent. One digest email was sent through SES on 2026-10-21 as a test, to the developer's own verified address and containing only synthetic demo data.
 - On a real deployment, DynamoDB point in time recovery would keep deleted records for its recovery window (AWS documents up to 35 days; not verified here). Delete all data would not purge that sooner.
 
 ## Sign in, sessions and tokens
@@ -108,7 +108,7 @@ Code is in `packages/auth`.
 
 | Who | For what | Live today? |
 | :--- | :--- | :--- |
-| Amazon Web Services | Storage (S3, DynamoDB), models (Bedrock), OCR (Textract), email (SES), hosting (Lambda) | **No.** Designed in the CDK stack and not deployed. No AWS call has been made by this code, except DynamoDB Local on a developer machine. |
+| Amazon Web Services | Storage (S3, DynamoDB), models (Bedrock), OCR (Textract), email (SES), hosting (Lambda) | **No.** Designed in the CDK stack and not deployed. The only AWS service this code has used for real is SES (one test digest, synthetic data). Bedrock calls were refused by AWS on the developer account (a zero token quota, see FL-020 in docs/FRICTION_LOG.md), so no document text has ever gone to a model. One synthetic fixture photo was sent to Textract once, through the AWS CLI, after the plan upgrade. DynamoDB has run only as DynamoDB Local. |
 | CPSC and NHTSA | Public recall data. The daily job sends product names, makes, models and years of your assets. It sends no documents and no personal data. | Parsers tested on saved real responses. The live calls are not run in tests. |
 | Amazon Alexa+ | Voice. Tool results go to Alexa+, which writes the spoken answer. | Not connected. Alexa+ developer tools are partner only, so the demo uses a web page acting as an MCP client. |
 
