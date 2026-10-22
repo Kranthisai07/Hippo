@@ -20,7 +20,7 @@ export function Trust() {
   return (
     <section className="lp-trust" aria-labelledby="trust-h">
       <div className="lp-wrap">
-        <h2 id="trust-h">Four rules Hippo does not bend</h2>
+        <h2 id="trust-h">Four rules Hippo follows</h2>
         <ul className="lp-rules">
           {rules.map(({ icon: Icon, h, p }) => (
             <li key={h}>
@@ -44,7 +44,7 @@ export function Planned() {
       <h2 id="planned-h">Planned: a Chrome extension</h2>
       <p className="lp-lead">
         Save a file from any page and get a reminder by email when it matters. This is on the roadmap. Today, Hippo
-        works through Alexa+ and the web app.
+        works through the web app and an Alexa+ style voice demo.
       </p>
       <div className="lp-browser" aria-hidden="true">
         <div className="lp-browser-bar">

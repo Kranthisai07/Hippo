@@ -13,7 +13,7 @@ const steps = [
   },
   {
     h: "Hear it before you ask.",
-    p: 'Your next question starts with one sentence: "Before that, your car insurance renews in 9 days." A daily email digest and a recall radar cover the days you never open the app.',
+    p: 'For example, your next question can start with one sentence: "Before that, your car insurance renews in 9 days." A daily email digest and a recall radar can cover the days you never open the app.',
     src: "/landing/ask-coming.png",
     alt: "The Ask page answering what is coming up: dated items and recalls that may affect the household.",
   },
@@ -24,7 +24,9 @@ export function Story() {
     <section id="story" className="lp-story" aria-labelledby="story-h">
       <div className="lp-wrap lp-story-head">
         <h2 id="story-h">Three moments, one quiet system</h2>
-        <p className="lp-lead">An Alexa+ add-on, plus a web app where you upload and review your documents.</p>
+        <p className="lp-lead">
+          Built for Alexa+ and demoed in the browser, plus a web app where you upload and review your documents.
+        </p>
       </div>
       <div className="lp-wrap lp-story-grid">
         <ol className="lp-steps">
