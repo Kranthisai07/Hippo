@@ -296,6 +296,26 @@ main:focus {
     display: none;
   }
 }
+.bar-end .btn {
+  white-space: nowrap;
+}
+/* Between the phone tab bar (820px) and a roomy desktop the centered nav no longer fits beside the brand and Sign out,
+   so the bar becomes brand, nav, Sign out with tighter pills and no pill icons. */
+@media (min-width: 821px) and (max-width: 1060px) {
+  .bar {
+    grid-template-columns: auto 1fr auto;
+    gap: var(--s2);
+  }
+  .nav {
+    justify-self: center;
+  }
+  .nav a {
+    padding: 0 var(--s3);
+  }
+  .nav a svg {
+    display: none;
+  }
+}
 .main {
   min-width: 0;
   flex: 1;
