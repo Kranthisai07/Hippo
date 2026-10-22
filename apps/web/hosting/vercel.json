@@ -1,16 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "redirects": [
-    { "source": "/", "destination": "/welcome", "permanent": false },
-    { "source": "/signin", "destination": "/welcome", "permanent": false },
-    { "source": "/ask", "destination": "/welcome", "permanent": false },
-    { "source": "/callback", "destination": "/welcome", "permanent": false },
-    { "source": "/upload", "destination": "/welcome", "permanent": false },
-    { "source": "/things/:path*", "destination": "/welcome", "permanent": false },
-    { "source": "/review/:path*", "destination": "/welcome", "permanent": false },
-    { "source": "/settings", "destination": "/welcome", "permanent": false }
-  ],
-  "rewrites": [{ "source": "/(welcome|privacy|terms)", "destination": "/index.html" }],
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
   "headers": [
     {
       "source": "/(.*)",
