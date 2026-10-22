@@ -127,7 +127,7 @@ The last command rebuilds the PDFs, the photo and the expected JSON, and fails i
 ## Hackathon
 
 - **Track:** Alexa+ (self-hosted MCP server, Streamable HTTP).
-- **Mini challenges:** AWS Builder (Bedrock, Textract, S3, Lambda, DynamoDB, EventBridge, SES) and Open Source (`obligation-kit` as a separate MIT package).
+- **Mini challenges:** Open Source (`obligation-kit` as a separate MIT package). AWS Builder is not entered: it needs a real Bedrock call and none succeeded (docs/PRODUCT_FEEDBACK.md).
 - **Built in the hackathon window:** everything in this repo.
 - **Demo data:** all documents are synthetic with fictional companies (Northwind Appliances, Harbor Mutual Insurance, Maple Court Apartments, Fernwood Streaming, Kestrel Learning). The recalls are real public records.
 
