@@ -108,7 +108,7 @@ Code is in `packages/auth`.
 
 | Who | For what | Live today? |
 | :--- | :--- | :--- |
-| Amazon Web Services | Storage (S3, DynamoDB), models (Bedrock), OCR (Textract), email (SES), hosting (Lambda) | **No.** Designed in the CDK stack and not deployed. The only AWS service this code has used for real is SES (one test digest, synthetic data). Bedrock calls were refused by AWS on the developer account (a zero token quota, see MEMORY.md G-047), so no document text has ever gone to a model. One synthetic fixture photo was sent to Textract once, through the AWS CLI, after the plan upgrade. DynamoDB has run only as DynamoDB Local. |
+| Amazon Web Services | Storage (S3, DynamoDB), models (Bedrock), OCR (Textract), email (SES), hosting (Lambda) | **No.** Designed in the CDK stack and not deployed. The only AWS service this code has used for real is SES (one test digest, synthetic data). Bedrock calls were refused by AWS on the developer account (a zero token quota, see FL-020 in docs/FRICTION_LOG.md), so no document text has ever gone to a model. One synthetic fixture photo was sent to Textract once, through the AWS CLI, after the plan upgrade. DynamoDB has run only as DynamoDB Local. |
 | CPSC and NHTSA | Public recall data. The daily job sends product names, makes, models and years of your assets. It sends no documents and no personal data. | Parsers tested on saved real responses. The live calls are not run in tests. |
 | Amazon Alexa+ | Voice. Tool results go to Alexa+, which writes the spoken answer. | Not connected. Alexa+ developer tools are partner only, so the demo uses a web page acting as an MCP client. |
 

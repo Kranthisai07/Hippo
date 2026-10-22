@@ -37,7 +37,7 @@ Paste targets for the Devpost form. The text below is written for hackathon judg
 
 - Alexa+ track: yes.
 - Open Source: yes.
-- AWS Builder: **do not enter.** It needs a real Bedrock call and none ran (MEMORY.md D-058).
+- AWS Builder: **do not enter.** It needs a real Bedrock call and none ran (docs/PRODUCT_FEEDBACK.md).
 
 ## K's checklist before 9:00 PM CT Thursday Oct 22
 

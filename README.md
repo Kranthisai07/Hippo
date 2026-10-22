@@ -38,7 +38,7 @@ Planned, not built. Four rules shape everything:
 - **Cite or do not claim.** Any answer from a document names the document and the page.
 - **Documents are hostile input.** Text inside an upload is data, never instructions.
 
-Full detail is in [INTENT.md](INTENT.md) (why and principles) and [SPEC.md](SPEC.md) (what to build).
+Details are in docs/ARCHITECTURE.md, docs/PRIVACY.md and docs/WEB_API.md.
 
 ## What exists today
 
@@ -131,7 +131,7 @@ The last command rebuilds the PDFs, the photo and the expected JSON, and fails i
 - **Built in the hackathon window:** everything in this repo.
 - **Demo data:** all documents are synthetic with fictional companies (Northwind Appliances, Harbor Mutual Insurance, Maple Court Apartments, Fernwood Streaming, Kestrel Learning). The recalls are real public records.
 
-Project decisions, gotchas and open questions are logged in [MEMORY.md](MEMORY.md). The build order is in [PLAN.md](PLAN.md).
+What went wrong and what we would change is in docs/FRICTION_LOG.md and docs/PRODUCT_FEEDBACK.md.
 
 ## License
 

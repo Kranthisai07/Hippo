@@ -2,7 +2,7 @@
 
 Real entries only, written while building Hippo for the Build, Ship, Shape hackathon (Alexa+ track, October 2026). Each entry says whether we hit the problem while building (hit) or found it by reading documentation while designing (read). Dates are 2026. Severity: blocker (stopped the work), major (cost real time or forced a workaround in the design), minor (small, but worth fixing).
 
-Source of truth for each entry: `MEMORY.md` gotchas (G-nnn). The G number is given so a reader can check the original note.
+Source of truth for each entry: the private working log gotchas (G-nnn). The G number is given so a reader can check the original note.
 
 ---
 

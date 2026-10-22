@@ -1,4 +1,4 @@
-# VERIFIED.md: live documentation versus SPEC.md
+# VERIFIED.md: live documentation versus the project spec
 
 Checked on 2026-10-18 (T0.2). Every claim below carries its URL. Verdict values: MATCHES SPEC, DIFFERS FROM SPEC, UNVERIFIED.
 
@@ -317,7 +317,7 @@ Sources: https://amazonappdev2026.devpost.com/ and https://amazonappdev2026.devp
 
 ---
 
-## Mismatches with SPEC.md
+## Mismatches with the project spec
 
 | # | Item | What SPEC says | What the docs say | Source | Action |
 | :--- | :--- | :--- | :--- | :--- | :--- |
