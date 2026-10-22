@@ -4,6 +4,21 @@ Hippo turns the paperwork a household never reads twice (warranties, insurance, 
 
 > **Status: working build, Alexa+ hackathon.** Today the repo contains the demo fixtures, the deadline engine, the asset resolver, the source quote check, asset linking, recall matchers, PDF page text extraction, the daily digest builder and daily job, the repository (memory and DynamoDB), the clause index, an OAuth 2.1 server, the MCP server with its nine tools, the web JSON API, the web app, the /ask demo client with its cards, the ingest pipeline and a CDK stack that has never been deployed, with 3090 passing tests (3361 in CI, which adds the DynamoDB Local suite). The ingest pipeline runs in fixture mode by default, so only the demo documents are read; its live Bedrock and Textract adapters exist and have only run against fakes. The cards are plain React, not the MCP Apps host bridge. Nothing is deployed. [What exists today](#what-exists-today) is the honest list.
 
+## Repository layout
+
+| Path | What it is |
+| :--- | :--- |
+| `apps/api` | The MCP server (nine tools), the OAuth endpoints and the web JSON API, on Hono. Data is in memory, seeded from the fixtures |
+| `apps/web` | The React web app (upload, review, Coming up, Things, Settings) and the `/ask` demo MCP client |
+| `apps/workers` | The ingest pipeline and the daily job (deadline alerts, recall radar, digest email) |
+| `packages/obligation-kit` | Deadline engine, extraction schemas, source quote check and CPSC and NHTSA matchers. No dependencies, no network |
+| `packages/core` | Asset resolver and linking, the repository (memory and DynamoDB), clause index, PDF page text, digest builder |
+| `packages/auth` | OAuth 2.1 server, sessions and tokens |
+| `infra` | CDK stack. Synthesized and template tested, never deployed |
+| `fixtures` | Synthetic demo documents, expected extractions and saved real recall responses |
+| `docs` | Architecture, privacy, web API, demo script, verified docs check, product feedback and friction log |
+| `.github/workflows`, `docker-compose.yml`, `scripts` | CI, DynamoDB Local for the repository tests, and stubs for commands that are not built |
+
 ## Why
 
 The cost of household paperwork shows up as missed deadlines: a lease notice window that closed, a warranty that ran out three weeks before the dishwasher leaked, a subscription that renewed at full price, a recalled product still in use.
