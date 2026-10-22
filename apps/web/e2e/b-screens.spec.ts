@@ -31,6 +31,12 @@ async function snap(page: Page, name: string) {
 
 test("every page: accessibility check and screenshots", async ({ page }) => {
   test.setTimeout(240_000);
+  await page.goto("/welcome");
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await snap(page, "welcome");
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.emulateMedia({ colorScheme: "light", reducedMotion: "reduce" });
+  await page.screenshot({ path: `${OUT}web-welcome-full-light.png`, fullPage: true });
   await page.goto("/signin");
   await snap(page, "signin");
 

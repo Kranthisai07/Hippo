@@ -1,0 +1,77 @@
+import { ArrowRight, FileCheck2, Hash, KeyRound, Trash2 } from "lucide-react";
+import { Link } from "react-router";
+
+const rules = [
+  {
+    icon: FileCheck2,
+    h: "No alert from an unconfirmed date",
+    p: "A date a model read is only a suggestion until you confirm it.",
+  },
+  { icon: Hash, h: "Numbers masked to the last 4", p: "Policy and account numbers never show in full." },
+  { icon: Trash2, h: "Delete everything in one click", p: "Documents, dates and alerts, gone together." },
+  {
+    icon: KeyRound,
+    h: "Documents are untrusted data",
+    p: "Text inside a document is read as content, never followed as an instruction.",
+  },
+];
+
+export function Trust() {
+  return (
+    <section className="lp-trust" aria-labelledby="trust-h">
+      <div className="lp-wrap">
+        <h2 id="trust-h">Four rules Hippo does not bend</h2>
+        <ul className="lp-rules">
+          {rules.map(({ icon: Icon, h, p }) => (
+            <li key={h}>
+              <Icon size={22} strokeWidth={1.75} aria-hidden="true" />
+              <h3>{h}</h3>
+              <p>{p}</p>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  );
+}
+
+export function Planned() {
+  return (
+    <section id="planned" className="lp-wrap lp-planned" aria-labelledby="planned-h">
+      <p className="lp-eyebrow">Planned, not built yet</p>
+      <h2 id="planned-h">Planned: a Chrome extension</h2>
+      <p className="lp-lead">
+        Save a file from any page and get a reminder by email when it matters. This is on the roadmap. Today, Hippo
+        works through Alexa+ and the web app.
+      </p>
+    </section>
+  );
+}
+
+export function Closing() {
+  return (
+    <section className="lp-closing" aria-labelledby="close-h">
+      <h2 id="close-h">Give your paperwork a memory</h2>
+      <p className="lp-lead">Upload one document and see the first date it finds.</p>
+      <Link to="/signin" className="lp-btn lp-btn-lg">
+        Try the demo
+        <ArrowRight size={18} strokeWidth={1.75} aria-hidden="true" />
+      </Link>
+    </section>
+  );
+}
+
+export function Footer() {
+  return (
+    <footer className="lp-footer">
+      <div className="lp-wrap lp-footer-in">
+        <span className="lp-brand-plain">Hippo</span>
+        <nav aria-label="Footer">
+          <Link to="/privacy">Privacy</Link>
+          <Link to="/terms">Terms</Link>
+          <Link to="/signin">Sign in</Link>
+        </nav>
+      </div>
+    </footer>
+  );
+}

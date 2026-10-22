@@ -3,9 +3,18 @@ import { AlertTriangle, CheckCircle2, Info, type LucideIcon } from "lucide-react
 
 // Small shared pieces. Everything takes text children; nothing here renders HTML from a string.
 
-export function Skeleton({ lines = 3, label = "Loading" }: { lines?: number; label?: string }) {
+// The variant only changes the shape of each placeholder so it matches what replaces it.
+export function Skeleton({
+  lines = 3,
+  label = "Loading",
+  variant = "lines",
+}: {
+  lines?: number;
+  label?: string;
+  variant?: "lines" | "tickets" | "tiles" | "rows" | "fields";
+}) {
   return (
-    <div className="stack" role="status" aria-live="polite" aria-label={label}>
+    <div className={`stack skel-${variant}`} role="status" aria-live="polite" aria-label={label}>
       <span className="sr-only">{label}</span>
       {Array.from({ length: lines }, (_, i) => (
         <div key={i} className="skel" aria-hidden="true" />
@@ -17,7 +26,7 @@ export function Skeleton({ lines = 3, label = "Loading" }: { lines?: number; lab
 export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
     <div className="banner banner-error" role="alert">
-      <AlertTriangle size={20} aria-hidden="true" />
+      <AlertTriangle size={20} strokeWidth={1.75} aria-hidden="true" />
       <span>{message}</span>
       {onRetry && (
         <button type="button" className="btn btn-sm" onClick={onRetry}>
@@ -40,8 +49,10 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="card stack" data-testid="empty-state">
-      <Icon size={32} aria-hidden="true" color="var(--accent)" />
+    <div className="card stack empty" data-testid="empty-state">
+      <span className="empty-icon" aria-hidden="true">
+        <Icon size={28} strokeWidth={1.75} />
+      </span>
       <h2>{title}</h2>
       {children && <p className="muted">{children}</p>}
       {action && <div>{action}</div>}

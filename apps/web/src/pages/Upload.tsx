@@ -33,13 +33,13 @@ function Steps({ state }: { state: UploadState }) {
       {steps.map((s, i) => (
         <li key={i} className="step" data-state={s}>
           {s === "done" ? (
-            <Check size={14} aria-hidden="true" />
+            <Check size={14} strokeWidth={1.75} aria-hidden="true" />
           ) : s === "failed" ? (
-            <AlertCircle size={14} aria-hidden="true" />
+            <AlertCircle size={14} strokeWidth={1.75} aria-hidden="true" />
           ) : s === "now" ? (
-            <Loader size={14} aria-hidden="true" />
+            <Loader size={14} strokeWidth={1.75} aria-hidden="true" />
           ) : (
-            <CircleDashed size={14} aria-hidden="true" />
+            <CircleDashed size={14} strokeWidth={1.75} aria-hidden="true" />
           )}
           {STEP_LABEL[i]}
           <span className="sr-only">
@@ -83,6 +83,7 @@ export function UploadPage() {
     }
   }
 
+  const working = rows.some((r) => r.state.phase === "uploading" || r.state.phase === "reading");
   return (
     <>
       <h1>Upload</h1>
@@ -92,6 +93,7 @@ export function UploadPage() {
       <div
         className="drop"
         data-over={over}
+        data-working={working}
         onDragOver={(e) => (e.preventDefault(), setOver(true))}
         onDragLeave={() => setOver(false)}
         onDrop={(e) => {
@@ -100,7 +102,9 @@ export function UploadPage() {
           add(e.dataTransfer.files);
         }}
       >
-        <FileUp size={40} aria-hidden="true" color="var(--accent)" />
+        <span className="drop-icon" aria-hidden="true">
+          <FileUp size={32} strokeWidth={1.75} />
+        </span>
         <h2>Drop files here</h2>
         <p className="muted">PDF, JPEG or PNG, up to 15 MB each. You can add several at once.</p>
         <label htmlFor="files" className="sr-only">
@@ -126,7 +130,7 @@ export function UploadPage() {
       {rows.length > 0 && (
         <ul className="list" aria-label="Your uploads">
           {rows.map((r) => (
-            <li key={r.id} className="card stack" data-testid="upload-row">
+            <li key={r.id} className="card stack upload-row" data-phase={r.state.phase} data-testid="upload-row">
               <div className="row">
                 <strong className="grow">{r.name}</strong>
                 <span className="chip" aria-live="polite">

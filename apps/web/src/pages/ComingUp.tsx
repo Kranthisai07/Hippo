@@ -57,6 +57,7 @@ function EntryCard({
     <li
       className={`item ${e.confirmed ? "" : "item-unconfirmed"}`}
       data-testid={e.confirmed ? "confirmed-item" : "unconfirmed-item"}
+      data-severity={e.confirmed ? (e.severity ?? "none") : "unconfirmed"}
     >
       <div className="date-block" aria-hidden="true">
         {parts ? (
@@ -155,7 +156,7 @@ export function ComingUp() {
     return (
       <>
         <h1>Coming up</h1>
-        <Skeleton lines={5} label="Loading what is coming up" />
+        <Skeleton variant="tickets" lines={4} label="Loading what is coming up" />
       </>
     );
   }
@@ -215,7 +216,7 @@ export function ComingUp() {
         </div>
       </div>
 
-      {loading && <Skeleton lines={2} label="Updating" />}
+      {loading && <Skeleton variant="tickets" lines={1} label="Updating" />}
 
       {confirmed.length === 0 && unconfirmed.length === 0 && !loading && (
         <EmptyState

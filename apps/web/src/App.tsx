@@ -12,6 +12,7 @@ import { ThingDetail, Things } from "./pages/Things";
 import { UploadPage } from "./pages/Upload";
 
 const AskPage = lazy(() => import("./ask/AskPage"));
+const Landing = lazy(() => import("./pages/Landing"));
 
 function Protected() {
   const { status } = useAuth();
@@ -47,6 +48,14 @@ export function App() {
               }
             />
           ))}
+          <Route
+            path="/welcome"
+            element={
+              <Suspense fallback={<Skeleton lines={3} label="Loading" />}>
+                <Landing />
+              </Suspense>
+            }
+          />
           <Route element={<Protected />}>
             <Route index element={<ComingUp />} />
             <Route path="/upload" element={<UploadPage />} />

@@ -41,31 +41,24 @@ export function Layout() {
       <a className="skip" href="#main">
         Skip to content
       </a>
-      <header className="topbar">
-        <Brand />
-        <button type="button" className="btn btn-quiet btn-sm" onClick={() => void signOut()}>
-          <LogOut size={16} aria-hidden="true" />
-          Sign out
-        </button>
-      </header>
-      <aside className="side">
+      <header className="bar">
         <Brand />
         <nav className="nav" aria-label="Main">
           {LINKS.map(({ to, label, icon: Icon, end }) => (
-            <NavLink key={to} to={to} end={end}>
-              <Icon size={20} aria-hidden="true" />
-              {label}
+            <NavLink key={to} to={to} end={end} viewTransition>
+              <Icon size={20} strokeWidth={1.75} aria-hidden="true" />
+              <span>{label}</span>
             </NavLink>
           ))}
         </nav>
-        <div className="side-foot">
-          {me && <p className="small muted">{me.email}</p>}
+        <div className="bar-end">
+          {me && <p className="small muted bar-email">{me.email}</p>}
           <button type="button" className="btn btn-quiet btn-sm" onClick={() => void signOut()}>
-            <LogOut size={16} aria-hidden="true" />
+            <LogOut size={16} strokeWidth={1.75} aria-hidden="true" />
             Sign out
           </button>
         </div>
-      </aside>
+      </header>
       <div className="main">
         <main id="main" className="page" tabIndex={-1}>
           <Outlet />
