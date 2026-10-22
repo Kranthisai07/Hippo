@@ -1,76 +1,7 @@
 @import "tailwindcss";
-
-/* Design tokens. Light and dark share the same names. Meaning is never color alone: every status chip has an icon and words. */
-:root {
-  color-scheme: light dark;
-  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-
-  --s1: 4px;
-  --s2: 8px;
-  --s3: 12px;
-  --s4: 16px;
-  --s5: 24px;
-  --s6: 32px;
-  --s7: 48px;
-  --s8: 64px;
-
-  --r1: 6px;
-  --r2: 10px;
-  --r3: 16px;
-  --shadow1: 0 1px 2px rgb(16 40 40 / 0.06), 0 1px 1px rgb(16 40 40 / 0.04);
-  --shadow2: 0 6px 24px rgb(16 40 40 / 0.1), 0 2px 6px rgb(16 40 40 / 0.06);
-  --t: 160ms ease;
-
-  --bg: #f6f5f1;
-  --surface: #ffffff;
-  --surface-2: #efede7;
-  --line: #d9d6cc;
-  --ink: #17262a;
-  --ink-2: #44575b;
-  --accent: #1f5a63;
-  --accent-hover: #174850;
-  --on-accent: #ffffff;
-  --accent-soft: #e0eeee;
-  --focus: #0b57d0;
-
-  --urgent: #a1261c;
-  --urgent-soft: #fbe9e6;
-  --warn: #7a4a00;
-  --warn-soft: #fdf0d5;
-  --ok: #1d6b3a;
-  --ok-soft: #e1f3e6;
-  --info: #1f5a63;
-  --info-soft: #e0eeee;
-  --mark: #ffe58a;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --shadow1: 0 1px 2px rgb(0 0 0 / 0.4);
-    --shadow2: 0 8px 28px rgb(0 0 0 / 0.5);
-    --bg: #0f1719;
-    --surface: #172124;
-    --surface-2: #1f2c2f;
-    --line: #34474b;
-    --ink: #e9f0f0;
-    --ink-2: #aabdc0;
-    --accent: #7cc6cd;
-    --accent-hover: #98d4da;
-    --on-accent: #08191c;
-    --accent-soft: #1b3a3f;
-    --focus: #8ab4ff;
-    --urgent: #ff9d92;
-    --urgent-soft: #3d1c19;
-    --warn: #f3c46d;
-    --warn-soft: #3a2c0f;
-    --ok: #86d9a0;
-    --ok-soft: #173223;
-    --info: #7cc6cd;
-    --info-soft: #1b3a3f;
-    --mark: #6b5600;
-  }
-}
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
+@import "./tokens.css";
 
 html {
   font-size: 17px;
