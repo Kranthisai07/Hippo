@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useLocation } from "react-router";
 import { Layout } from "./components/Layout";
 import { Skeleton, ToastProvider } from "./components/ui";
 import { AuthProvider, useAuth } from "./lib/auth";
+import { HOSTED } from "./lib/hosted";
 import { ComingUp } from "./pages/ComingUp";
 import { Legal } from "./pages/Legal";
 import { Review } from "./pages/Review";
@@ -28,7 +29,28 @@ function Protected() {
   return <Layout />;
 }
 
+// The static site has no API, so the only routes are the landing page and the legal pages. Everything else, including
+// links inside those pages that point at "/", goes to the landing page (a server redirect cannot catch client navigation).
+function HostedApp() {
+  return (
+    <Routes>
+      <Route
+        path="/welcome"
+        element={
+          <Suspense fallback={<Skeleton lines={3} label="Loading" />}>
+            <Landing />
+          </Suspense>
+        }
+      />
+      <Route path="/privacy" element={<Legal which="privacy" />} />
+      <Route path="/terms" element={<Legal which="terms" />} />
+      <Route path="*" element={<Navigate to="/welcome" replace />} />
+    </Routes>
+  );
+}
+
 export function App() {
+  if (HOSTED) return <HostedApp />;
   return (
     <AuthProvider>
       <ToastProvider>
