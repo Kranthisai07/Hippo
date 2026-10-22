@@ -20,7 +20,7 @@ Paste targets for the Devpost form. The text below is written for hackathon judg
 
 **Alexa+ track, and what we could not do.** The Alexa+ developer tools are partner only, so we could not run Hippo on a real Alexa+ client. The demo is a web page (/ask) that acts as a real MCP client against the same server, with plain React cards drawn from the tool results (not the MCP Apps host bridge). The server is plain MCP and runs on any client.
 
-**Honest limits.** The default build reads only the six demo documents. The Bedrock and Textract adapters exist with a call cap and timeouts, but a live document extraction never ran: AWS refused it on our account (every daily token quota was 0 and not adjustable; case 179260044300224 was open at the deadline). One real SES digest was sent and one Textract page was read. Nothing is deployed; it runs locally. DynamoDB is verified only against DynamoDB Local. Sessions and auth state are in memory.
+**Honest limits.** The default build reads only the six demo documents. The Bedrock and Textract adapters exist with a call cap and timeouts, but a live document extraction never ran: AWS refused it on our account (every daily token quota was 0 and not adjustable; case 179260044300224 was still open when we stopped waiting). One real SES digest was sent and one Textract page was read. Nothing is deployed; it runs locally. DynamoDB is verified only against DynamoDB Local. Sessions and auth state are in memory.
 
 **Run it.** `pnpm install`, `pnpm dev`, `pnpm dev:web`, open http://localhost:5173 (steps and the 2:45 demo path are in the README and docs/DEMO_SCRIPT.md). Our product feedback and friction log (22 entries) are in docs/PRODUCT_FEEDBACK.md and docs/FRICTION_LOG.md.
 
