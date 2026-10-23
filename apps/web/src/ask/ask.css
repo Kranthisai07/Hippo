@@ -1099,9 +1099,9 @@
   }
 }
 
-/* The Coming up card holds a list and a recalls column. Beside the 340px log there is only about 530px for the card,
-   so below 1500px it stacks instead of squeezing each row into 230px. */
-@media (min-width: 1000px) and (max-width: 1499px) {
+/* The Coming up card holds a list and a recalls column. The card is only about 610px wide at every desktop width
+   (the console column is capped and the log sits beside it), so it always stacks instead of squeezing each row. */
+@media (min-width: 1000px) {
   .ha-two--wide {
     grid-template-columns: minmax(0, 1fr);
   }
