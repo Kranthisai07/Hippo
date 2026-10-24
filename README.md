@@ -61,7 +61,7 @@ The last command rebuilds the PDFs, the photo and the expected JSON, and fails i
 
 The browser tests need their browser once: `pnpm --filter @hippo/web exec playwright install chromium`, then `pnpm --filter @hippo/web test:e2e` with ports 8787 and 5173 free.
 
-A static copy of the landing page can be hosted: build with `VITE_HOSTED=1 pnpm --filter @hippo/web build` and deploy `apps/web/dist` with `apps/web/hosting/vercel.json`. The static page has no API behind it, so its demo buttons open the live demo server ([docs/DEPLOY.md](docs/DEPLOY.md)).
+A static copy of the landing page can be hosted: build with `VITE_HOSTED=1 pnpm --filter @hippo/web build` and on Vercel with the project root set to `apps/web`, which reads `apps/web/vercel.json` (install, build and rewrite settings). The static page has no API behind it, so its demo buttons open the live demo server ([docs/DEPLOY.md](docs/DEPLOY.md)).
 
 </details>
 
