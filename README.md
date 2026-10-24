@@ -4,9 +4,9 @@
 
 Hippo turns the paperwork a household never reads twice (warranties, insurance, a lease, subscriptions, recall notices) into dated obligations, and watches them while nobody is talking. You drop documents into a web app. Then you ask Alexa, and Hippo answers from your own documents and cites the page.
 
-[Demo video](https://youtu.be/OxnZ7RSM9_Y) | [Landing page](https://hippo-landing-kranthisai07s-projects.vercel.app/welcome) | [Run it in two minutes](#run-the-demo) | [Honest limits](#honest-limits)
+[Live demo](https://hippo-production-f9ae.up.railway.app) | [Demo video](https://youtu.be/OxnZ7RSM9_Y) | [Landing page](https://hippo-landing-kranthisai07s-projects.vercel.app/welcome) | [Run it in two minutes](#run-the-demo) | [Honest limits](#honest-limits)
 
-> **Status: working build, Alexa+ hackathon (Build, Ship, Shape).** Everything runs locally against a synthetic household, with 3090 passing tests (3361 in CI, which adds the DynamoDB Local suite). Nothing is deployed. Alexa+ developer tools are partner only, so the voice demo is a web page (`/ask`) that acts as a real MCP client against the same server. A live Bedrock extraction never ran, because the account's daily token quotas were zero. [What is real and what is not](#what-is-real-and-what-is-not) is the honest list.
+> **Status: working build, Alexa+ hackathon (Build, Ship, Shape).** Everything runs locally against a synthetic household, with 3090 passing tests (3361 in CI, which adds the DynamoDB Local suite). Only a synthetic data demo server is deployed ([docs/DEPLOY.md](docs/DEPLOY.md)); the AWS design in `infra/` is not. Alexa+ developer tools are partner only, so the voice demo is a web page (`/ask`) that acts as a real MCP client against the same server. A live Bedrock extraction never ran, because the account's daily token quotas were zero. [What is real and what is not](#what-is-real-and-what-is-not) is the honest list.
 
 ## Why
 
@@ -61,7 +61,7 @@ The last command rebuilds the PDFs, the photo and the expected JSON, and fails i
 
 The browser tests need their browser once: `pnpm --filter @hippo/web exec playwright install chromium`, then `pnpm --filter @hippo/web test:e2e` with ports 8787 and 5173 free.
 
-A static copy of the landing page can be hosted: build with `VITE_HOSTED=1 pnpm --filter @hippo/web build` and deploy `apps/web/dist` with `apps/web/hosting/vercel.json`. The demo and the app need the local API, so on the hosted page the demo buttons point to these run steps.
+A static copy of the landing page can be hosted: build with `VITE_HOSTED=1 pnpm --filter @hippo/web build` and deploy `apps/web/dist` with `apps/web/hosting/vercel.json`. The static page has no API behind it, so its demo buttons open the live demo server ([docs/DEPLOY.md](docs/DEPLOY.md)).
 
 </details>
 
