@@ -1,0 +1,16 @@
+node_modules
+**/node_modules
+.git
+.claude
+brag-output
+apps/web/_video
+apps/web/dist
+apps/web/test-results
+apps/web/playwright-report
+**/*.log
+INTENT.md
+MEMORY.md
+PLAN.md
+SPEC.md
+**/.env
+**/.env.*

@@ -97,3 +97,48 @@ describe("the local demo login", () => {
     }
   });
 });
+
+describe("hosting the web build and the public address", () => {
+  it("serves the built web app from the same address and never answers an API path with the page", async () => {
+    const { mkdtempSync, mkdirSync, writeFileSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const dir = mkdtempSync(join(tmpdir(), "hippo-web-"));
+    mkdirSync(join(dir, "assets"));
+    writeFileSync(join(dir, "index.html"), "<!doctype html><title>PAGE-MARKER</title>");
+    writeFileSync(join(dir, "assets", "a.js"), "console.log('ASSET-MARKER')");
+    const port = await freePort();
+    const server = await startServer({ port, env: { HIPPO_SIGNING_KEY: KEY, HIPPO_WEB_DIST: dir }, log: () => {} });
+    try {
+      const base = `http://127.0.0.1:${port}`;
+      const page = await fetch(`${base}/welcome`);
+      expect(page.status).toBe(200);
+      expect(await page.text()).toContain("PAGE-MARKER");
+      expect(await (await fetch(`${base}/callback`)).text()).toContain("PAGE-MARKER");
+      expect(await (await fetch(`${base}/assets/a.js`)).text()).toContain("ASSET-MARKER");
+      // Raw sockets would be needed to send an un-normalised path; fetch still proves a dot segment never leaves the root.
+      expect(await (await fetch(`${base}/..%2f..%2fpackage.json`)).text()).not.toContain('"name"');
+      for (const p of ["/api/nothing-here", "/oauth/nothing-here", "/mcp", "/.well-known/nothing-here"]) {
+        expect(await (await fetch(`${base}${p}`)).text()).not.toContain("PAGE-MARKER");
+      }
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("takes its public address and callback from the host's domain", async () => {
+    const port = await freePort();
+    const server = await startServer({
+      port,
+      env: { HIPPO_SIGNING_KEY: KEY, RAILWAY_PUBLIC_DOMAIN: "hippo.example.app" },
+      log: () => {},
+    });
+    try {
+      expect(server.url).toBe("https://hippo.example.app");
+      expect(server.mcpUrl).toBe("https://hippo.example.app/mcp");
+      expect(server.redirectUri).toBe("https://hippo.example.app/callback");
+    } finally {
+      await server.close();
+    }
+  });
+});

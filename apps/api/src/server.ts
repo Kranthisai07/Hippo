@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomInt } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { createAuth } from "@hippo/auth";
 import { serve, type ServerType } from "@hono/node-server";
+import { serveStatic } from "@hono/node-server/serve-static";
 import { createMemoryRepository } from "core/src/repository";
 import { createApp } from "./app";
 import { createLocalUploader, createMemoryObjectStore } from "./api/storage";
@@ -54,7 +55,11 @@ export async function startServer(opts: ServerOptions = {}): Promise<Running> {
   const log = opts.log ?? ((line: string) => console.log(line));
   const port = opts.port ?? Number(env.PORT ?? 8787);
   const host = opts.host ?? env.HOST ?? "127.0.0.1";
-  const issuer = env.HIPPO_ISSUER ?? `http://localhost:${port}`;
+  // A host that publishes its own domain (Railway sets RAILWAY_PUBLIC_DOMAIN) gets that as its public address.
+  const issuer =
+    env.HIPPO_ISSUER ??
+    (env.RAILWAY_PUBLIC_DOMAIN ? `https://${env.RAILWAY_PUBLIC_DOMAIN}` : `http://localhost:${port}`);
+  const publicHost = !LOOPBACK_HOSTS.has(new URL(issuer).hostname);
 
   let signingKey = env.HIPPO_SIGNING_KEY;
   if (!signingKey) {
@@ -87,7 +92,9 @@ export async function startServer(opts: ServerOptions = {}): Promise<Running> {
   // A fresh code on every start, so there is no public default. It is logged once, only for a local demo.
   const demoCode = env.HIPPO_DEMO_CODE ?? String(randomInt(100_000, 1_000_000));
   const clientId = env.HIPPO_CLIENT_ID ?? "hippo-demo";
-  const redirectUris = list(env.HIPPO_REDIRECT_URIS, ["http://localhost:5173/callback"]);
+  const redirectUris = list(env.HIPPO_REDIRECT_URIS, [
+    publicHost ? `${issuer}/callback` : "http://localhost:5173/callback",
+  ]);
   const serviceId = env.HIPPO_SERVICE_CLIENT_ID;
   const serviceSecret = env.HIPPO_SERVICE_CLIENT_SECRET;
 
@@ -116,7 +123,8 @@ export async function startServer(opts: ServerOptions = {}): Promise<Running> {
     repo,
     indexSource,
     now: clock,
-    allowedOrigins,
+    // The server's own origin too: when it serves the web build itself, the /ask page calls /mcp from this origin.
+    allowedOrigins: [new URL(issuer).origin, ...allowedOrigins],
     // Web API: files in memory, the PUT route of this server, and the fixture ingest (createApp's default hook) that
     // only reads the demo documents. The web dev server may send the cookie from its own origin.
     web: {
@@ -135,6 +143,16 @@ export async function startServer(opts: ServerOptions = {}): Promise<Running> {
     },
     log,
   });
+
+  // HIPPO_WEB_DIST serves the built web app from this same address (one container, same origin, so the strict CSP and
+  // the cookie session work unchanged). The API, OAuth and MCP paths are never answered with the page.
+  if (env.HIPPO_WEB_DIST) {
+    const root = env.HIPPO_WEB_DIST;
+    const API_PATHS = ["/api", "/oauth", "/mcp", "/.well-known"];
+    const isApi = (p: string) => API_PATHS.some((a) => p === a || p.startsWith(`${a}/`));
+    app.get("*", async (c, next) => (isApi(c.req.path) ? next() : serveStatic({ root })(c, next)));
+    app.get("*", async (c, next) => (isApi(c.req.path) ? next() : serveStatic({ root, path: "index.html" })(c, next)));
+  }
 
   const server: ServerType = await new Promise((resolve) => {
     const s = serve({ fetch: app.fetch, port, hostname: host }, () => resolve(s));
