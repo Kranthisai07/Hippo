@@ -57,7 +57,8 @@ export async function startServer(opts: ServerOptions = {}): Promise<Running> {
   const host = opts.host ?? env.HOST ?? "127.0.0.1";
   // A host that publishes its own domain (Railway sets RAILWAY_PUBLIC_DOMAIN) gets that as its public address.
   const issuer =
-    env.HIPPO_ISSUER ?? (env.RAILWAY_PUBLIC_DOMAIN ? `https://${env.RAILWAY_PUBLIC_DOMAIN}` : `http://localhost:${port}`);
+    env.HIPPO_ISSUER ??
+    (env.RAILWAY_PUBLIC_DOMAIN ? `https://${env.RAILWAY_PUBLIC_DOMAIN}` : `http://localhost:${port}`);
   const publicHost = !LOOPBACK_HOSTS.has(new URL(issuer).hostname);
 
   let signingKey = env.HIPPO_SIGNING_KEY;
@@ -91,7 +92,9 @@ export async function startServer(opts: ServerOptions = {}): Promise<Running> {
   // A fresh code on every start, so there is no public default. It is logged once, only for a local demo.
   const demoCode = env.HIPPO_DEMO_CODE ?? String(randomInt(100_000, 1_000_000));
   const clientId = env.HIPPO_CLIENT_ID ?? "hippo-demo";
-  const redirectUris = list(env.HIPPO_REDIRECT_URIS, [publicHost ? `${issuer}/callback` : "http://localhost:5173/callback"]);
+  const redirectUris = list(env.HIPPO_REDIRECT_URIS, [
+    publicHost ? `${issuer}/callback` : "http://localhost:5173/callback",
+  ]);
   const serviceId = env.HIPPO_SERVICE_CLIENT_ID;
   const serviceSecret = env.HIPPO_SERVICE_CLIENT_SECRET;
 
