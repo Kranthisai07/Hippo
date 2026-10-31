@@ -1,7 +1,7 @@
 import type { Context } from "hono";
 import type { z } from "zod";
 
-export type ApiStatus = 400 | 401 | 403 | 404 | 409 | 413 | 415 | 429 | 500;
+export type ApiStatus = 400 | 401 | 403 | 404 | 409 | 413 | 415 | 422 | 429 | 500;
 
 const CODES: Record<ApiStatus, string> = {
   400: "invalid_request",
@@ -11,6 +11,7 @@ const CODES: Record<ApiStatus, string> = {
   409: "conflict",
   413: "too_large",
   415: "unsupported_type",
+  422: "limit_reached",
   429: "rate_limited",
   500: "internal",
 };

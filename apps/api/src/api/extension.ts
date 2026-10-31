@@ -39,6 +39,8 @@ export interface ExtensionDeps {
 }
 
 export const MAX_CAPTURE_CHARS = 60_000;
+/** Saved pages one household may keep. Delete some in Hippo to save more. */
+export const MAX_CAPTURED_PAGES = 200;
 /** JSON escapes and multibyte text can make a page of MAX_CAPTURE_CHARS several times its length in bytes. */
 const MAX_CAPTURE_BYTES = 256 * 1024;
 const SCOPE = "mcp:tools";
@@ -126,6 +128,14 @@ export function createExtensionApi(deps: ExtensionDeps): Hono<{ Variables: { hh:
     const existing = await repo.getDoc(hh, docId);
     if (existing && existing.status !== "failed") {
       throw new ApiError(409, "This page is already saved.", { "X-Hippo-Doc": docId });
+    }
+    // shortcut: counts by listing the household's documents, which is fine at this cap and not for thousands.
+    const held = (await repo.listDocs(hh)).filter((d) => d.s3Key.startsWith("captures/")).length;
+    if (held >= MAX_CAPTURED_PAGES) {
+      throw new ApiError(
+        422,
+        `You have saved ${MAX_CAPTURED_PAGES} pages, which is the limit. Delete some in Hippo to save more.`,
+      );
     }
     const doc: Doc = {
       id: docId,

@@ -268,6 +268,31 @@ describe("POST /ext/captures", () => {
     }
     expect(last).toBe(429);
   });
+
+  it("refuses a new page once the household holds 200, and says how to make room", async () => {
+    const { w, call } = await setup();
+    for (let i = 0; i < 200; i++) {
+      await w.repo.putDoc(HH, {
+        id: `doc-held-${i}`,
+        s3Key: `captures/${HH}/doc-held-${i}/page.txt`,
+        filename: `held-${i}.txt`,
+        docType: "other",
+        status: "needs_review",
+        uploadedAt: "2026-10-01T00:00:00.000Z",
+        assetIds: [],
+      });
+    }
+    const r = await call(HH, "/ext/captures", { title: "One more", host: "a.example", text: "Renews on 2027-01-15." });
+    expect(r.status).toBe(422);
+    const body = (await r.json()) as { error: { code: string; message: string } };
+    expect(body.error.code).toBe("limit_reached");
+    expect(body.error.message).toContain("Delete some");
+    // Uploaded files do not count toward it, and another household is not affected.
+    expect(
+      (await call("hh_third", "/ext/captures", { title: "x", host: "a.example", text: "Renews on 2027-01-15." }))
+        .status,
+    ).not.toBe(422);
+  });
 });
 
 describe("keeping a page out of a reachable server", () => {
