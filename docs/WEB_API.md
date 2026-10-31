@@ -107,6 +107,7 @@ The real worker plugs in by passing its own `onUploaded` (or by running outside 
 | Route | Request | Response |
 | :--- | :--- | :--- |
 | `PUT /api/settings` | `{ digestOn: boolean, email?: string }` | `{ digestOn, email }`. The email is trimmed, lower cased and validated, at most 254 characters. Leaving it out keeps the saved one. |
+| `GET /api/export` | none | One JSON download (`hippo-export.json`): settings, documents, agreements with their quotes, assets and alerts for the household, masked like every other read. At most 5 a hour (429 with `Retry-After`). |
 | `DELETE /api/data` | `{ confirm: "delete all my data" }` (exactly) | `204`. Deletes everything for the household, its files and its clause index. The session stays valid. |
 
 ## Dev walkthrough (the lease demo)
@@ -142,7 +143,9 @@ For the browser extension, under `/ext`, not `/api`. Auth is `Authorization: Bea
 
 - 403: saving is off (no `onCaptured` hook). `apps/api/src/server.ts` loads the hook only when the server is bound to a loopback host, has a loopback issuer and no public domain (`isLocalOnly`). Anything else refuses.
 - 409: the same text was saved already, or the household already tracks that vendor. `X-Hippo-Doc` holds the existing document id, when there is one.
-- 429: more than 30 saves per household per hour, with `Retry-After`.
+- 429: more than 30 saves per household per hour, or 60 list reads per household per minute, with `Retry-After`.
+- Every `/ext` call also counts against a per address limit of 300 a minute, and every `/oauth` call against 120 a minute (429 in the OAuth shape `{ "error": "rate_limited" }`). The address is the socket address, or the header named by `HIPPO_CLIENT_IP_HEADER` on a host whose proxy writes it (`cf-connecting-ip`). A client can never choose its own bucket by sending that header unless the host names it.
+- CORS: `Origin` must match the allowed list exactly (the extension's `chrome-extension://<id>` and the web origins). A preflight (`OPTIONS`) from a listed origin gets 204 with that origin echoed back, `Authorization, Content-Type` as allowed headers, no credentials and never `*`. Any other origin, including `null`, is 403.
 - A saved page is a Doc with key `captures/<household>/<doc>/page.txt`, status `needs_review` and every field `extracted`. It then follows the normal review, confirm and delete routes.
 
 ## Not in this API
@@ -151,4 +154,4 @@ For the browser extension, under `/ext`, not `/api`. Auth is `Authorization: Bea
 - Anything that takes a household id.
 - Recall lookups from the browser: recalls come from the daily job and arrive as alerts.
 - A presigned S3 upload (`createS3Presigner`) is not built yet; the `Uploader` interface (`prepare({ key, contentType, size }) -> { method, url, headers, expiresInSeconds }`) is where it plugs in.
-- Real rate limiting beyond the upload cap, and any persistence: the local server keeps files, the repository and sessions in memory.
+- Durable rate limit counters and persistence: the local server keeps files, the repository, sessions and counters in memory. A hosted server passes its own `RateLimiter`.

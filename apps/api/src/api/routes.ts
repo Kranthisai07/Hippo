@@ -372,6 +372,28 @@ export function createWebApi(deps: WebApiDeps): Hono<{ Variables: { hh: string; 
     return c.json({ digestOn: next.digestOn, email: next.email ?? c.var.email });
   });
 
+  // Everything kept for this household that a person put in or confirmed, as one file. Masked like every other read.
+  api.get("/export", async (c) => {
+    const hh = c.var.hh;
+    await enforce(deps.limiter, `export:${hh}`, 3_600_000, 5, "Too many exports. Please try again later.");
+    const [household, docs, agreements, assets, alerts] = await Promise.all([
+      repo.getHousehold(hh),
+      repo.listDocs(hh),
+      repo.listAgreements(hh),
+      repo.listAssets(hh),
+      repo.listAlerts(hh),
+    ]);
+    c.header("Content-Disposition", 'attachment; filename="hippo-export.json"');
+    return c.json({
+      exportedAt: nowIso(),
+      settings: { digestOn: household?.digestOn ?? true, email: household?.email ?? c.var.email },
+      documents: docs.map(docView),
+      agreements: agreements.map(agreementView),
+      assets: assets.map(maskAsset),
+      alerts: alerts.map(maskAlert),
+    });
+  });
+
   api.delete("/data", async (c) => {
     const hh = c.var.hh;
     await readJson(c, DeleteDataBody);
