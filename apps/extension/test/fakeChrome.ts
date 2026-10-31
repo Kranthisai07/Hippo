@@ -18,6 +18,7 @@ export function fakeChrome() {
     },
     tabs: { query: vi.fn(async () => [{ id: 7 }]), create: vi.fn() },
     scripting: { executeScript: vi.fn() },
+    action: { setBadgeText: vi.fn(), setBadgeBackgroundColor: vi.fn() },
   };
   vi.stubGlobal("chrome", chromeFake);
   return { chrome: chromeFake, session };
