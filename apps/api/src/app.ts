@@ -3,8 +3,10 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import type { Repository } from "core/src/contracts";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
+import { errorBody } from "./api/http";
 import { createExtensionApi, type OnCaptured } from "./api/extension";
 import { createFixtureIngest, type IndexStore, type OnUploaded } from "./api/fixtureIngest";
+import { clientAddress, createMemoryLimiter, type RateLimiter } from "./api/limiter";
 import { createWebApi } from "./api/routes";
 import { createLocalUploader, createMemoryObjectStore, type ObjectStore, type Uploader } from "./api/storage";
 import { createIndexCache, type IndexSource } from "./mcp/indexCache";
@@ -21,6 +23,10 @@ export interface AppDeps {
   newId?: () => string;
   /** Browser origins allowed to call /mcp (the web demo page). A request with no Origin header is always fine. */
   allowedOrigins?: string[];
+  /** Counts hits for every rate limit. Default: in memory, one process. A hosted server passes a durable one. */
+  limiter?: RateLimiter;
+  /** The header a trusted proxy sets to the caller's address (cf-connecting-ip on Cloudflare). Unset: the socket address. */
+  clientIpHeader?: string;
   /** Request body limit for /mcp in bytes. */
   maxBodyBytes?: number;
   log?: (line: string) => void;
@@ -47,6 +53,9 @@ export interface WebDeps {
 const SERVICE_METHODS: ReadonlySet<string> = new Set(["initialize", "tools/list", "ping", "notifications/initialized"]);
 
 export const DEFAULT_MAX_BODY_BYTES = 128 * 1024;
+/** Coarse per address limits in front of the sign-in and extension routes. The exact limits sit behind them. */
+export const OAUTH_PER_MINUTE = 120;
+export const EXT_PER_MINUTE = 300;
 const MCP_PATH = "/mcp";
 
 const rpcError = (
@@ -76,6 +85,25 @@ export function createApp(deps: AppDeps): Hono {
   const now = deps.now ?? Date.now;
   const newId = deps.newId ?? (() => crypto.randomUUID());
   const allowed = new Set(deps.allowedOrigins ?? []);
+  const limiter = deps.limiter ?? createMemoryLimiter(now);
+
+  // Before auth, so a flood of bad tokens or codes is stopped without any work. OAuth clients get an OAuth error body.
+  app.use("/oauth/*", async (c, next) => {
+    const r = await limiter(`ip:oauth:${clientAddress(c, deps.clientIpHeader)}`, 60_000, OAUTH_PER_MINUTE);
+    if (r.ok) return next();
+    return c.json({ error: "rate_limited" }, 429, {
+      "Cache-Control": "no-store",
+      "Retry-After": String(r.retryAfterSec),
+    });
+  });
+  app.use("/ext/*", async (c, next) => {
+    const r = await limiter(`ip:ext:${clientAddress(c, deps.clientIpHeader)}`, 60_000, EXT_PER_MINUTE);
+    if (r.ok) return next();
+    return c.json(errorBody(429, "Too many requests. Please slow down."), 429, {
+      "Cache-Control": "no-store",
+      "Retry-After": String(r.retryAfterSec),
+    });
+  });
 
   app.route("/", deps.auth.app);
 
@@ -95,6 +123,7 @@ export function createApp(deps: AppDeps): Hono {
       now,
       newId,
       origins: web.origins ?? [],
+      limiter,
     }),
   );
 
@@ -105,6 +134,7 @@ export function createApp(deps: AppDeps): Hono {
       repo: deps.repo,
       onCaptured: web.onCaptured,
       allowedOrigins: allowed,
+      limiter,
       now,
     }),
   );

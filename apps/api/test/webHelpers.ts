@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { createAuth } from "@hippo/auth";
 import { createMemoryRepository } from "core/src/repository";
-import { createApp, type WebDeps } from "../src/app";
+import { createApp, type AppDeps, type WebDeps } from "../src/app";
 import { createLocalUploader, createMemoryObjectStore } from "../src/api/storage";
 import { createIndexCache, createMemoryIndexSource } from "../src/mcp/indexCache";
 import { seedHousehold } from "../src/seed";
@@ -31,7 +31,7 @@ export interface Client {
 
 export type Web = Awaited<ReturnType<typeof makeWeb>>;
 
-export async function makeWeb(over: { web?: WebDeps } = {}) {
+export async function makeWeb(over: { web?: WebDeps; app?: Partial<AppDeps> } = {}) {
   const repo = createMemoryRepository();
   const indexSource = createMemoryIndexSource();
   const objectStore = createMemoryObjectStore();
@@ -57,6 +57,7 @@ export async function makeWeb(over: { web?: WebDeps } = {}) {
     now: () => clock.t,
     newId: () => `t${++n}`,
     web: { objectStore, uploader: createLocalUploader(), origins: [DEV_ORIGIN], ...over.web },
+    ...over.app,
   });
 
   const clientFor = (cookie: string): Client => {

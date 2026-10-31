@@ -7,6 +7,7 @@ import { z } from "zod";
 import { maskNumbers } from "../mcp/speak";
 import { listSubscriptions } from "../subscriptions";
 import { ApiError, errorBody, readJson } from "./http";
+import { enforce, type RateLimiter } from "./limiter";
 import { UPLOADS_PER_HOUR } from "./routes";
 import { sanitizeFilename } from "./storage";
 
@@ -33,6 +34,7 @@ export interface ExtensionDeps {
   repo: Repository;
   onCaptured: OnCaptured | undefined;
   allowedOrigins: ReadonlySet<string>;
+  limiter: RateLimiter;
   now: () => number;
 }
 
@@ -40,6 +42,7 @@ export const MAX_CAPTURE_CHARS = 60_000;
 /** JSON escapes and multibyte text can make a page of MAX_CAPTURE_CHARS several times its length in bytes. */
 const MAX_CAPTURE_BYTES = 256 * 1024;
 const SCOPE = "mcp:tools";
+const READS_PER_MINUTE = 60;
 
 const CaptureBody = z.strictObject({
   title: z.string().max(300),
@@ -56,7 +59,6 @@ const reviewUrl = (docId: string): string => `/review/${docId}`;
 export function createExtensionApi(deps: ExtensionDeps): Hono<{ Variables: { hh: string } }> {
   const { repo } = deps;
   const ext = new Hono<{ Variables: { hh: string } }>();
-  const captureLog = new Map<string, number[]>();
   const today = () => new Date(deps.now()).toISOString().slice(0, 10);
 
   ext.onError((err, c) => {
@@ -79,7 +81,10 @@ export function createExtensionApi(deps: ExtensionDeps): Hono<{ Variables: { hh:
     await next();
   });
 
-  ext.get("/subscriptions", async (c) => c.json(await listSubscriptions(repo, c.var.hh, today())));
+  ext.get("/subscriptions", async (c) => {
+    await enforce(deps.limiter, `sub:${c.var.hh}`, 60_000, READS_PER_MINUTE, "Too many requests. Please slow down.");
+    return c.json(await listSubscriptions(repo, c.var.hh, today()));
+  });
 
   ext.post("/captures", async (c) => {
     if (!deps.onCaptured) {
@@ -88,12 +93,13 @@ export function createExtensionApi(deps: ExtensionDeps): Hono<{ Variables: { hh:
     const hh = c.var.hh;
     const body = await readJson(c, CaptureBody, MAX_CAPTURE_BYTES);
 
-    const hourAgo = deps.now() - 3_600_000;
-    const recent = (captureLog.get(hh) ?? []).filter((t) => t > hourAgo);
-    if (recent.length >= UPLOADS_PER_HOUR) {
-      throw new ApiError(429, "Too many pages saved. Please try again later.", { "Retry-After": "600" });
-    }
-    captureLog.set(hh, [...recent, deps.now()]);
+    await enforce(
+      deps.limiter,
+      `cap:${hh}`,
+      3_600_000,
+      UPLOADS_PER_HOUR,
+      "Too many pages saved. Please try again later.",
+    );
 
     // Masked again here: a client is never trusted to have done it.
     const title = maskNumbers(body.title.replace(/\s+/g, " ").trim());

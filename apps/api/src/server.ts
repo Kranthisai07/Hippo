@@ -139,6 +139,8 @@ export async function startServer(opts: ServerOptions = {}): Promise<Running> {
     repo,
     indexSource,
     now: clock,
+    // Set only behind a proxy that writes this header itself (cf-connecting-ip on Cloudflare).
+    ...(env.HIPPO_CLIENT_IP_HEADER ? { clientIpHeader: env.HIPPO_CLIENT_IP_HEADER } : {}),
     // The server's own origin too: when it serves the web build itself, the /ask page calls /mcp from this origin.
     allowedOrigins: [
       new URL(issuer).origin,

@@ -12,6 +12,7 @@ import { maskNumbers } from "../mcp/speak";
 import type { IndexCache } from "../mcp/indexCache";
 import { agreementView, allReviewed, docView, isKnownField, valueSchemaOf } from "./agreements";
 import { readPages, updateIndex, type IndexStore, type OnUploaded } from "./fixtureIngest";
+import { enforce, type RateLimiter } from "./limiter";
 import { ApiError, errorBody, notFound, readBytes, readJson } from "./http";
 import { maskAlert, maskAsset, maskEvent, maskObligation } from "./mask";
 import {
@@ -37,6 +38,7 @@ export interface WebApiDeps {
   newId: () => string;
   /** Browser origins that may send writes with the cookie. The request's own origin is always allowed. */
   origins: string[];
+  limiter: RateLimiter;
 }
 
 /** Every list a route returns is cut at this many rows. */
@@ -76,7 +78,6 @@ export function createWebApi(deps: WebApiDeps): Hono<{ Variables: { hh: string; 
   const extra = new Set(deps.origins);
   const nowIso = () => new Date(deps.now()).toISOString();
   const today = () => nowIso().slice(0, 10);
-  const uploadLog = new Map<string, number[]>();
   const receiving = new Set<string>();
 
   api.onError((err, c) => {
@@ -127,12 +128,7 @@ export function createWebApi(deps: WebApiDeps): Hono<{ Variables: { hh: string; 
     if (body.size < 1) throw new ApiError(400, "That file is empty.");
     if (body.size > MAX_UPLOAD_BYTES) throw new ApiError(413, "That file is larger than 15 MB.");
 
-    const hourAgo = deps.now() - 3_600_000;
-    const recent = (uploadLog.get(hh) ?? []).filter((t) => t > hourAgo);
-    if (recent.length >= UPLOADS_PER_HOUR) {
-      throw new ApiError(429, "Too many uploads. Please try again later.", { "Retry-After": "600" });
-    }
-    uploadLog.set(hh, [...recent, deps.now()]);
+    await enforce(deps.limiter, `up:${hh}`, 3_600_000, UPLOADS_PER_HOUR, "Too many uploads. Please try again later.");
 
     const docId = `doc-${deps.newId()}`;
     // The person's file name is a label only. The key is built from ids and the type, so no name can shape a path.
