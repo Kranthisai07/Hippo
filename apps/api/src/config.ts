@@ -1,3 +1,6 @@
+/** The id Chrome gives apps/extension, fixed by the public key in its manifest. Local servers trust it by default. */
+export const DEV_EXTENSION_ID = "gcanedelajoahpaoeeonbdlieoepcobc";
+
 /** What a production server must not run with. Returns every problem, so one start attempt shows them all. */
 export function productionProblems(
   env: Record<string, string | undefined>,

@@ -1,0 +1,229 @@
+import { readFileSync } from "node:fs";
+import { describe, expect, it } from "vitest";
+import {
+  authzParams,
+  codeGrant,
+  openAuthorize,
+  pkce,
+  postAuthorize,
+  tokenReq,
+  REDIRECT,
+  RESOURCE,
+  type Env as AuthTestEnv,
+} from "../../../packages/auth/test/helpers";
+import { createSqliteD1 } from "../../../packages/core/test/d1.sqlite";
+import worker, { buildApp, householdOf, type Env } from "../src/index";
+import { fakeBucket } from "./fakes";
+
+// The whole Workers app, in process: the entry wired to the D1 stores (on node:sqlite), an R2 fake and a fake email
+// binding. It runs the extension's real path: sign in by emailed code with PKCE, save a page, list it, and check that a
+// second person sees nothing. It does not prove Cloudflare's runtime: that is the wrangler dev run and staging.
+
+const ISSUER = "https://api.hippo.test";
+const T0 = Date.UTC(2026, 9, 31, 12, 0, 0);
+
+const page = (name: string): string => {
+  const html = readFileSync(new URL(`../../../fixtures/pages/${name}.html`, import.meta.url), "utf8");
+  return /<body>([\s\S]*)<\/body>/
+    .exec(html)![1]!
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/<[^>]+>/g, "\n")
+    .replaceAll("&gt;", ">");
+};
+
+function setup(over: Partial<Env> = {}) {
+  const db = createSqliteD1();
+  const { bucket, objects } = fakeBucket();
+  const mails: { to: string; text: string }[] = [];
+  const logs: string[] = [];
+  const env: Env = {
+    DB: db,
+    BUCKET: bucket,
+    EMAIL: {
+      async send(m) {
+        mails.push({ to: m.to, text: m.text });
+        return { messageId: "m" };
+      },
+    },
+    HIPPO_ISSUER: ISSUER,
+    HIPPO_CLIENT_ID: "alexa",
+    HIPPO_REDIRECT_URIS: REDIRECT,
+    HIPPO_SIGNING_KEY: "test-signing-key-test-signing-key-0123456789",
+    HIPPO_EXTENSION_ID: "abcdefghijklmnopabcdefghijklmnop",
+    HIPPO_MAIL_FROM: "Hippo <login@hippo.test>",
+    ...over,
+  };
+  const app = buildApp(env, { now: () => T0, log: (l) => logs.push(l) });
+  const req = (path: string, init?: RequestInit) => Promise.resolve(app.request(ISSUER + path, init));
+  // What the auth package's own test helpers need: a way to send a request.
+  const authEnv = { req, logs, clock: { t: T0 }, auth: undefined as never } as AuthTestEnv;
+  const codeFor = (email: string): string =>
+    /\b(\d{6})\b/.exec([...mails].reverse().find((m) => m.to === email)!.text)![1]!;
+
+  /** Sign in by the extension's route: authorize page, emailed code, PKCE token exchange. */
+  async function signIn(email: string): Promise<string> {
+    const { verifier, challenge } = await pkce();
+    const p = authzParams(challenge);
+    const form = await openAuthorize(authEnv, p);
+    const sent = await postAuthorize(authEnv, form, p, { action: "send", email });
+    expect(sent.status).toBe(200);
+    const done = await postAuthorize(authEnv, form, p, { action: "login", email, code: codeFor(email) });
+    const code = new URL(done.headers.get("location")!).searchParams.get("code")!;
+    const tokens = (await (await tokenReq(authEnv, codeGrant(code, verifier))).json()) as { access_token: string };
+    expect(tokens.access_token).toBeTruthy();
+    return tokens.access_token;
+  }
+  const authed = (token: string, path: string, body?: unknown) =>
+    req(path, {
+      method: body === undefined ? "GET" : "POST",
+      headers: {
+        authorization: `Bearer ${token}`,
+        ...(body === undefined ? {} : { "content-type": "application/json" }),
+      },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    });
+  return { app, req, env, db, objects, mails, logs, signIn, authed, codeFor };
+}
+
+describe("the Workers app", () => {
+  it("answers health, the OAuth metadata and a bare 401 with the security headers and a request id", async () => {
+    const t = setup();
+    expect((await t.req("/healthz")).status).toBe(200);
+    const meta = (await (await t.req("/.well-known/oauth-authorization-server")).json()) as Record<string, string>;
+    expect(meta.issuer).toBe(ISSUER);
+    expect(meta.revocation_endpoint).toBe(`${ISSUER}/oauth/revoke`);
+    const denied = await t.req("/ext/subscriptions");
+    expect(denied.status).toBe(401);
+    expect(denied.headers.get("x-request-id")).toMatch(/^[0-9a-f-]{36}$/);
+    expect(denied.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(denied.headers.get("strict-transport-security")).toContain("max-age=");
+  });
+
+  it("signs in by emailed code, saves a page, lists it, and a second person sees nothing", async () => {
+    const t = setup();
+    const alice = await t.signIn("alice@example.com");
+    expect(t.mails.at(-1)).toMatchObject({ to: "alice@example.com" });
+    expect(t.mails.at(-1)!.text).toMatch(/\d{6}/);
+
+    const saved = await t.authed(alice, "/ext/captures", {
+      title: "Billing | Fernwood Plus",
+      host: "account.fernwood-plus.example",
+      text: page("fernwood_billing"),
+    });
+    expect(saved.status).toBe(201);
+    const list = (await (await t.authed(alice, "/ext/subscriptions")).json()) as {
+      subscriptions: { vendor: string; confirmed: boolean }[];
+    };
+    expect(list.subscriptions).toHaveLength(1);
+    expect(list.subscriptions[0]!.confirmed).toBe(false);
+
+    const bob = await t.signIn("bob@example.com");
+    const theirs = (await (await t.authed(bob, "/ext/subscriptions")).json()) as { subscriptions: unknown[] };
+    expect(theirs.subscriptions).toEqual([]);
+    // The page text is in R2 under alice's household only.
+    const hh = await householdOf("alice@example.com");
+    expect([...t.objects.keys()].filter((k) => k.includes(hh)).length).toBeGreaterThan(0);
+    const bobHh = await householdOf("bob@example.com");
+    expect([...t.objects.keys()].filter((k) => k.includes(bobHh))).toEqual([]);
+  });
+
+  it("keeps the sign in code out of the log, and the page text too", async () => {
+    const t = setup();
+    const token = await t.signIn("carol@example.com");
+    const code = t.codeFor("carol@example.com");
+    await t.authed(token, "/ext/captures", { title: "Billing", host: "x.example", text: page("fernwood_billing") });
+    const all = t.logs.join("\n");
+    expect(all).not.toContain(code);
+    expect(all).not.toContain("carol@example.com");
+    expect(all).not.toContain(token);
+    expect(all).not.toContain("Fernwood");
+  });
+
+  it("refuses uploads with a plain 503 until an ingest is connected", async () => {
+    const t = setup();
+    const code = await (async () => {
+      await t.req("/oauth/magic-code", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: "dave@example.com" }),
+      });
+      return t.codeFor("dave@example.com");
+    })();
+    const session = await t.req("/oauth/session", {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: ISSUER },
+      body: JSON.stringify({ email: "dave@example.com", code }),
+    });
+    expect(session.status).toBe(200);
+    const cookie = /hippo_session=[^;]+/.exec(session.headers.get("set-cookie")!)![0];
+    const r = await t.req("/api/uploads", {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: ISSUER, cookie },
+      body: JSON.stringify({ filename: "a.pdf", contentType: "application/pdf", size: 5 }),
+    });
+    expect(r.status).toBe(503);
+  });
+
+  it("serves the MCP endpoint to a signed in client", async () => {
+    const t = setup();
+    const token = await t.signIn("erin@example.com");
+    const r = await t.req("/mcp", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+        accept: "application/json, text/event-stream",
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "t", version: "1" } },
+      }),
+    });
+    expect(r.status).toBe(200);
+    expect(RESOURCE).toBe(`${ISSUER}/mcp`);
+  });
+});
+
+describe("production settings", () => {
+  const GOOD: Partial<Env> = {
+    HIPPO_ENV: "production",
+    HIPPO_DEMO: "0",
+    HIPPO_SIGNING_KEY: "k".repeat(40),
+    HIPPO_ISSUER: ISSUER,
+    HIPPO_ALLOWED_ORIGINS: "https://app.hippo.test",
+    HIPPO_CLIENT_IP_HEADER: "cf-connecting-ip",
+  };
+
+  it("starts with every setting present", () => {
+    expect(() => setup(GOOD)).not.toThrow();
+  });
+  it("refuses to start without the settings, and names them without ever printing a value", () => {
+    const secret = "SECRET-VALUE-XYZ";
+    const bad = { ...GOOD, HIPPO_SIGNING_KEY: secret, HIPPO_DEMO: "1", HIPPO_EXTENSION_ID: undefined };
+    let message = "";
+    try {
+      setup(bad);
+    } catch (e) {
+      message = (e as Error).message;
+    }
+    expect(message).toContain("HIPPO_SIGNING_KEY");
+    expect(message).toContain("HIPPO_DEMO");
+    expect(message).toContain("HIPPO_EXTENSION_ID");
+    expect(message).not.toContain(secret);
+  });
+  it("has no demo login and, in production, no console mailer", () => {
+    expect(() => setup({ ...GOOD, EMAIL: undefined })).toThrow(/mailer/i);
+  });
+  it("the Worker answers a bare 500 when it cannot start, and says nothing a caller could use", async () => {
+    const { env } = setup();
+    const res = await worker.fetch(new Request(`${ISSUER}/healthz`), {
+      ...env,
+      HIPPO_ENV: "production",
+      HIPPO_DEMO: "1",
+    });
+    expect(res.status).toBe(500);
+    expect(await res.text()).toBe("Service unavailable");
+  });
+});

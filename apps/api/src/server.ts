@@ -6,7 +6,7 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import { createMemoryRepository } from "core/src/repository";
 import { createApp } from "./app";
 import { createFixtureIngest } from "./api/demoIngest";
-import { productionProblems } from "./config";
+import { DEV_EXTENSION_ID, productionProblems } from "./config";
 import { createLocalUploader, createMemoryObjectStore } from "./api/storage";
 import { createMemoryIndexSource } from "./mcp/indexCache";
 import { DEMO_HOUSEHOLD, seedHousehold } from "./seed";
@@ -26,8 +26,7 @@ export const isLocalOnly = (host: string, issuer: string, env: Record<string, st
 
 /** The date every deadline in the fixtures is computed against (fixtures/README.md). */
 export const DEMO_TODAY = "2026-10-21";
-/** The id Chrome gives apps/extension, fixed by the public key in its manifest. Local servers trust it by default. */
-export const DEV_EXTENSION_ID = "gcanedelajoahpaoeeonbdlieoepcobc";
+export { DEV_EXTENSION_ID };
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
 
 /**

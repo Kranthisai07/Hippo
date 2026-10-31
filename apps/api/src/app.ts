@@ -93,8 +93,9 @@ export function createApp(deps: AppDeps): Hono {
   app.use("*", async (c, next) => {
     const id = crypto.randomUUID();
     const t0 = Date.now();
-    c.header("X-Request-Id", id);
     await next();
+    // After the handler, because a handler that returns its own Response (a bare 401) would drop a header set before it.
+    c.res.headers.set("X-Request-Id", id);
     deps.log?.(
       JSON.stringify({
         ts: new Date(t0).toISOString(),

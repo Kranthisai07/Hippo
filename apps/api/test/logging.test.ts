@@ -30,4 +30,12 @@ describe("the access log", () => {
     await w.app.request(`${BASE}/ext/subscriptions`);
     expect(w.requestLog.some((l) => l.includes('"status":401'))).toBe(true);
   });
+  it("sends the request id on a response a handler built itself, like a bare 401", async () => {
+    const w = await makeWeb();
+    const r = await w.app.request(`${BASE}/ext/subscriptions`);
+    expect(r.status).toBe(401);
+    const id = r.headers.get("x-request-id");
+    expect(id).toMatch(/^[0-9a-f-]{36}$/);
+    expect(w.requestLog.some((l) => l.includes(id!))).toBe(true);
+  });
 });

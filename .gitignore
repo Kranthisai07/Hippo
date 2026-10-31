@@ -8,3 +8,8 @@ docs/SUBMISSION.md
 
 # A key for apps/extension must never be committed (the manifest holds only the public key).
 *.pem
+
+# Local secrets and wrangler state
+.dev.vars*
+.env*
+.wrangler/
