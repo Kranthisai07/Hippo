@@ -1,5 +1,8 @@
 /** What a production server must not run with. Returns every problem, so one start attempt shows them all. */
-export function productionProblems(env: Record<string, string | undefined>, opts: { durable: boolean }): string[] {
+export function productionProblems(
+  env: Record<string, string | undefined>,
+  opts: { durable: boolean; mailer: boolean },
+): string[] {
   const out: string[] = [];
   const key = env.HIPPO_SIGNING_KEY ?? "";
   if (key.length < 32)
@@ -15,6 +18,7 @@ export function productionProblems(env: Record<string, string | undefined>, opts
     out.push("HIPPO_ALLOWED_ORIGINS must hold no localhost and no wildcard.");
   if (env.HIPPO_LIVE_AI === "1" && !env.HIPPO_SERVICE_CLIENT_SECRET)
     out.push("HIPPO_SERVICE_CLIENT_SECRET is required with HIPPO_LIVE_AI.");
+  if (!opts.mailer) out.push("No mailer is set, so nobody can sign in by email. A demo login must not be the way in.");
   if (!opts.durable) out.push("The repository and auth store are in memory. Production needs durable ones.");
   return out;
 }

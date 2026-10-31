@@ -1,6 +1,7 @@
 import { Hono, type Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
+import type { Mailer } from "./mailer";
 import { defaultRandom, safeEqual, sha256b64url, sixDigits, token, type RandomBytes } from "./crypto";
 import { errorPage, loginPage } from "./pages";
 import { createMemoryStore, type AuthStore } from "./store";
@@ -35,6 +36,8 @@ export interface AuthOptions {
    * exists). Defaults to true. Turn it off anywhere the log is shared: the code is a login credential.
    */
   logMagicCodes?: boolean;
+  /** Emails the code. When set it replaces the log line. A failure is logged by error name only and never shown. */
+  mailer?: Mailer;
   /** Service credentials for the client_credentials grant (scope mcp:service only). */
   serviceClient?: { clientId: string; clientSecret: string };
   /** Origins allowed to call the cookie session endpoints. Defaults to the issuer origin. */
@@ -205,8 +208,13 @@ export function createAuth(opts: AuthOptions): Auth {
       expiresAt: now() + TTL.magicMs,
       attempts: 0,
     });
-    // DELIBERATE: the only place a secret is logged. The demo has no mail provider, so the magic code goes to the server log.
-    if (opts.logMagicCodes !== false) opts.log(`[hippo-auth] magic code for ${email}: ${code}`);
+    if (opts.mailer) {
+      // The answer must not depend on the provider, or an outage would show which addresses were tried.
+      await opts.mailer
+        .send(email, code)
+        .catch((e: unknown) => opts.log(`[hippo-auth] mail failed: ${e instanceof Error ? e.name : "error"}`));
+      // DELIBERATE: the only place a secret is logged. The demo has no mail provider, so the magic code goes to the server log.
+    } else if (opts.logMagicCodes !== false) opts.log(`[hippo-auth] magic code for ${email}: ${code}`);
     return null;
   };
 

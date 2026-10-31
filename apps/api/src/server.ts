@@ -67,7 +67,7 @@ export async function startServer(opts: ServerOptions = {}): Promise<Running> {
   const env = opts.env ?? process.env;
   // This entry keeps everything in memory, so production is refused here until a durable host entry replaces it.
   if (env.HIPPO_ENV === "production") {
-    const problems = productionProblems(env, { durable: false }).map((x) => `- ${x}`);
+    const problems = productionProblems(env, { durable: false, mailer: false }).map((x) => `- ${x}`);
     throw new Error(["Refusing to start in production:", ...problems].join("\n"));
   }
   const log = opts.log ?? ((line: string) => console.log(line));

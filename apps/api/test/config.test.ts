@@ -16,7 +16,7 @@ const GOOD = {
 
 describe("production config", () => {
   it("accepts a complete config on a durable host", () => {
-    expect(productionProblems(GOOD, { durable: true })).toEqual([]);
+    expect(productionProblems(GOOD, { durable: true, mailer: true })).toEqual([]);
   });
   it.each([
     ["a short signing key", { HIPPO_SIGNING_KEY: "short" }],
@@ -29,10 +29,13 @@ describe("production config", () => {
     ["localhost in the origins", { HIPPO_ALLOWED_ORIGINS: "https://app.hippo.example,http://localhost:5173" }],
     ["a wildcard origin", { HIPPO_ALLOWED_ORIGINS: "*" }],
   ])("refuses %s", (_name, change) => {
-    expect(productionProblems({ ...GOOD, ...change }, { durable: true })).toHaveLength(1);
+    expect(productionProblems({ ...GOOD, ...change }, { durable: true, mailer: true })).toHaveLength(1);
+  });
+  it("refuses no mailer", () => {
+    expect(productionProblems(GOOD, { durable: true, mailer: false })).toHaveLength(1);
   });
   it("refuses memory storage", () => {
-    expect(productionProblems(GOOD, { durable: false })).toHaveLength(1);
+    expect(productionProblems(GOOD, { durable: false, mailer: true })).toHaveLength(1);
   });
   it("the in-memory server will not start in production", async () => {
     await expect(startServer({ env: GOOD, log: () => undefined })).rejects.toThrow(/in memory/);

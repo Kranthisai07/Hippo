@@ -3,6 +3,7 @@ import { createAuth, type Auth, type AuthOptions } from "./auth";
 
 export { createAuth, unauthorized, SCOPE_SERVICE, USER_SCOPES, TTL } from "./auth";
 export type { Auth, AuthOptions, ClientConfig } from "./auth";
+export type { Mailer } from "./mailer";
 export { createMemoryStore } from "./store";
 export type { AuthStore, CodeRecord, RefreshRecord, SessionRecord, MagicRecord } from "./store";
 
