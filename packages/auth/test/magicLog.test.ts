@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { MAIL_TIMEOUT_MS, type AuditEvent } from "../src";
 import { makeEnv } from "./helpers";
 
 // Round 2 review: the magic code is a login credential and was written to the log in every environment.
@@ -104,5 +105,40 @@ describe("a mailer", () => {
     };
     expect(await msg("real@example.com")).toBe("If that address can sign in, a code was sent. Enter it below.");
     expect(await msg("not an email")).toBe("If that address can sign in, a code was sent. Enter it below.");
+  });
+});
+
+describe("a mailer that does not answer", () => {
+  it("is cut off after the timeout, the answer is unchanged, and the audit says mail failed", async () => {
+    vi.useFakeTimers();
+    try {
+      const events: AuditEvent[] = [];
+      const env = makeEnv({ mailer: { send: () => new Promise(() => undefined) }, audit: (e) => events.push(e) });
+      // The request reaches the mailer after a few awaits, so time moves on until it answers.
+      let res: Response | undefined;
+      const pending = send(env).then((r) => (res = r));
+      for (let i = 0; i < 20 && !res; i++) await vi.advanceTimersByTimeAsync(MAIL_TIMEOUT_MS);
+      await pending;
+      if (!res) throw new Error("no answer");
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ ok: true });
+      expect(events.map((e) => e.event)).toEqual(["mail_failed"]);
+      expect(env.logs.join("\n")).not.toMatch(/alice@|\d{6}/);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it("a failure is audited as mail failed, not as sent", async () => {
+    const events: AuditEvent[] = [];
+    const env = makeEnv({
+      mailer: {
+        send: async () => {
+          throw new Error("down");
+        },
+      },
+      audit: (e) => events.push(e),
+    });
+    await send(env);
+    expect(events.map((e) => e.event)).toEqual(["mail_failed"]);
   });
 });

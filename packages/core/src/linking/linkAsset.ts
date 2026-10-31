@@ -49,11 +49,16 @@ const MIN_MODEL = 3;
  */
 const key = (s: unknown): string => {
   const text = typeof s === "string" ? s : typeof s === "number" ? String(s) : "";
-  return text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+  return text
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]/gu, "");
 };
 
 const last4 = (s: unknown): string => key(s).slice(-4);
-const clean = (s: unknown): string | undefined => (typeof s === "string" ? s.trim() || undefined : typeof s === "number" ? String(s) : undefined);
+const clean = (s: unknown): string | undefined =>
+  typeof s === "string" ? s.trim() || undefined : typeof s === "number" ? String(s) : undefined;
 
 /** A model written with the brand in front ("Acme DW500" for brand Acme) is the model DW500. */
 const modelKey = (model: unknown, brand: unknown): string => {
@@ -63,13 +68,19 @@ const modelKey = (model: unknown, brand: unknown): string => {
 };
 
 const byName = (a: AssetRecord, b: AssetRecord): number => a.name.localeCompare(b.name) || a.id.localeCompare(b.id);
-const ask = (found: AssetRecord[]): Link => ({ status: "ambiguous", candidates: [...found].sort(byName).slice(0, MAX_OPTIONS) });
+const ask = (found: AssetRecord[]): Link => ({
+  status: "ambiguous",
+  candidates: [...found].sort(byName).slice(0, MAX_OPTIONS),
+});
 
 function draftFor(hint: AssetHint): Link {
   const brand = clean(hint.brand);
   const written = clean(hint.model);
   const modelNumber =
-    brand && written && written.toLowerCase().startsWith(brand.toLowerCase()) && modelKey(written, brand) !== key(written)
+    brand &&
+    written &&
+    written.toLowerCase().startsWith(brand.toLowerCase()) &&
+    modelKey(written, brand) !== key(written)
       ? written.slice(brand.length).trim()
       : written;
   const serial = last4(hint.serial);
@@ -121,7 +132,10 @@ export function linkVehicleHint(hint: VehicleHint, assets: AssetRecord[]): Link 
   const model = key(hint.model);
   if (!make || !model) return { status: "none" };
   // Anything that is not a plausible model year (NaN, 20200, 0) is no year at all, so it can only lead to a question.
-  const year = typeof hint.year === "number" && Number.isInteger(hint.year) && hint.year >= 1886 && hint.year <= 2100 ? hint.year : null;
+  const year =
+    typeof hint.year === "number" && Number.isInteger(hint.year) && hint.year >= 1886 && hint.year <= 2100
+      ? hint.year
+      : null;
 
   const cars = assets.filter(
     (a) =>
@@ -140,6 +154,10 @@ export function linkVehicleHint(hint: VehicleHint, assets: AssetRecord[]): Link 
   if (year !== null) vehicle.modelYear = year;
   return {
     status: "propose",
-    draft: { name: [year, make0, model0].filter((p) => p !== null && p !== "").join(" "), category: "vehicle", vehicle },
+    draft: {
+      name: [year, make0, model0].filter((p) => p !== null && p !== "").join(" "),
+      category: "vehicle",
+      vehicle,
+    },
   };
 }

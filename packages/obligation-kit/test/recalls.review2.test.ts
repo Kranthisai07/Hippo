@@ -17,16 +17,25 @@ const load = (p: string) => JSON.parse(readFileSync(`${FIX}${p}`, "utf8"));
 const boonRaw = load("cpsc/recall_26530_boon_nursh_bottles.json")[0];
 const crv = load("nhtsa/recallsByVehicle_HONDA_CR-V_2021.json");
 
-const rawRecall = (o: Record<string, unknown>) => normalizeCpscRecall({ RecallNumber: "77", RecallDate: "2026-01-02", ...o });
+const rawRecall = (o: Record<string, unknown>) =>
+  normalizeCpscRecall({ RecallNumber: "77", RecallDate: "2026-01-02", ...o });
 const A = (o: Partial<RecallAsset>): RecallAsset => ({ id: "a", name: "zzz", ...o });
 
 describe("high via model needs brand and model on the SAME product", () => {
-  const two = { Products: [{ Name: "Acme chair", Model: "M100" }, { Name: "Boon bottle", Model: "B5" }] };
+  const two = {
+    Products: [
+      { Name: "Acme chair", Model: "M100" },
+      { Name: "Boon bottle", Model: "B5" },
+    ],
+  };
   it("model belongs to another product than the brand", () => {
     expect(matchCpscRecall(A({ brand: "Boon", modelNumber: "M100" }), rawRecall(two))?.confidence).not.toBe("high");
   });
   it("same product is high", () => {
-    expect(matchCpscRecall(A({ brand: "Acme", modelNumber: "m100" }), rawRecall(two))).toEqual({ confidence: "high", evidence: "model_brand" });
+    expect(matchCpscRecall(A({ brand: "Acme", modelNumber: "m100" }), rawRecall(two))).toEqual({
+      confidence: "high",
+      evidence: "model_brand",
+    });
     expect(matchCpscRecall(A({ brand: "Boon", modelNumber: "b5x" }), rawRecall(two))).toBeNull();
   });
   it("Description naming the brand is not high", () => {
@@ -51,7 +60,10 @@ describe("high via model needs brand and model on the SAME product", () => {
 
 describe("model fold", () => {
   const hi = (model: string, asset: string) =>
-    matchCpscRecall(A({ brand: "Acme", modelNumber: asset }), rawRecall({ Products: [{ Name: "Acme thing", Model: model }] }))?.confidence;
+    matchCpscRecall(
+      A({ brand: "Acme", modelNumber: asset }),
+      rawRecall({ Products: [{ Name: "Acme thing", Model: model }] }),
+    )?.confidence;
   it("1-23 and 12-3 do not collide", () => {
     expect(hi("12-3", "1-23")).toBeUndefined();
     expect(hi("1-2-34", "12-34")).toBeUndefined();
@@ -115,7 +127,20 @@ describe("CPSC ceiling", () => {
 const nraw = () => ({
   Count: 1,
   Message: "ok",
-  results: [{ NHTSACampaignNumber: "26V1", ReportReceivedDate: "21/05/2026", Component: "X", Summary: "s", Consequence: "c", Remedy: "r", Manufacturer: "m", Make: "HONDA", Model: "CR-V", ModelYear: "2021" }],
+  results: [
+    {
+      NHTSACampaignNumber: "26V1",
+      ReportReceivedDate: "21/05/2026",
+      Component: "X",
+      Summary: "s",
+      Consequence: "c",
+      Remedy: "r",
+      Manufacturer: "m",
+      Make: "HONDA",
+      Model: "CR-V",
+      ModelYear: "2021",
+    },
+  ],
 });
 
 describe("NHTSA body integrity", () => {
@@ -128,9 +153,12 @@ describe("NHTSA body integrity", () => {
     expect(() => parseNhtsaResponse({ results: [] })).toThrow(NhtsaApiError);
     expect(() => parseNhtsaResponse({ ...nraw(), Count: "1" })).toThrow(NhtsaApiError);
   });
-  it.each([{ Count: 0 }, { Count: 0, results: null }, { Count: 0, results: {} }])("throws when results is missing or not a list %j", (b) => {
-    expect(() => parseNhtsaResponse(b)).toThrow(NhtsaApiError);
-  });
+  it.each([{ Count: 0 }, { Count: 0, results: null }, { Count: 0, results: {} }])(
+    "throws when results is missing or not a list %j",
+    (b) => {
+      expect(() => parseNhtsaResponse(b)).toThrow(NhtsaApiError);
+    },
+  );
 });
 
 describe("NHTSA pacing under concurrency", () => {

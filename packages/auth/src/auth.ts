@@ -55,6 +55,7 @@ export interface AuditEvent {
   event:
     | "code_sent"
     | "code_throttled"
+    | "mail_failed"
     | "login_ok"
     | "login_failed"
     | "refresh_reuse"
@@ -65,6 +66,9 @@ export interface AuditEvent {
   sub?: string;
   reason?: string;
 }
+
+/** How long the mail provider gets before the answer goes out anyway. */
+export const MAIL_TIMEOUT_MS = 5_000;
 
 export const TTL = {
   codeMs: 60_000,
@@ -233,11 +237,26 @@ export function createAuth(opts: AuthOptions): Auth {
     });
     if (opts.mailer) {
       // The answer must not depend on the provider, or an outage would show which addresses were tried.
-      await opts.mailer
-        .send(email, code)
-        .catch((e: unknown) => opts.log(`[hippo-auth] mail failed: ${e instanceof Error ? e.name : "error"}`));
+      // A hung provider must not hold the request open, so the send gets MAIL_TIMEOUT_MS.
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const sent = await Promise.race([
+        opts.mailer.send(email, code).then(() => true),
+        new Promise<false>((resolve) => (timer = setTimeout(() => resolve(false), MAIL_TIMEOUT_MS))),
+      ])
+        .catch((e: unknown) => {
+          opts.log(`[hippo-auth] mail failed: ${e instanceof Error ? e.name : "error"}`);
+          return false;
+        })
+        .finally(() => clearTimeout(timer));
+      if (!sent) {
+        opts.log("[hippo-auth] mail not sent");
+        opts.audit?.({ event: "mail_failed", sub: await subOf(email) });
+        return null;
+      }
+    } else if (opts.logMagicCodes !== false) {
       // DELIBERATE: the only place a secret is logged. The demo has no mail provider, so the magic code goes to the server log.
-    } else if (opts.logMagicCodes !== false) opts.log(`[hippo-auth] magic code for ${email}: ${code}`);
+      opts.log(`[hippo-auth] magic code for ${email}: ${code}`);
+    }
     opts.audit?.({ event: "code_sent", sub: await subOf(email) });
     return null;
   };
@@ -646,10 +665,12 @@ export function createAuth(opts: AuthOptions): Auth {
       return c.json({ error: "invalid_request" }, 400, noStore);
     const sp = new URLSearchParams(await c.req.text());
     const rt = single(sp, "token");
-    const clientId = single(sp, "client_id");
-    if (typeof rt === "string" && rt.length <= 200 && typeof clientId === "string") {
+    // Whoever holds a refresh token may end it, whatever client_id they name: it is the credential. Checking the client
+    // here would burn the token on a mismatch (consumeRefresh is destructive) and make its owner's next refresh look
+    // like reuse.
+    if (typeof rt === "string" && rt.length <= 200) {
       const got = await store.consumeRefresh(await sha256b64url(rt));
-      if (got.status !== "unknown" && got.record.clientId === clientId) {
+      if (got.status !== "unknown") {
         await store.revokeFamily(got.record.familyId);
         opts.audit?.({ event: "revoke", sub: got.record.sub });
       }

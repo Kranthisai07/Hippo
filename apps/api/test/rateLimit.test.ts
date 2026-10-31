@@ -42,11 +42,32 @@ describe("per address limits in front of the sign-in and extension routes", () =
     expect(blocked.headers.get("retry-after")).not.toBeNull();
   });
 
-  it("ignores the proxy header unless the host names it, so a client cannot pick its own bucket", async () => {
+  const socket = (address: string) => ({ incoming: { socket: { remoteAddress: address } } });
+
+  it("without a named header it uses the socket address: two addresses get separate buckets, and the header changes nothing", async () => {
     const w = await makeWeb();
-    for (let i = 0; i < EXT_PER_MINUTE; i++)
-      await w.app.request(`${BASE}/ext/subscriptions`, from(`198.51.100.${i % 250}`));
-    expect((await w.app.request(`${BASE}/ext/subscriptions`, from("198.51.100.250"))).status).toBe(429);
+    const hit = (address: string, spoof: string) =>
+      w.app.request(`${BASE}/ext/subscriptions`, from(spoof), socket(address));
+    for (let i = 0; i < EXT_PER_MINUTE; i++) await hit("192.0.2.1", `198.51.100.${i % 250}`);
+    expect((await hit("192.0.2.1", "198.51.100.250")).status).toBe(429);
+    expect((await hit("192.0.2.2", "198.51.100.250")).status).toBe(401);
+  });
+
+  it("a 429 on /ext lets the listed origin read it and Retry-After", async () => {
+    const EXT = "chrome-extension://abcdefghijklmnopabcdefghijklmnop";
+    const w = await makeWeb({ app: { allowedOrigins: [EXT] } });
+    const hit = (origin: string) =>
+      w.app.request(`${BASE}/ext/subscriptions`, { headers: { origin } }, socket("192.0.2.9"));
+    for (let i = 0; i < EXT_PER_MINUTE; i++) await hit(EXT);
+    const listed = await hit(EXT);
+    expect(listed.status).toBe(429);
+    expect(listed.headers.get("access-control-allow-origin")).toBe(EXT);
+    expect(listed.headers.get("retry-after")).not.toBeNull();
+    expect(listed.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(listed.headers.get("x-request-id")).not.toBeNull();
+    const other = await hit("https://evil.example");
+    expect(other.status).toBe(429);
+    expect(other.headers.get("access-control-allow-origin")).toBeNull();
   });
 });
 

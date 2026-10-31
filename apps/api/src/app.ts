@@ -128,9 +128,13 @@ export function createApp(deps: AppDeps): Hono {
   app.use("/ext/*", async (c, next) => {
     const r = await limiter(`ip:ext:${clientAddress(c, deps.clientIpHeader)}`, 60_000, EXT_PER_MINUTE);
     if (r.ok) return next();
+    // This runs before the /ext CORS middleware, so a listed origin gets its header here too and can read Retry-After.
+    const origin = c.req.header("origin");
     return c.json(errorBody(429, "Too many requests. Please slow down."), 429, {
       "Cache-Control": "no-store",
       "Retry-After": String(r.retryAfterSec),
+      Vary: "Origin",
+      ...(origin !== undefined && allowed.has(origin) ? { "Access-Control-Allow-Origin": origin } : {}),
     });
   });
 

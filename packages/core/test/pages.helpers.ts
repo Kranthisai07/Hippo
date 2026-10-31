@@ -24,7 +24,8 @@ export function buildPdf(pageTexts: (string | null)[], opts: BuildOpts = {}): Ui
       objs[contentId] = "<< /Length 0 >>\nstream\n\nendstream";
     } else {
       const stream = `BT /F1 12 Tf ${opts.renderMode ?? 0} Tr 72 700 Td (${t.replace(/[()\\]/g, "\\$&")}) Tj ET`;
-      objs[pageId] = `<< ${opts.pageType ?? "/Type /Page"} /Parent 2 0 R /MediaBox [0 0 612 792] ${res} /Contents ${contentId} 0 R >>`;
+      objs[pageId] =
+        `<< ${opts.pageType ?? "/Type /Page"} /Parent 2 0 R /MediaBox [0 0 612 792] ${res} /Contents ${contentId} 0 R >>`;
       objs[contentId] = `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`;
     }
   });
@@ -95,7 +96,13 @@ export function buildRawPdf(objs: Record<number, string | Buffer>, trailerExtra 
     len += b.length;
   }
   let x = `xref\n0 ${max + 1}\n0000000000 65535 f \n`;
-  for (let i = 1; i <= max; i++) x += offsets[i] === undefined ? "0000000000 65535 f \n" : `${String(offsets[i]).padStart(10, "0")} 00000 n \n`;
-  parts.push(Buffer.from(`${x}trailer\n<< /Size ${max + 1} /Root 1 0 R ${trailerExtra} >>\nstartxref\n${len}\n%%EOF\n`, "latin1"));
+  for (let i = 1; i <= max; i++)
+    x += offsets[i] === undefined ? "0000000000 65535 f \n" : `${String(offsets[i]).padStart(10, "0")} 00000 n \n`;
+  parts.push(
+    Buffer.from(
+      `${x}trailer\n<< /Size ${max + 1} /Root 1 0 R ${trailerExtra} >>\nstartxref\n${len}\n%%EOF\n`,
+      "latin1",
+    ),
+  );
   return new Uint8Array(Buffer.concat(parts));
 }

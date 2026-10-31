@@ -21,13 +21,21 @@ describe("extractPages synthetic PDFs", () => {
     const r = await extractPages(buildPdf([`${LONG} alpha`, `${LONG} bravo`, `${LONG} charlie`]));
     expect(r.kind).toBe("pdf");
     expect(r.pages.map((p) => p.number)).toEqual([1, 2, 3]);
-    expect(r.pages.map((p) => ["alpha", "bravo", "charlie"].filter((w) => p.text.includes(w)))).toEqual([["alpha"], ["bravo"], ["charlie"]]);
+    expect(r.pages.map((p) => ["alpha", "bravo", "charlie"].filter((w) => p.text.includes(w)))).toEqual([
+      ["alpha"],
+      ["bravo"],
+      ["charlie"],
+    ]);
     expect(r.pages.every((p) => !p.needsOcr)).toBe(true);
   });
 
   it("flags a text-less page and keeps its number", async () => {
     const r = await extractPages(buildPdf([LONG, null, LONG]));
-    expect(r.pages.map((p) => [p.number, p.needsOcr])).toEqual([[1, false], [2, true], [3, false]]);
+    expect(r.pages.map((p) => [p.number, p.needsOcr])).toEqual([
+      [1, false],
+      [2, true],
+      [3, false],
+    ]);
     expect(r.pages[1]!.text).toBe("");
   });
 
@@ -53,7 +61,9 @@ describe("extractPages errors and images", () => {
     expect(await codeOf(extractPages(new TextEncoder().encode("hello, this is not a pdf at all")))).toBe("not_pdf");
   });
   it("rejects a PDF header with a corrupt body", async () => {
-    expect(await codeOf(extractPages(new TextEncoder().encode("%PDF-1.4\nthis is garbage, no objects here\n")))).toBe("corrupt");
+    expect(await codeOf(extractPages(new TextEncoder().encode("%PDF-1.4\nthis is garbage, no objects here\n")))).toBe(
+      "corrupt",
+    );
   });
   it("rejects a truncated PDF without partial text", async () => {
     const full = buildPdf([LONG, LONG]);
@@ -70,7 +80,10 @@ describe("extractPages errors and images", () => {
     const jpg = bytes(0xff, 0xd8, 0xff, 0xe0, 0, 0x10);
     const heic = bytes(0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70, 0x68, 0x65, 0x69, 0x63, 0, 0, 0, 0);
     for (const b of [png, jpg, heic]) {
-      expect(await extractPages(b)).toEqual({ kind: "image", pages: [{ number: 1, text: "", needsOcr: true, ocrDone: false }] });
+      expect(await extractPages(b)).toEqual({
+        kind: "image",
+        pages: [{ number: 1, text: "", needsOcr: true, ocrDone: false }],
+      });
     }
   });
   it("does not treat a non image ftyp brand as an image", async () => {
@@ -118,7 +131,8 @@ describe("fixtures", () => {
         else if (v && typeof v === "object") {
           const o = v as Record<string, unknown>;
           const ref = o.sourceRef as { page?: number; quote?: string } | undefined;
-          if (ref && typeof ref.page === "number" && typeof ref.quote === "string") quotes.push({ page: ref.page, quote: ref.quote });
+          if (ref && typeof ref.page === "number" && typeof ref.quote === "string")
+            quotes.push({ page: ref.page, quote: ref.quote });
           Object.values(o).forEach(walk);
         }
       };

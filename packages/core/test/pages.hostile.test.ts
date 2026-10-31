@@ -26,7 +26,10 @@ describe("lying page tree", () => {
     expect(await codeOf(extractPages(buildPdf([LONG, "second page quote"], { count: 1 })))).toBe("corrupt");
   });
   it("rejects 41 real pages with /Count 2 as too_many_pages", async () => {
-    const pdf = buildPdf(Array.from({ length: 41 }, () => LONG), { count: 2 });
+    const pdf = buildPdf(
+      Array.from({ length: 41 }, () => LONG),
+      { count: 2 },
+    );
     expect(await codeOf(extractPages(pdf))).toBe("too_many_pages");
   });
   it("never returns a wrong page list when /Count is too high", async () => {
@@ -72,7 +75,9 @@ describe("resource limits", () => {
     const p = extractPages(buildPdf(Array.from({ length: 40 }, () => LONG)), { timers: t.timers });
     // Fire the deadline when page 1 text is requested: loading is done, 39 pages are not.
     const probe = pdfjs.getDocument({ data: buildPdf([LONG]) });
-    const proto = Object.getPrototypeOf(await (await probe.promise).getPage(1)) as { getTextContent: (...a: unknown[]) => Promise<unknown> };
+    const proto = Object.getPrototypeOf(await (await probe.promise).getPage(1)) as {
+      getTextContent: (...a: unknown[]) => Promise<unknown>;
+    };
     await probe.destroy();
     const orig = proto.getTextContent;
     proto.getTextContent = function (this: unknown, ...a: unknown[]) {
@@ -88,7 +93,9 @@ describe("resource limits", () => {
   it("clears its timer on success and uses a 10 second default", async () => {
     const t = fakeTimers();
     let ms = 0;
-    await extractPages(buildPdf([LONG]), { timers: { ...t.timers, setTimeout: (fn, m) => ((ms = m), t.timers.setTimeout(fn)) } });
+    await extractPages(buildPdf([LONG]), {
+      timers: { ...t.timers, setTimeout: (fn, m) => ((ms = m), t.timers.setTimeout(fn)) },
+    });
     expect(ms).toBe(10_000);
     expect(t.wasCleared()).toBe(true);
   });
@@ -139,7 +146,8 @@ describe("file type detection", () => {
       avif: ftyp("avif"),
       mp4: ftyp("isom"),
     };
-    for (const [name, b] of Object.entries(cases)) expect([name, await codeOf(extractPages(b))]).toEqual([name, "unsupported"]);
+    for (const [name, b] of Object.entries(cases))
+      expect([name, await codeOf(extractPages(b))]).toEqual([name, "unsupported"]);
     expect(await codeOf(extractPages(enc("plain text, nothing special")))).toBe("not_pdf");
   });
 });
@@ -173,7 +181,10 @@ describe("fillOcrPages state", () => {
   const ocrOf = (f: (n: number) => unknown): Ocr => (async (p: { number: number }) => f(p.number)) as Ocr;
   it("marks filled pages ocrDone, keeps needsOcr, trims, and copies untouched pages", async () => {
     const r = await extractPages(buildPdf([LONG, null]));
-    const out = await fillOcrPages(r, ocrOf((n) => `  ocr ${n}\n`));
+    const out = await fillOcrPages(
+      r,
+      ocrOf((n) => `  ocr ${n}\n`),
+    );
     expect(out.pages[1]).toEqual({ number: 2, text: "ocr 2", needsOcr: true, ocrDone: true });
     expect(out.pages[0]).toEqual(r.pages[0]);
     expect(out.pages[0]!.ocrDone).toBe(false);
@@ -183,7 +194,14 @@ describe("fillOcrPages state", () => {
   it("fails closed on a non string OCR result", async () => {
     const r = await extractPages(buildPdf([null]));
     for (const bad of [undefined, null, 42, { text: "x" }]) {
-      expect(await codeOf(fillOcrPages(r, ocrOf(() => bad)))).toBe("bad_ocr");
+      expect(
+        await codeOf(
+          fillOcrPages(
+            r,
+            ocrOf(() => bad),
+          ),
+        ),
+      ).toBe("bad_ocr");
     }
   });
 });

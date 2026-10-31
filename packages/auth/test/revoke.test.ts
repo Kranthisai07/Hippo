@@ -24,12 +24,12 @@ describe("POST /oauth/revoke", () => {
     const env = makeEnv();
     expect((await revoke(env, { token: "nope", client_id: "alexa" })).status).toBe(200);
   });
-  it("does nothing when another client names the token", async () => {
+  it("ends the family whatever client_id is named, so a holder cannot burn it and leave it alive", async () => {
     const env = makeEnv();
     const { body } = await fullTokens(env);
-    expect((await revoke(env, { token: body.refresh_token!, client_id: "someone-else" })).status).toBe(200);
-    // consumeRefresh used the token up, but the family was not revoked: its descendants still exist. Reuse is refused.
-    expect((await tokenReq(env, refreshGrant(body.refresh_token!))).status).toBe(400);
+    const rotated = (await (await tokenReq(env, refreshGrant(body.refresh_token!))).json()) as Record<string, string>;
+    expect((await revoke(env, { token: rotated.refresh_token!, client_id: "someone-else" })).status).toBe(200);
+    expect((await tokenReq(env, refreshGrant(rotated.refresh_token!))).status).toBe(400);
   });
   it("is advertised in the metadata, and refuses a JSON body", async () => {
     const env = makeEnv();

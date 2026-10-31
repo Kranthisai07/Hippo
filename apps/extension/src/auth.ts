@@ -76,6 +76,7 @@ export async function signOut(): Promise<void> {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ token: tokens.refresh, client_id: CLIENT_ID }),
+      signal: AbortSignal.timeout(5000),
     }).catch(() => undefined);
   }
   await clear();

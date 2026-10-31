@@ -29,3 +29,11 @@ No decisions log exists on main (MEMORY.md is only in old worktrees), so this fi
 - **Quota:** 200 saved pages per household, counted from the document list (fine at this size, commented as a shortcut). New status 422 `limit_reached` so the popup's duplicate handling (409) is not triggered. A per day text counter was skipped: 30 pages an hour of at most 60,000 characters already bounds it.
 - **Masking:** seven or more single digits joined by single separators are masked. Spelled out digits are not, and PRIVACY.md now says so instead of claiming more.
 
+## 2026-10-31: fixes from the reviewer round on k/hardening (+claude)
+
+- **Revoke ignores `client_id`:** `consumeRefresh` is destructive, so checking the client after it burned the token on a mismatch and made its owner's next refresh look like reuse. Anyone holding a refresh token may end it: it is the credential. A non-consuming lookup was rejected because it adds another method every durable store must implement.
+- **Mail timeout:** the mailer gets 5 seconds, then the answer goes out unchanged and the audit says `mail_failed`, not `code_sent`.
+- **429 from the per address limit** now carries `Access-Control-Allow-Origin` for a listed origin, because it runs before the `/ext` CORS middleware.
+- **Tests that passed for the wrong reason** were rewritten: the socket address test injects two addresses, and the wrong client revoke test checks that a descendant token dies.
+- **Left as is:** the revoke versus rotation race needs a tombstone in a durable store (Phase 2); the quota is not atomic (bounded by 30 saves an hour); the production check only fires on `HIPPO_ENV=production`.
+

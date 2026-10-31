@@ -1,7 +1,7 @@
 import type { Hono } from "hono";
 import { createAuth, type Auth, type AuthOptions } from "./auth";
 
-export { createAuth, unauthorized, SCOPE_SERVICE, USER_SCOPES, TTL } from "./auth";
+export { createAuth, unauthorized, MAIL_TIMEOUT_MS, SCOPE_SERVICE, USER_SCOPES, TTL } from "./auth";
 export type { Auth, AuditEvent, AuthOptions, ClientConfig } from "./auth";
 export type { Mailer } from "./mailer";
 export { createMemoryStore } from "./store";

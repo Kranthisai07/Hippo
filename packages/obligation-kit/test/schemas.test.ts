@@ -50,7 +50,12 @@ describe("schemas are strict", () => {
   });
 
   it("rejects an empty quote and a page that is not a positive whole number", () => {
-    for (const bad of [{ page: 0, quote: "x" }, { page: 1.5, quote: "x" }, { page: -2, quote: "x" }, { page: 1, quote: "" }]) {
+    for (const bad of [
+      { page: 0, quote: "x" },
+      { page: 1.5, quote: "x" },
+      { page: -2, quote: "x" },
+      { page: 1, quote: "" },
+    ]) {
       expect(SourceRefSchema.safeParse(bad).success, JSON.stringify(bad)).toBe(false);
     }
   });
@@ -145,7 +150,11 @@ describe("billing cycle is an enum", () => {
     const today = "2026-10-21";
     for (const cycle of ["weekly", "biweekly", "monthly", "quarterly", "semiannual", "annual"]) {
       const obs = computeObligations(
-        { kind: "subscription", fields: { nextChargeDate: "2026-09-01", cycle }, fieldStatus: { nextChargeDate: "confirmed", cycle: "confirmed" } },
+        {
+          kind: "subscription",
+          fields: { nextChargeDate: "2026-09-01", cycle },
+          fieldStatus: { nextChargeDate: "confirmed", cycle: "confirmed" },
+        },
         today,
       );
       const charge = obs.find((o) => o.type === "charge");
@@ -223,7 +232,10 @@ describe("leavesToAgreementFields flattens leaves for the engine and the review 
   });
 
   it("drops null fields instead of carrying them", () => {
-    const flat = leavesToAgreementFields("warranty", ExtractionSchemas.warranty.parse({ provider: null, endDate: null }));
+    const flat = leavesToAgreementFields(
+      "warranty",
+      ExtractionSchemas.warranty.parse({ provider: null, endDate: null }),
+    );
     expect(flat.fields).toEqual({});
     expect(flat.sourceRefs).toEqual({});
   });
@@ -235,9 +247,15 @@ describe("leavesToAgreementFields flattens leaves for the engine and the review 
     };
     for (const exp of spec.obligations) {
       const doc = load(exp.from);
-      const flat = leavesToAgreementFields(doc.docType, ExtractionSchemas[doc.docType as AgreementKind].parse(doc.fields));
+      const flat = leavesToAgreementFields(
+        doc.docType,
+        ExtractionSchemas[doc.docType as AgreementKind].parse(doc.fields),
+      );
       const confirmed = Object.fromEntries(Object.keys(flat.fields).map((k) => [k, "confirmed" as const]));
-      const got = computeObligations({ kind: doc.docType, fields: flat.fields, fieldStatus: confirmed }, spec.anchorDate);
+      const got = computeObligations(
+        { kind: doc.docType, fields: flat.fields, fieldStatus: confirmed },
+        spec.anchorDate,
+      );
       const hit = got.find((o) => o.type === exp.type && o.dueDate === exp.dueDate);
       expect(hit, `${exp.from} ${exp.type}`).toBeDefined();
       expect(hit!.daysUntil).toBe(exp.daysFromAnchor);

@@ -62,7 +62,10 @@ describe("CPSC: a UPC written with spaces is one code, and lists still split", (
     expect(upcs).toEqual(["00012345678905", "00036000291452", "04006381333931"]);
   });
   it("splits a list separated only by spaces into codes that are each 12 to 14 digits", () => {
-    expect(rec({ ProductUPCs: [{ UPC: "012345678905 036000291452" }] }).upcs).toEqual(["00012345678905", "00036000291452"]);
+    expect(rec({ ProductUPCs: [{ UPC: "012345678905 036000291452" }] }).upcs).toEqual([
+      "00012345678905",
+      "00036000291452",
+    ]);
   });
   it("never invents a code out of short pieces", () => {
     expect(rec({ ProductUPCs: [{ UPC: "1 2 3" }] }).upcs).toEqual([]);

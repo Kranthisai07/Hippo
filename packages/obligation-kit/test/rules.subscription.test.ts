@@ -12,7 +12,8 @@ const expected = JSON.parse(readFileSync(new URL("expected.json", PAGES), "utf8"
 function visibleText(name: string): string {
   const html = readFileSync(new URL(`${name}.html`, PAGES), "utf8");
   const title = /<title>(.*?)<\/title>/.exec(html)![1]!;
-  const body = /<body>([\s\S]*)<\/body>/.exec(html)![1]!
+  const body = /<body>([\s\S]*)<\/body>/
+    .exec(html)![1]!
     .replace(/<!--[\s\S]*?-->/g, "")
     .replace(/<[^>]+>/g, "\n")
     .replaceAll("&gt;", ">");
@@ -22,7 +23,8 @@ function visibleText(name: string): string {
 const valuesOf = (f: ReturnType<typeof extractSubscriptionRules>) =>
   Object.fromEntries(Object.entries(f).map(([k, v]) => [k, v?.value ?? null]));
 
-const read = (text: string, host = "billing.acme-tools.example") => extractSubscriptionRules(`Acme Tools\n${text}`, { host });
+const read = (text: string, host = "billing.acme-tools.example") =>
+  extractSubscriptionRules(`Acme Tools\n${text}`, { host });
 
 describe("the synthetic billing pages", () => {
   for (const [name, want] of Object.entries(expected)) {

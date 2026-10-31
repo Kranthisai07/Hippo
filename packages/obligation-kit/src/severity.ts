@@ -1,12 +1,5 @@
 export type ObligationType =
-  | "expires"
-  | "renews"
-  | "notice_by"
-  | "charge"
-  | "cancel_by"
-  | "trial_end"
-  | "service_due"
-  | "claim_by";
+  "expires" | "renews" | "notice_by" | "charge" | "cancel_by" | "trial_end" | "service_due" | "claim_by";
 
 export type Severity = "high" | "possible";
 

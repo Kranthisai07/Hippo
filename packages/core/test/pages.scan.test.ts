@@ -28,8 +28,10 @@ const BASE: Record<number, string> = {
   3: "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
   4: "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>",
 };
-const withObjStm = (dictExtra: string, data: Buffer) => buildRawPdf({ ...BASE, 6: streamObj(`/Type /ObjStm /N 1 /First 4 ${dictExtra}`, data) });
-const pageObjs = (n: number) => Buffer.from("7 0 " + Array.from({ length: n }, () => "<< /Type /Page /Parent 2 0 R >>").join(" "), "latin1");
+const withObjStm = (dictExtra: string, data: Buffer) =>
+  buildRawPdf({ ...BASE, 6: streamObj(`/Type /ObjStm /N 1 /First 4 ${dictExtra}`, data) });
+const pageObjs = (n: number) =>
+  Buffer.from("7 0 " + Array.from({ length: n }, () => "<< /Type /Page /Parent 2 0 R >>").join(" "), "latin1");
 
 describe("pre-scan cost is linear", () => {
   for (const mb of [1.6, 3.2]) {
@@ -37,7 +39,7 @@ describe("pre-scan cost is linear", () => {
       const markers = Buffer.from("/Type /ObjStm ".repeat(Math.floor((mb * MB) / 14)), "latin1");
       const r = await timed(extractPages(buildBinaryPdf("", markers)));
       expect(r.out).toMatch(/^(ok:1|corrupt|unsupported)$/);
-      expect(r.ms).toBeLessThan(4000) /* the quadratic scan took 7 s and 23 s */;
+      expect(r.ms).toBeLessThan(4000); /* the quadratic scan took 7 s and 23 s */
     });
   }
   for (const unit of ["stream\n", "/", "/Type %", "/Type /Page\n", "endstream stream\r"]) {
@@ -62,7 +64,11 @@ describe("pre-scan cost is linear", () => {
 });
 
 describe("decompression is bounded before pdf.js runs", () => {
-  it.each([[0x68, 0xde], [0x58, 0x85], [0x48, 0x89]])(
+  it.each([
+    [0x68, 0xde],
+    [0x58, 0x85],
+    [0x48, 0x89],
+  ])(
     "a bomb behind the valid zlib header %i %i is rejected like one behind 78 9c (a four pair allowlist let it through)",
     async (b0, b1) => {
       const z = deflateSync(Buffer.alloc(100 * MB, 0x20));
@@ -74,7 +80,9 @@ describe("decompression is bounded before pdf.js runs", () => {
     },
   );
   it("rejects a 100 MB flate stream (over the per stream cap) as too_large", async () => {
-    const r = await timed(extractPages(buildBinaryPdf("/Filter /FlateDecode", deflateSync(Buffer.alloc(100 * MB, 0x20)))));
+    const r = await timed(
+      extractPages(buildBinaryPdf("/Filter /FlateDecode", deflateSync(Buffer.alloc(100 * MB, 0x20)))),
+    );
     expect(r.out).toBe("too_large");
     expect(r.ms).toBeLessThan(8000);
   });
@@ -102,7 +110,10 @@ describe("lying /Count with page objects the byte scan used to miss", () => {
   for (const [name, pageType] of Object.entries(forms)) {
     for (const n of [5, 45]) {
       it(`${name}, ${n} real pages, /Count 1`, async () => {
-        const pdf = buildPdf(Array.from({ length: n }, () => LONG), { count: 1, pageType });
+        const pdf = buildPdf(
+          Array.from({ length: n }, () => LONG),
+          { count: 1, pageType },
+        );
         expect(await outcome(extractPages(pdf))).toBe(n > 40 ? "too_many_pages" : "corrupt");
       });
     }
@@ -126,11 +137,22 @@ describe("object streams the scan cannot read fail closed", () => {
     expect(await outcome(extractPages(withObjStm("/Filter [/ASCIIHexDecode /FlateDecode]", hex)))).toBe("unsupported");
   });
   it("flate object stream that does not inflate", async () => {
-    expect(await outcome(extractPages(withObjStm("/Filter /FlateDecode", Buffer.from([0x78, 0x9c, 1, 2, 3, 4, 5, 6]))))).toBe("unsupported");
+    expect(
+      await outcome(extractPages(withObjStm("/Filter /FlateDecode", Buffer.from([0x78, 0x9c, 1, 2, 3, 4, 5, 6])))),
+    ).toBe("unsupported");
   });
   it("object stream hidden behind a name escape and a long dictionary", async () => {
     const pad = "/Pad (" + "x".repeat(900) + ")";
-    expect(await outcome(extractPages(buildRawPdf({ ...BASE, 6: streamObj(`/Type /Obj#53tm /N 1 /First 4 ${pad} /Filter /ASCIIHexDecode`, Buffer.from("00>")) })))).toBe("unsupported");
+    expect(
+      await outcome(
+        extractPages(
+          buildRawPdf({
+            ...BASE,
+            6: streamObj(`/Type /Obj#53tm /N 1 /First 4 ${pad} /Filter /ASCIIHexDecode`, Buffer.from("00>")),
+          }),
+        ),
+      ),
+    ).toBe("unsupported");
   });
   it("an unfiltered object stream is plain text the raw scan reads", async () => {
     expect(await outcome(extractPages(withObjStm("", pageObjs(2))))).toBe("corrupt");
@@ -161,9 +183,15 @@ describe("encrypted PDF with flate object streams", () => {
     const pad = Buffer.from("28BF4E5E4E758A4164004E56FFFA01082E2E00B6D0683E802F0CA9FE6453697A", "hex");
     const O = Buffer.alloc(32, 7);
     const id = Buffer.alloc(16, 9);
-    const key = createHash("md5").update(Buffer.concat([pad, O, Buffer.from([0xfc, 0xff, 0xff, 0xff]), id])).digest().subarray(0, 5);
+    const key = createHash("md5")
+      .update(Buffer.concat([pad, O, Buffer.from([0xfc, 0xff, 0xff, 0xff]), id]))
+      .digest()
+      .subarray(0, 5);
     const U = rc4(key, pad);
-    const objKey = createHash("md5").update(Buffer.concat([key, Buffer.from([7, 0, 0, 0, 0])])).digest().subarray(0, 10);
+    const objKey = createHash("md5")
+      .update(Buffer.concat([key, Buffer.from([7, 0, 0, 0, 0])]))
+      .digest()
+      .subarray(0, 10);
     const data = rc4(objKey, deflateSync(pageObjs(44)));
     const pdf = buildRawPdf(
       {
@@ -200,6 +228,8 @@ describe("input handling", () => {
 
 describe("deadline between pages", () => {
   it("timeoutMs 1 on a 40 page document throws timeout", async () => {
-    expect(await outcome(extractPages(buildPdf(Array.from({ length: 40 }, () => LONG)), { timeoutMs: 1 }))).toBe("timeout");
+    expect(await outcome(extractPages(buildPdf(Array.from({ length: 40 }, () => LONG)), { timeoutMs: 1 }))).toBe(
+      "timeout",
+    );
   });
 });
