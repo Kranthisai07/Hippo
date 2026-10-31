@@ -143,6 +143,7 @@ For the browser extension, under `/ext`, not `/api`. Auth is `Authorization: Bea
 
 - 403: saving is off (no `onCaptured` hook). `apps/api/src/server.ts` loads the hook only when the server is bound to a loopback host, has a loopback issuer and no public domain (`isLocalOnly`). Anything else refuses.
 - 409: the same text was saved already, or the household already tracks that vendor. `X-Hippo-Doc` holds the existing document id, when there is one.
+- 422 `limit_reached`: the household already holds 200 saved pages. The message says to delete some in Hippo.
 - 429: more than 30 saves per household per hour, or 60 list reads per household per minute, with `Retry-After`.
 - Every `/ext` call also counts against a per address limit of 300 a minute, and every `/oauth` call against 120 a minute (429 in the OAuth shape `{ "error": "rate_limited" }`). The address is the socket address, or the header named by `HIPPO_CLIENT_IP_HEADER` on a host whose proxy writes it (`cf-connecting-ip`). A client can never choose its own bucket by sending that header unless the host names it.
 - CORS: `Origin` must match the allowed list exactly (the extension's `chrome-extension://<id>` and the web origins). A preflight (`OPTIONS`) from a listed origin gets 204 with that origin echoed back, `Authorization, Content-Type` as allowed headers, no credentials and never `*`. Any other origin, including `null`, is 403.
@@ -155,3 +156,9 @@ For the browser extension, under `/ext`, not `/api`. Auth is `Authorization: Bea
 - Recall lookups from the browser: recalls come from the daily job and arrive as alerts.
 - A presigned S3 upload (`createS3Presigner`) is not built yet; the `Uploader` interface (`prepare({ key, contentType, size }) -> { method, url, headers, expiresInSeconds }`) is where it plugs in.
 - Durable rate limit counters and persistence: the local server keeps files, the repository, sessions and counters in memory. A hosted server passes its own `RateLimiter`.
+
+## Sign out and logging
+
+- `POST /oauth/revoke` (RFC 7009, form body `token`, `client_id`): ends a refresh token and its whole family, including the token a rotation handed out last. Always 200, so a caller learns nothing about the token. Advertised as `revocation_endpoint`. The extension calls it on Sign out.
+- `POST /oauth/logout-all` (JSON, cookie session): ends every web session and every refresh token of the person. Access tokens already issued end by themselves within 15 minutes.
+- Every response carries `X-Request-Id`. The server logs one JSON line per request: `{ ts, id, method, path, status, ms }`, and security events as `{ ts, audit, sub, reason }` with a hashed `sub`. Query strings, headers, bodies, emails, codes and tokens are never logged.
