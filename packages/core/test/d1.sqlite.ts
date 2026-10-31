@@ -22,6 +22,8 @@ export interface SqliteD1 extends D1Like {
   /** Every statement text that ran, to assert on. */
   ran: string[];
   count(table?: string): number;
+  /** Calls that would each be a network round trip to D1: one per `all()` and one per `batch()`. */
+  trips: number;
 }
 
 export function createSqliteD1(opts: { interleave?: boolean } = {}): SqliteD1 {
@@ -29,6 +31,7 @@ export function createSqliteD1(opts: { interleave?: boolean } = {}): SqliteD1 {
   for (const sql of MIGRATIONS) db.exec(sql);
   const ran: string[] = [];
   let turn = 0;
+  let trips = 0;
   const wait = async () => {
     if (!opts.interleave) return;
     // One to three trips round the event loop, varying, so concurrent callers drift apart and together.
@@ -43,15 +46,20 @@ export function createSqliteD1(opts: { interleave?: boolean } = {}): SqliteD1 {
     values,
     bind: (...v) => stmt(sql, v),
     all: async () => {
+      trips++;
       await wait();
       return exec(sql, values);
     },
   });
   return {
     ran,
+    get trips() {
+      return trips;
+    },
     count: (table = "items") => (db.prepare(`SELECT count(*) AS n FROM ${table}`).get() as { n: number }).n,
     prepare: (sql) => stmt(sql),
     async batch(statements) {
+      trips++;
       const list = statements as ReturnType<typeof stmt>[];
       if (opts.interleave) {
         const out = [];

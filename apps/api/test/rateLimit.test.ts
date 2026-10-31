@@ -2,19 +2,10 @@ import { describe, expect, it } from "vitest";
 import { EXT_PER_MINUTE, OAUTH_PER_MINUTE } from "../src/app";
 import { createMemoryLimiter } from "../src/api/limiter";
 import { BASE } from "./helpers";
+import { runLimiterSuite } from "./limiter.suite";
 import { makeWeb } from "./webHelpers";
 
-describe("the memory limiter", () => {
-  it("allows max hits per window, then says how long to wait, then forgets", async () => {
-    let t = 1_000_000;
-    const limit = createMemoryLimiter(() => t);
-    for (let i = 0; i < 3; i++) expect(await limit("k", 60_000, 3)).toEqual({ ok: true });
-    expect(await limit("k", 60_000, 3)).toEqual({ ok: false, retryAfterSec: 60 });
-    expect(await limit("other", 60_000, 3)).toEqual({ ok: true });
-    t += 60_001;
-    expect(await limit("k", 60_000, 3)).toEqual({ ok: true });
-  });
-});
+runLimiterSuite("memory", (now) => createMemoryLimiter(now));
 
 describe("per address limits in front of the sign-in and extension routes", () => {
   const from = (ip: string) => ({ headers: { "cf-connecting-ip": ip } });

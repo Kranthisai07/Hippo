@@ -1,4 +1,4 @@
-import { createMemoryStore } from "@hippo/auth";
+import { createMemoryStore, type AuthStore } from "@hippo/auth";
 import type { Context } from "hono";
 import { ApiError } from "./http";
 
@@ -10,16 +10,18 @@ export type RateLimiter = (
 ) => Promise<{ ok: true } | { ok: false; retryAfterSec: number }>;
 
 /**
- * Reuses the auth store's atomic counter. shortcut: memory only and one process, and keys are never evicted, so this is
- * for tests and local runs. A hosted server must pass a durable limiter (Durable Object, DynamoDB conditional write).
+ * A limiter over any store with the auth store's atomic counter: the memory one here, the D1 one on Workers.
+ * The retry wait is rounded up to whole seconds, at least 1.
  */
-export function createMemoryLimiter(now: () => number): RateLimiter {
-  const store = createMemoryStore();
+export function limiterFromStore(store: Pick<AuthStore, "tryHit">, now: () => number): RateLimiter {
   return async (key, windowMs, max) => {
     const r = await store.tryHit(key, windowMs, max, 0, now());
     return r.ok ? r : { ok: false, retryAfterSec: Math.max(1, Math.ceil(r.retryAfterMs / 1000)) };
   };
 }
+
+/** shortcut: memory only and one process, and keys are never evicted, so this is for tests and local runs. */
+export const createMemoryLimiter = (now: () => number): RateLimiter => limiterFromStore(createMemoryStore(), now);
 
 /** Throws the 429 every route uses, with the wait in Retry-After. */
 export async function enforce(

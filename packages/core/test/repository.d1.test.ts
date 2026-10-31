@@ -39,6 +39,15 @@ describe("the D1 item client's own behaviour", () => {
     }
   });
 
+  it("a conditional delete costs two round trips: claim and read in one, then the delete", async () => {
+    const db = createSqliteD1();
+    const c = createD1ItemClient(db);
+    await c.put(item("H#a", "U#1"));
+    const before = db.trips;
+    await c.deleteIfExists("H#a", "U#1");
+    expect(db.trips - before).toBe(2);
+  });
+
   it("a row that was claimed and then written again is deletable again", async () => {
     const c = createD1ItemClient(createSqliteD1());
     await c.put(item("H#a", "U#1"));

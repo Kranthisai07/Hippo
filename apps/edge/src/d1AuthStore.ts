@@ -21,8 +21,11 @@ export function createD1AuthStore(
   db: D1Like,
   opts: D1AuthStoreOptions = {},
 ): AuthStore & {
-  /** Deletes records past their expiry, and tombstones older than `tombstoneTtlMs` (the longest a token can live). */
-  purgeExpired(nowMs: number, tombstoneTtlMs: number): Promise<void>;
+  /**
+   * Deletes records past their expiry, tombstones older than `tombstoneTtlMs` (the longest a token can live), and rate
+   * hits older than `hitTtlMs` (the longest window in use, default one hour).
+   */
+  purgeExpired(nowMs: number, tombstoneTtlMs: number, hitTtlMs?: number): Promise<void>;
 } {
   const clock = opts.now ?? Date.now;
   const rows = async (sql: string, ...values: unknown[]): Promise<Row[]> =>
@@ -47,13 +50,17 @@ export function createD1AuthStore(
       ),
     async consume(key: string): Promise<Consumed<T>> {
       const mine = crypto.randomUUID();
-      await run(
-        `UPDATE ${table} SET winner = ? WHERE key = ? AND winner IS NULL
-           AND family_id NOT IN (SELECT family_id FROM auth_revoked_families)`,
-        mine,
-        key,
-      );
-      const [row] = await rows(`SELECT rec, winner FROM ${table} WHERE key = ?`, key);
+      // One round trip. The batch is not relied on as a transaction: the UPDATE is safe by itself.
+      const [, read] = await db.batch([
+        db
+          .prepare(
+            `UPDATE ${table} SET winner = ? WHERE key = ? AND winner IS NULL
+               AND family_id NOT IN (SELECT family_id FROM auth_revoked_families)`,
+          )
+          .bind(mine, key),
+        db.prepare(`SELECT rec, winner FROM ${table} WHERE key = ?`).bind(key),
+      ]);
+      const [row] = (read?.results ?? []) as Row[];
       if (!row) return { status: "unknown" };
       const record = JSON.parse(row.rec as string) as T;
       return { status: row.winner === mine ? "ok" : "used", record };
@@ -113,31 +120,27 @@ export function createD1AuthStore(
 
     async tryHit(key, windowMs, max, minGapMs, nowMs) {
       const since = nowMs - windowMs;
-      // Hits that left the window are only clutter. A key keeps one window length, so this never removes a live hit.
-      await run("DELETE FROM auth_hits WHERE key = ? AND ts <= ?", key, since);
-      const before = (await rows("SELECT ts FROM auth_hits WHERE key = ? AND ts > ? ORDER BY ts", key, since)).map(
-        (r) => r.ts as number,
-      );
-      // Take the slot only if there is room and the last hit is old enough. One statement, so two callers cannot both
-      // take the last slot, whatever order their statements run in. The row carries this call's own random value, so
-      // reading it back says whether this call, and not another one, got the slot.
+      // One round trip for all four steps. Each statement is safe on its own, so the batch need not be a transaction:
+      // 1. hits that left the window are only clutter (a key keeps one window length, so no live hit is removed);
+      // 2. read the window, for the wait in case of a refusal;
+      // 3. take the slot only if there is room and the last hit is old enough, in one statement, so two callers cannot
+      //    both take the last slot. The row carries this call's own random value;
+      // 4. read that value back: if it is there, this call and not another one got the slot.
       const mine = crypto.randomUUID();
-      await run(
-        `INSERT INTO auth_hits (key, ts, nonce)
-         SELECT ?, ?, ? WHERE (SELECT count(*) FROM auth_hits WHERE key = ? AND ts > ?) < ?
-           AND NOT EXISTS (SELECT 1 FROM auth_hits WHERE key = ? AND ts > ?)`,
-        key,
-        nowMs,
-        mine,
-        key,
-        since,
-        max,
-        key,
-        nowMs - minGapMs,
-      );
-      if ((await rows("SELECT 1 AS got FROM auth_hits WHERE key = ? AND nonce = ?", key, mine)).length > 0) {
-        return { ok: true };
-      }
+      const [, window, , taken] = await db.batch([
+        db.prepare("DELETE FROM auth_hits WHERE key = ? AND ts <= ?").bind(key, since),
+        db.prepare("SELECT ts FROM auth_hits WHERE key = ? AND ts > ? ORDER BY ts").bind(key, since),
+        db
+          .prepare(
+            `INSERT INTO auth_hits (key, ts, nonce)
+             SELECT ?, ?, ? WHERE (SELECT count(*) FROM auth_hits WHERE key = ? AND ts > ?) < ?
+               AND NOT EXISTS (SELECT 1 FROM auth_hits WHERE key = ? AND ts > ?)`,
+          )
+          .bind(key, nowMs, mine, key, since, max, key, nowMs - minGapMs),
+        db.prepare("SELECT 1 AS got FROM auth_hits WHERE key = ? AND nonce = ?").bind(key, mine),
+      ]);
+      if ((taken?.results?.length ?? 0) > 0) return { ok: true };
+      const before = ((window?.results ?? []) as Row[]).map((r) => r.ts as number);
       // Refused. The wait is worked out the way the memory store does it, from the hits seen before the attempt.
       const waits: number[] = [];
       if (before.length >= max) waits.push(before[before.length - max]! + windowMs - nowMs);
@@ -151,12 +154,13 @@ export function createD1AuthStore(
 
   return {
     ...store,
-    async purgeExpired(nowMs, tombstoneTtlMs) {
+    async purgeExpired(nowMs, tombstoneTtlMs, hitTtlMs = 3_600_000) {
       await run("DELETE FROM auth_codes WHERE expires_at <= ?", nowMs);
       await run("DELETE FROM auth_refresh WHERE expires_at <= ?", nowMs);
       await run("DELETE FROM auth_sessions WHERE expires_at <= ?", nowMs);
       await run("DELETE FROM auth_magic WHERE expires_at <= ?", nowMs);
       await run("DELETE FROM auth_revoked_families WHERE at <= ?", nowMs - tombstoneTtlMs);
+      await run("DELETE FROM auth_hits WHERE ts <= ?", nowMs - hitTtlMs);
     },
   };
 }

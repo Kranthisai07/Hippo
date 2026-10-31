@@ -52,8 +52,11 @@ export function createD1ItemClient(db: D1Like): ItemClient {
       // delete. This does not depend on D1 treating a batch as isolated. If the Worker dies between the claim and the
       // delete, that row stays claimed (an undo record that can no longer be popped, and it expires anyway).
       const mine = crypto.randomUUID();
-      await db.prepare("UPDATE items SET claim = ? WHERE pk = ? AND sk = ? AND claim IS NULL").bind(mine, pk, sk).all();
-      const [row] = await rows("SELECT claim FROM items WHERE pk = ? AND sk = ?", pk, sk);
+      const [, read] = await db.batch([
+        db.prepare("UPDATE items SET claim = ? WHERE pk = ? AND sk = ? AND claim IS NULL").bind(mine, pk, sk),
+        db.prepare("SELECT claim FROM items WHERE pk = ? AND sk = ?").bind(pk, sk),
+      ]);
+      const [row] = (read?.results ?? []) as Record<string, unknown>[];
       if (row?.claim !== mine) return false;
       await db.prepare("DELETE FROM items WHERE pk = ? AND sk = ? AND claim = ?").bind(pk, sk, mine).all();
       return true;
