@@ -28,11 +28,23 @@ describe("the D1 item client's own behaviour", () => {
     expect(await c.deleteIfExists("H#a", "U#1")).toBe(false);
   });
 
-  it("three racing deleteIfExists: exactly one wins", async () => {
+  it("racing deleteIfExists: exactly one wins, even when statements of different callers interleave", async () => {
+    for (const interleave of [false, true]) {
+      const db = createSqliteD1({ interleave });
+      const c = createD1ItemClient(db);
+      await c.put(item("H#a", "U#1"));
+      const wins = await Promise.all(Array.from({ length: 12 }, () => c.deleteIfExists("H#a", "U#1")));
+      expect(wins.filter(Boolean)).toHaveLength(1);
+      expect(db.count()).toBe(0);
+    }
+  });
+
+  it("a row that was claimed and then written again is deletable again", async () => {
     const c = createD1ItemClient(createSqliteD1());
     await c.put(item("H#a", "U#1"));
-    const wins = await Promise.all([1, 2, 3].map(() => c.deleteIfExists("H#a", "U#1")));
-    expect(wins.filter(Boolean)).toHaveLength(1);
+    expect(await c.deleteIfExists("H#a", "U#1")).toBe(true);
+    await c.put(item("H#a", "U#1"));
+    expect(await c.deleteIfExists("H#a", "U#1")).toBe(true);
   });
 
   it("a write is all or nothing", async () => {

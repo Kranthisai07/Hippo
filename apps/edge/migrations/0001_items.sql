@@ -6,6 +6,8 @@ CREATE TABLE IF NOT EXISTS items (
   gsi1pk TEXT,
   gsi1sk TEXT,
   item TEXT NOT NULL,
+  -- Set by the one caller that wins a conditional delete (see d1.ts deleteIfExists).
+  claim TEXT,
   PRIMARY KEY (pk, sk)
 ) WITHOUT ROWID;
 

@@ -48,12 +48,15 @@ export function createD1ItemClient(db: D1Like): ItemClient {
       await remove(pk, sk).all();
     },
     async deleteIfExists(pk, sk) {
-      // The look and the delete are one transaction, so two callers racing for one row cannot both win.
-      const [seen] = await db.batch([
-        db.prepare("SELECT 1 AS present FROM items WHERE pk = ? AND sk = ?").bind(pk, sk),
-        remove(pk, sk),
-      ]);
-      return (seen?.results?.length ?? 0) > 0;
+      // One UPDATE can set the claim on a row, once, so only one caller can see its own value afterwards and go on to
+      // delete. This does not depend on D1 treating a batch as isolated. If the Worker dies between the claim and the
+      // delete, that row stays claimed (an undo record that can no longer be popped, and it expires anyway).
+      const mine = crypto.randomUUID();
+      await db.prepare("UPDATE items SET claim = ? WHERE pk = ? AND sk = ? AND claim IS NULL").bind(mine, pk, sk).all();
+      const [row] = await rows("SELECT claim FROM items WHERE pk = ? AND sk = ?", pk, sk);
+      if (row?.claim !== mine) return false;
+      await db.prepare("DELETE FROM items WHERE pk = ? AND sk = ? AND claim = ?").bind(pk, sk, mine).all();
+      return true;
     },
     async query({ index, hash, range, descending }) {
       const [hashCol, rangeCol] = index ? ["gsi1pk", "gsi1sk"] : ["pk", "sk"];

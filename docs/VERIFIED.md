@@ -493,3 +493,16 @@ Checked on 2026-10-31. Pages read with WebFetch (small-model summaries), so quot
 - Google PKCE with web clients; `*.workers.dev` as an authorized domain; brand verification for a consent screen without a logo.
 - Chrome registration fee amount today; store handling of manifest `key`; install warnings for `identity`, `storage`, `scripting`.
 - Durable Objects SQLite billing status as of 2026-10-31.
+
+### 10.14 Open checks for the staging run (slice 6)
+
+Written by the slice 3 work. Each item is something the code assumes about Cloudflare D1 and the test database cannot prove. Status of all of them: unverified.
+
+| Assumption in the code | Where it matters | How to check on a real D1 database |
+| :--- | :--- | :--- |
+| One statement is applied atomically, also under concurrent requests | `consume`, `tryHit`, `deleteIfExists` (apps/edge/src/d1AuthStore.ts, packages/core/src/repository/d1.ts) | Run packages/auth/test/store.suite.ts against the real binding with 20 to 50 parallel callers, many times |
+| A SELECT after an UPDATE in the same request reads the primary, not a stale replica | The "read your own winner" step of `consume` and `tryHit` | Leave read replication off, and repeat the parallel run; if it is on, use the session bookmark API |
+| `db.batch` accepts the chunk size used (25 statements) | `write` in d1.ts | Write 25 and 100 item batches, note any limit error |
+| Latency of 3 to 4 statements per `tryHit` is acceptable on every /oauth and /ext call | slice 4 | Time 100 sequential calls from a Worker in the same region as the database |
+| `crypto.randomUUID()` and `Buffer`/`node:crypto` `createHash` work in Workers with nodejs_compat | d1 stores, apps/api | Smoke test with `wrangler dev` |
+
