@@ -70,13 +70,29 @@ export function createExtensionApi(deps: ExtensionDeps): Hono<{ Variables: { hh:
 
   ext.use("*", async (c, next) => {
     c.header("Cache-Control", "no-store");
+    c.header("Vary", "Origin");
     const origin = c.req.header("origin");
+    // Exact match against the list. "null" and every other origin are refused, and nothing here is a wildcard.
     if (origin !== undefined && !deps.allowedOrigins.has(origin)) {
       throw new ApiError(403, "This request did not come from the Hippo extension.");
     }
+    if (origin !== undefined) c.header("Access-Control-Allow-Origin", origin);
+    // A preflight carries no token, so it is answered before the bearer check.
+    if (c.req.method === "OPTIONS") {
+      c.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+      c.header("Access-Control-Allow-Headers", "Authorization, Content-Type");
+      c.header("Access-Control-Max-Age", "600");
+      return c.body(null, 204);
+    }
     // The household comes from the token and from nowhere else.
     const user = await deps.auth.verifyBearer(c.req.header("authorization"));
-    if (!user || !user.scope.split(" ").includes(SCOPE)) return unauthorized();
+    if (!user || !user.scope.split(" ").includes(SCOPE)) {
+      // unauthorized() is a fresh Response, so the headers set above are not on it.
+      const denied = unauthorized();
+      denied.headers.set("Vary", "Origin");
+      if (origin !== undefined) denied.headers.set("Access-Control-Allow-Origin", origin);
+      return denied;
+    }
     c.set("hh", user.householdId);
     await next();
   });

@@ -49,3 +49,37 @@ describe("per address limits in front of the sign-in and extension routes", () =
     expect((await w.app.request(`${BASE}/ext/subscriptions`, from("198.51.100.250"))).status).toBe(429);
   });
 });
+
+describe("CORS on /ext", () => {
+  const EXT = "chrome-extension://abcdefghijklmnopabcdefghijklmnop";
+  const setup = () => makeWeb({ app: { allowedOrigins: [EXT] } });
+  const preflight = (w: Awaited<ReturnType<typeof setup>>, origin: string) =>
+    w.app.request(`${BASE}/ext/captures`, {
+      method: "OPTIONS",
+      headers: { origin, "access-control-request-method": "POST", "access-control-request-headers": "authorization" },
+    });
+
+  it("answers the preflight of the listed origin with that origin only, and no token", async () => {
+    const r = await preflight(await setup(), EXT);
+    expect(r.status).toBe(204);
+    expect(r.headers.get("access-control-allow-origin")).toBe(EXT);
+    expect(r.headers.get("access-control-allow-headers")).toBe("Authorization, Content-Type");
+    expect(r.headers.get("vary")).toContain("Origin");
+  });
+  it.each(["https://evil.example", "null", "http://localhost:5173"])("refuses the preflight of %s", async (origin) => {
+    const r = await preflight(await setup(), origin);
+    expect(r.status).toBe(403);
+    expect(r.headers.get("access-control-allow-origin")).toBeNull();
+  });
+  it("lets the listed origin read a 401, and shows nothing to others", async () => {
+    const w = await setup();
+    const r = await w.app.request(`${BASE}/ext/subscriptions`, { headers: { origin: EXT } });
+    expect(r.status).toBe(401);
+    expect(r.headers.get("access-control-allow-origin")).toBe(EXT);
+  });
+  it("never allows credentials or a wildcard", async () => {
+    const r = await preflight(await setup(), EXT);
+    expect(r.headers.get("access-control-allow-credentials")).toBeNull();
+    expect(r.headers.get("access-control-allow-origin")).not.toBe("*");
+  });
+});
