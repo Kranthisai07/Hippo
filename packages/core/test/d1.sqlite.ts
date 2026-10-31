@@ -22,6 +22,8 @@ export interface SqliteD1 extends D1Like {
   /** Every statement text that ran, to assert on. */
   ran: string[];
   count(table?: string): number;
+  /** Every row of every table, as JSON text, to prove what is and is not stored. */
+  dump(): string;
   /** Calls that would each be a network round trip to D1: one per `all()` and one per `batch()`. */
   trips: number;
 }
@@ -55,6 +57,12 @@ export function createSqliteD1(opts: { interleave?: boolean } = {}): SqliteD1 {
     ran,
     get trips() {
       return trips;
+    },
+    dump: () => {
+      const tables = db
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")
+        .all() as { name: string }[];
+      return JSON.stringify(tables.map((t) => db.prepare(`SELECT * FROM ${t.name}`).all()));
     },
     count: (table = "items") => (db.prepare(`SELECT count(*) AS n FROM ${table}`).get() as { n: number }).n,
     prepare: (sql) => stmt(sql),

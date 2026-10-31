@@ -1,3 +1,4 @@
+import { TTL } from "@hippo/auth";
 import { describe, expect, it } from "vitest";
 import {
   cookieHeader,
@@ -60,13 +61,18 @@ describe("createAuth on the D1 store", () => {
     });
   }
 
-  it("keeps no secret in the database: keys are hashes, and the log holds no key, code or token", async () => {
+  it("keeps no secret in the database: every stored value is a hash or a record, and the log holds no key, code or token", async () => {
     const db = createSqliteD1();
     const env = makeEnv({ store: createD1AuthStore(db), logMagicCodes: false });
     const { body, code } = await fullTokens(env);
-    const dump = db.ran.join("\n");
+    const stored = db.dump();
+    expect(stored.length).toBeGreaterThan(200); // the dump holds real rows, so the checks below mean something
+    expect(stored).toContain("familyId");
+    // Positive control: the dump does show stored values, so a raw token in it would be caught.
+    await createD1AuthStore(db).putMagic("canary", { codeHash: "CANARY-VALUE", expiresAt: 1, attempts: 0 });
+    expect(db.dump()).toContain("CANARY-VALUE");
     for (const secret of [body.access_token!, body.refresh_token!, code]) {
-      expect(dump).not.toContain(secret);
+      expect(stored).not.toContain(secret);
       expect(env.logs.join("\n")).not.toContain(secret);
     }
   });
@@ -81,11 +87,14 @@ describe("purgeExpired", () => {
     await store.putRefresh("live", { ...rec, expiresAt: 9e9 });
     await store.putSession("sold", { email: "a@x.example", sub: "u", householdId: "h", expiresAt: 500 });
     await store.revokeFamily("f");
-    await store.purgeExpired(2000, 10_000);
+    await store.purgeExpired(2000);
     expect(db.count("auth_refresh")).toBe(1);
     expect(db.count("auth_sessions")).toBe(0);
     expect(db.count("auth_revoked_families")).toBe(1);
-    await store.purgeExpired(20_000, 10_000);
+    // The tombstone stays for as long as a refresh token can live, whatever the caller does.
+    await store.purgeExpired(1000 + TTL.refreshMs - 1);
+    expect(db.count("auth_revoked_families")).toBe(1);
+    await store.purgeExpired(1000 + TTL.refreshMs + 1);
     expect(db.count("auth_revoked_families")).toBe(0);
   });
 });

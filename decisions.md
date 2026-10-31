@@ -62,3 +62,10 @@ No decisions log exists on main (MEMORY.md is only in old worktrees), so this fi
 - **Table growth:** a per address key that is never seen again would stay forever, so `purgeExpired` also deletes hits older than the longest window in use (default one hour).
 - **Cost, unverified:** each check still reads and writes a few rows. Cloudflare's per row prices are in docs/VERIFIED.md 10 but the real rows per request are only known on staging. If it is too costly, the per address limit can move to Cloudflare's own rate limiting (approximate, per location) and the exact per household limits stay in D1.
 
+## 2026-10-31: fixes from the reviewer round on slices 1 to 4 (+claude)
+
+- **`purgeExpired` no longer takes a tombstone age.** Tombstones live as long as a refresh token can (`TTL.refreshMs`), because a shorter age brings revoked tokens back to life. Only the rate hit age stays a parameter.
+- **The "no secret in the database" test was checking SQL text, not stored values.** The test database now dumps every table, with a positive control (a known value must show up in the dump), so a raw token in a row would be caught.
+- **The DynamoDB fake now rejects a base table read without `ConsistentRead`.** Removing it from the real client's Get fails 121 tests; before, nothing would have noticed.
+- **Written down, not changed:** the one window per rate key assumption (a comment in the code now says it is unenforced), the future timestamp difference in the minimum gap check between the D1 and memory stores, the narrow window in `revokeUser` between deleting sessions and tombstoning families, and that a late put into a revoked family logs a reuse event for what is really a rotation race.
+

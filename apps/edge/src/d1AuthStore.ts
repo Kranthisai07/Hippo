@@ -1,3 +1,4 @@
+import { TTL } from "@hippo/auth";
 import type { AuthStore, CodeRecord, Consumed, RefreshRecord, SessionRecord } from "@hippo/auth/src/store";
 import type { D1Like } from "core/src/repository/d1";
 
@@ -22,10 +23,11 @@ export function createD1AuthStore(
   opts: D1AuthStoreOptions = {},
 ): AuthStore & {
   /**
-   * Deletes records past their expiry, tombstones older than `tombstoneTtlMs` (the longest a token can live), and rate
-   * hits older than `hitTtlMs` (the longest window in use, default one hour).
+   * Deletes records past their expiry, tombstones older than a refresh token can live (TTL.refreshMs, not a choice of the
+   * caller: a shorter one would bring revoked tokens back to life), and rate hits older than `hitTtlMs` (the longest
+   * window in use, default one hour).
    */
-  purgeExpired(nowMs: number, tombstoneTtlMs: number, hitTtlMs?: number): Promise<void>;
+  purgeExpired(nowMs: number, hitTtlMs?: number): Promise<void>;
 } {
   const clock = opts.now ?? Date.now;
   const rows = async (sql: string, ...values: unknown[]): Promise<Row[]> =>
@@ -121,7 +123,8 @@ export function createD1AuthStore(
     async tryHit(key, windowMs, max, minGapMs, nowMs) {
       const since = nowMs - windowMs;
       // One round trip for all four steps. Each statement is safe on its own, so the batch need not be a transaction:
-      // 1. hits that left the window are only clutter (a key keeps one window length, so no live hit is removed);
+      // 1. hits that left the window are only clutter. shortcut: this assumes a key is always used with one window length
+      //    (true for every key in this repo, not enforced); two lengths on one key would delete hits the longer one needs;
       // 2. read the window, for the wait in case of a refusal;
       // 3. take the slot only if there is room and the last hit is old enough, in one statement, so two callers cannot
       //    both take the last slot. The row carries this call's own random value;
@@ -154,12 +157,12 @@ export function createD1AuthStore(
 
   return {
     ...store,
-    async purgeExpired(nowMs, tombstoneTtlMs, hitTtlMs = 3_600_000) {
+    async purgeExpired(nowMs, hitTtlMs = 3_600_000) {
       await run("DELETE FROM auth_codes WHERE expires_at <= ?", nowMs);
       await run("DELETE FROM auth_refresh WHERE expires_at <= ?", nowMs);
       await run("DELETE FROM auth_sessions WHERE expires_at <= ?", nowMs);
       await run("DELETE FROM auth_magic WHERE expires_at <= ?", nowMs);
-      await run("DELETE FROM auth_revoked_families WHERE at <= ?", nowMs - tombstoneTtlMs);
+      await run("DELETE FROM auth_revoked_families WHERE at <= ?", nowMs - TTL.refreshMs);
       await run("DELETE FROM auth_hits WHERE ts <= ?", nowMs - hitTtlMs);
     },
   };

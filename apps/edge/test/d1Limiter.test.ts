@@ -42,7 +42,7 @@ describe("purgeExpired and rate hits", () => {
     const store = createD1AuthStore(db);
     await store.tryHit("old", 60_000, 5, 0, 1_000);
     await store.tryHit("new", 60_000, 5, 0, 3_000_000);
-    await store.purgeExpired(3_601_500, 1_000_000_000);
+    await store.purgeExpired(3_601_500);
     expect(db.count("auth_hits")).toBe(1);
   });
 });
