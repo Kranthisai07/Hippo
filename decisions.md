@@ -77,3 +77,10 @@ No decisions log exists on main (MEMORY.md is only in old worktrees), so this fi
 - **Risk found, not yet tested:** `ajv` (pulled in by the MCP SDK) generates code at run time, and Workers may refuse code generation from strings. `/mcp` may fail on Workers even though the bundle builds. The local `wrangler dev` smoke test in 5c will show it.
 - **Machine note:** the root `pnpm typecheck` runs the Go based compiler in parallel and runs out of memory here; `pnpm -r --workspace-concurrency=1 typecheck` is clean (exit 0).
 
+## 2026-10-31: Phase 2 slice 5b, adapters for R2 and Email (+claude)
+
+- **Verified before writing:** the R2 and Email Sending method names and shapes, the wrangler keys and the runtime rules are in docs/VERIFIED.md 10.15 (a `docs-verifier` run against developers.cloudflare.com). Two things differed from what I had assumed: the email binding is configured as `[[send_email]]` with `name`, and Cloudflare now recommends `wrangler.jsonc` over toml.
+- **R2:** `ObjectStore` and the clause `IndexStore` over a three method `R2BucketLike`; deletes go in calls of at most 1000 keys; the index key is built only from a household id that matches `[A-Za-z0-9_-]{1,100}`, so no id can steer a key. One whole index object is written per change, and R2 allows one write a second to a key, which the 30 saves an hour limit keeps far below.
+- **Mailer:** `createCloudflareMailer(env.EMAIL, from)` sends one plain text message. Resend is not built: its API is unchecked and the provider choice is still open. Email Sending is beta and paid, and `from` must be on a verified domain, so none of it can be tried before an account exists; the adapter is only tested against a fake binding.
+- **Still unverified, to settle in the smoke test:** whether `new Function` (used by `ajv`) is refused on Workers (only `eval` is named in the docs), `structuredClone`, and whether `wrangler dev --local` accepts a placeholder D1 `database_id`.
+

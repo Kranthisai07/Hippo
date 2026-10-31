@@ -14,6 +14,8 @@ export { createApp } from "../../api/src/app";
 export { createCaptureIngest } from "../../workers/src/ingest/capture";
 export { createD1Repository } from "core/src/repository/d1";
 export { createD1AuthStore } from "../src/d1AuthStore";
+export { createR2IndexStore, createR2ObjectStore } from "../src/r2";
+export { createCloudflareMailer } from "../src/cloudflareMailer";
 `;
 
 describe("a Workers build of the API", () => {
