@@ -76,6 +76,18 @@ export interface Alert {
   snoozedUntil?: string | null;
 }
 
+export interface Subscription {
+  agreementId: string;
+  docId: string | null;
+  vendor: string;
+  plan: string | null;
+  amount: number | null;
+  cycle: string | null;
+  nextChargeDate: string | null;
+  confirmed: boolean;
+  source: { docName: string; page: number | null } | null;
+}
+
 export interface Asset {
   id: string;
   name: string;

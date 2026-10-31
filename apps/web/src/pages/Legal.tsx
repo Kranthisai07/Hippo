@@ -6,7 +6,10 @@ const PRIVACY: [string, string][] = [
     "What Hippo stores",
     "The documents you upload, the fields read from them (dates, terms, contacts), and the text of each page so you can see where a value came from. In a hosted setup the files sit in an encrypted bucket. The demo build keeps everything in memory on one computer and forgets it when stopped.",
   ],
-  ["What Hippo does not do", "It does not read your email or your bank. It only knows what you upload or tell it."],
+  [
+    "What Hippo does not do",
+    "It does not read your email or your bank. It only knows what you upload, tell it, or save yourself with the browser extension.",
+  ],
   ["Numbers", "Policy and account numbers are shown with only the last 4 digits."],
   ["Logs", "Document text is never written to logs."],
   [

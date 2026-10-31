@@ -1,10 +1,11 @@
-import { CalendarClock, LogOut, MessageSquare, Package, Settings, Upload } from "lucide-react";
+import { CalendarClock, CreditCard, LogOut, MessageSquare, Package, Settings, Upload } from "lucide-react";
 import { Link, NavLink, Outlet } from "react-router";
 import { useAuth } from "../lib/auth";
 
 const LINKS = [
   { to: "/", label: "Coming up", icon: CalendarClock, end: true },
   { to: "/upload", label: "Upload", icon: Upload },
+  { to: "/subscriptions", label: "Subscriptions", icon: CreditCard },
   { to: "/things", label: "Things", icon: Package },
   { to: "/ask", label: "Ask", icon: MessageSquare },
   { to: "/settings", label: "Settings", icon: Settings },

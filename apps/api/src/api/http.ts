@@ -65,11 +65,15 @@ export function describeIssues(error: z.ZodError): string {
 }
 
 /** JSON content type, a bounded body, strict zod. Any failure is a clear 4xx. */
-export async function readJson<S extends z.ZodType>(c: Context, schema: S): Promise<z.infer<S>> {
+export async function readJson<S extends z.ZodType>(
+  c: Context,
+  schema: S,
+  maxBytes = MAX_JSON_BYTES,
+): Promise<z.infer<S>> {
   const type = (c.req.header("content-type") ?? "").toLowerCase();
   if (type.split(";")[0]!.trim() !== "application/json")
     throw new ApiError(415, "Send the request as JSON (application/json).");
-  const bytes = await readBytes(c.req.raw, MAX_JSON_BYTES);
+  const bytes = await readBytes(c.req.raw, maxBytes);
   if (bytes === null) throw new ApiError(413, "That request is too large.");
   let value: unknown;
   try {

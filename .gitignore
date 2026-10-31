@@ -5,3 +5,6 @@ MEMORY.md
 PLAN.md
 SPEC.md
 docs/SUBMISSION.md
+
+# A key for apps/extension must never be committed (the manifest holds only the public key).
+*.pem

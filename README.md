@@ -6,7 +6,7 @@ Hippo turns the paperwork a household never reads twice (warranties, insurance, 
 
 [Live demo](https://hippo-production-f9ae.up.railway.app) | [Demo video](https://youtu.be/OxnZ7RSM9_Y) | [Landing page](https://hippo-landing-kranthisai07s-projects.vercel.app/welcome) | [Run it in two minutes](#run-the-demo) | [Honest limits](#honest-limits)
 
-> **Status: working build, Alexa+ hackathon (Build, Ship, Shape).** Everything runs locally against a synthetic household, with 3090 passing tests (3361 in CI, which adds the DynamoDB Local suite). Only a synthetic data demo server is deployed ([docs/DEPLOY.md](docs/DEPLOY.md)); the AWS design in `infra/` is not. Alexa+ developer tools are partner only, so the voice demo is a web page (`/ask`) that acts as a real MCP client against the same server. A live Bedrock extraction never ran, because the account's daily token quotas were zero. [What is real and what is not](#what-is-real-and-what-is-not) is the honest list.
+> **Status: working build, Alexa+ hackathon (Build, Ship, Shape).** Everything runs locally against a synthetic household, with 3253 passing tests (3524 in CI, which adds the DynamoDB Local suite). Only a synthetic data demo server is deployed ([docs/DEPLOY.md](docs/DEPLOY.md)); the AWS design in `infra/` is not. Alexa+ developer tools are partner only, so the voice demo is a web page (`/ask`) that acts as a real MCP client against the same server. A live Bedrock extraction never ran, because the account's daily token quotas were zero. [What is real and what is not](#what-is-real-and-what-is-not) is the honest list.
 
 ## Why
 
@@ -53,7 +53,7 @@ Open http://localhost:5173 (use `localhost`, not `127.0.0.1`) and press the demo
 Needs Python 3.9 or newer for the fixture generator.
 
 ```bash
-pnpm test && pnpm typecheck   # obligation-kit 531, core 1054 (1325 in CI with DynamoDB Local), auth 306, api 693, workers 363, web 118, infra 25
+pnpm test && pnpm typecheck   # obligation-kit 614, core 1054 (1325 in CI with DynamoDB Local), auth 307, api 734, workers 366, web 126, extension 28, infra 25
 pip install reportlab pypdf pillow && python fixtures/tools/generate.py
 ```
 
@@ -64,6 +64,14 @@ The browser tests need their browser once: `pnpm --filter @hippo/web exec playwr
 A static copy of the landing page can be hosted: build with `VITE_HOSTED=1 pnpm --filter @hippo/web build` and on Vercel with the project root set to `apps/web`, which reads `apps/web/vercel.json` (install, build and rewrite settings). The static page has no API behind it, so its demo buttons open the live demo server ([docs/DEPLOY.md](docs/DEPLOY.md)).
 
 </details>
+
+## The Chrome extension
+
+Most subscription paperwork is a web page, not a PDF. The extension saves one: open a billing page, a receipt or a checkout, click the Hippo button, press Save. Hippo pulls out the vendor, price, cycle and dates, each with the words it came from, and you confirm them on the same Review screen as an upload. Nothing alerts until you do. The Subscriptions page and the popup list everything Hippo knows about, with a monthly total of what you have confirmed.
+
+It reads only the page you choose, only after your click: the visible text, with long numbers masked, and the site name, never the full address. There is no background reading and no email or bank access. Reading uses fixed rules with no model, so it costs nothing and handles common layouts only. A page with no subscription is not kept. Details are in [apps/extension/README.md](apps/extension/README.md).
+
+Status: run it locally as an unpacked extension. It is not in the Chrome Web Store, and saving is off on the public demo server, because everyone there shares one household.
 
 ## Four rules everything follows
 
@@ -95,6 +103,7 @@ This is the target design. It runs locally today; the CDK stack for the AWS vers
 | :--- | :--- |
 | `apps/api` | The MCP server (nine tools), the OAuth endpoints and the web JSON API, on Hono. Data is in memory, seeded from the fixtures |
 | `apps/web` | The React web app (upload, review, Coming up, Things, Settings), the public landing page and the `/ask` demo MCP client |
+| `apps/extension` | The Chrome extension (Manifest V3): save a subscription page you are looking at, for review in the web app |
 | `apps/workers` | The ingest pipeline and the daily job (deadline alerts, recall radar, digest email) |
 | `packages/obligation-kit` | Deadline engine, extraction schemas, source quote check and CPSC and NHTSA matchers. One dependency (zod); network access only through an injected fetch |
 | `packages/core` | Asset resolver and linking, the repository (memory and DynamoDB), clause index, PDF page text, digest builder |
@@ -114,6 +123,7 @@ This is the target design. It runs locally today; the CDK stack for the AWS vers
 | Web JSON API, web app, `/ask` demo client with Coverage, Coming up and Recall cards | The MCP Apps host bridge (the cards are plain React) |
 | Daily job, digest builder and the SES adapter: one real digest was sent on 2026-10-21 from a sandbox account to a verified address | Any AWS deployment. DynamoDB is verified only against DynamoDB Local; sessions and auth state are in memory |
 | Ingest pipeline in fixture mode (8 of 8 dates and 58 of 58 fields match the expected files) | Reading any document other than the demo documents by default |
+| Chrome extension against a local server: sign in, save a page, confirm, in real Chrome | The toolbar click (the automated run used a test copy that opens the popup as a tab), any store release, saving on a public server |
 
 <details>
 <summary>Per part detail and test counts</summary>

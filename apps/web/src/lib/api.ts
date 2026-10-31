@@ -11,6 +11,7 @@ import type {
   ObligationRecord,
   ServiceEvent,
   UploadTicket,
+  Subscription,
 } from "./types";
 
 // One function per route of docs/WEB_API.md. The browser calls its own origin; the cookie is HttpOnly and never read here.
@@ -143,6 +144,9 @@ export const api = {
   listAlerts: (openOnly = true) => json<{ alerts: Alert[] }>("GET", `/api/alerts${openOnly ? "?open=true" : ""}`),
   resolveAlert: (alertId: string, action: AlertAction) =>
     json<{ alert: Alert }>("POST", `/api/alerts/${id(alertId)}/resolve`, { action }),
+
+  // Subscriptions
+  listSubscriptions: () => json<{ subscriptions: Subscription[]; monthlyTotal: number }>("GET", "/api/subscriptions"),
 
   // Things
   listAssets: () => json<{ assets: Asset[] }>("GET", "/api/assets"),

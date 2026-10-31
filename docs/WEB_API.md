@@ -125,6 +125,26 @@ curl -b jar "http://localhost:8787/api/alerts?open=true"                 # the n
 
 The demo household (`hh_demo`) already has the five seeded documents, so it has a confirmed lease. To see a clean first run, delete `doc-lease` first (`DELETE /api/docs/doc-lease`) or sign in with a magic code for another email (a new empty household). The clock is 2026-10-21, so the notice date 2026-11-01 is 11 days away.
 
+## Subscriptions
+
+| Route | Request | Response |
+| :--- | :--- | :--- |
+| `GET /api/subscriptions` | none | `{ subscriptions: Subscription[], monthlyTotal }`, by vendor, at most 200. `Subscription` is `{ agreementId, docId, vendor, plan, amount, cycle, nextChargeDate, confirmed, source }`. `confirmed` means a person confirmed the price, the cycle and any next charge date, and only those count in `monthlyTotal`. `source` is `{ docName, page }`, or null for a subscription added by voice. |
+
+## Extension API
+
+For the browser extension, under `/ext`, not `/api`. Auth is `Authorization: Bearer` with scope `mcp:tools`, the token an OAuth client gets; a bad token is a bare 401. An `Origin` that is not allowed is 403. Errors have the shape above. Household id: from the token only.
+
+| Route | Request | Response |
+| :--- | :--- | :--- |
+| `POST /ext/captures` | `{ title, host, text }`, strict. `host` is a site name, not an address. `text` is 1 to 60,000 characters. | `201 { saved: true, docId, reviewUrl }`, or `200 { saved: false }` when the page has no subscription and nothing was stored. |
+| `GET /ext/subscriptions` | none | Same as `GET /api/subscriptions`. |
+
+- 403: saving is off (no `onCaptured` hook). `apps/api/src/server.ts` loads the hook only when the server is bound to a loopback host, has a loopback issuer and no public domain (`isLocalOnly`). Anything else refuses.
+- 409: the same text was saved already, or the household already tracks that vendor. `X-Hippo-Doc` holds the existing document id, when there is one.
+- 429: more than 30 saves per household per hour, with `Retry-After`.
+- A saved page is a Doc with key `captures/<household>/<doc>/page.txt`, status `needs_review` and every field `extracted`. It then follows the normal review, confirm and delete routes.
+
 ## Not in this API
 
 - Reading email or bank data, filing claims, cancelling subscriptions (out of scope).

@@ -21,12 +21,27 @@ Today "the database" and "the object store" are both in memory when you run the 
 
 ## What Hippo does not do
 
-- It does not read your email or your bank to find subscriptions. You upload documents or say things.
+- It does not read your email or your bank to find subscriptions. You upload documents, say things, or save a page yourself with the browser extension.
 - It does not file claims.
 - It does not cancel subscriptions.
 - It does not push to your Echo. Reminders come at your next Alexa+ question or in a daily email digest.
 - It does not look at vehicle identification numbers. Vehicle recalls are matched by make, model and year, so they always say "may affect your car".
 - It is not legal or insurance advice. A coverage answer says what your document says and what the deadline is. It never says a claim will be approved. Check the document and talk to your insurer or seller.
+
+## The browser extension
+
+The extension (`apps/extension`) does not change the rule above: it reads no email and no bank data, and it never reads in the background.
+
+- It can read a page only after you click its button, and only that tab (`activeTab`). There is no content script on other pages and no access to all sites.
+- It reads the text visible on the page, the page title and the site name. It does not read form values or the page source, and it never sends the full address, because an address can hold a token.
+- Nothing leaves the browser until you press Save. The popup says how much text will be sent.
+- Long numbers are masked in the browser, and masked again by the server.
+- A page with no subscription on it is not kept. A saved page is stored like an upload, and deleting it removes the same things.
+- A saved page cannot alert and cannot answer a voice question until you have reviewed it.
+- Sign-in tokens are kept in memory only (`chrome.storage.session`) and are gone when the browser closes.
+- Saving is refused unless the server is bound to its own machine, so a hosted server refuses it. A tunnel you open yourself to a local server gets around this, so do not open one. The public demo shares one household between everyone, so a real page would be readable by the next visitor.
+
+The visible text of a billing page can still hold your name or address. Hippo does not remove those. Check the page before you press Save.
 
 ## Numbers are masked
 
@@ -130,6 +145,8 @@ For this prototype there is no production deployment and no retention schedule. 
 | Quotes must be on the cited page | `packages/obligation-kit/src/sourceRefs.ts` | `packages/obligation-kit/test/sourceRefs.test.ts` |
 | Delete one document / all data | `apps/api/src/api/routes.ts`, repository `deleteDocumentCascade` and `deleteHousehold` | `apps/api/test/webApi.review.test.ts` (sections "delete a document", "settings and delete all data"), repository suite |
 | Errors repeat no document text | `apps/api/src/api/routes.ts` `onError`, `http.ts` | `webApi.review.test.ts` ("an error never repeats document text") |
+| Extension: nothing alerts before review, household from token, no capture on a public host, no page kept without a subscription | `apps/api/src/api/extension.ts`, `apps/workers/src/ingest/capture.ts` | `apps/api/test/extension.test.ts` |
+| Extension: narrow permissions, nothing sent before Save, masked before sending | `apps/extension/public/manifest.json`, `apps/extension/src/page.ts` | `apps/extension/test/popup.test.tsx` |
 | Upload type, size and magic number checks | `apps/api/src/api/routes.ts`, `storage.ts` | `apps/api/test/webApi.upload.test.ts` |
 | PKCE S256, resource, bare 401, throttling, token lifetimes | `packages/auth/src/auth.ts` | `packages/auth/test/*` |
 | Encryption at rest, no public bucket, TLS only | `infra/src/hippo-stack.ts` | `infra/test/hippo-stack.test.ts` (template only, not deployed) |
