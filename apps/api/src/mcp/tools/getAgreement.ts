@@ -102,6 +102,30 @@ export const getAgreement: ToolHandler<Args> = async (ctx, args) => {
   const a = found.found;
   const doc = a.docId ? await repo.getDoc(hh, a.docId) : null;
 
+  const base = {
+    id: a.id,
+    kind: a.kind,
+    party: a.party ?? null,
+    title: a.title ?? null,
+    docId: a.docId ?? null,
+    docName: a.docId ? docNameOf(doc) : null,
+    assetIds: a.assetIds,
+  };
+  // Only reviewed documents answer: what a person has not looked at yet is not something to speak from. That includes
+  // the names read from it, which are page text and could say anything, so this reply carries none of them.
+  if (a.docId && doc?.status !== "active") {
+    return ok(
+      `I found your ${a.kind.replace("_", " ")}, but it has not been reviewed yet. Please confirm it in the app.`,
+      {
+        kind: "agreement",
+        agreement: { ...base, party: null, title: null, docName: null },
+        terms: [],
+        datesConfirmed: false,
+        quotedFromDocument: false,
+      },
+    );
+  }
+
   const terms = ROWS[a.kind].flatMap((row) => {
     const v = a.fields[row.key];
     if (v === null || v === undefined || flat(v) === "") return [];
@@ -114,15 +138,7 @@ export const getAgreement: ToolHandler<Args> = async (ctx, args) => {
 
   const structured = {
     kind: "agreement",
-    agreement: {
-      id: a.id,
-      kind: a.kind,
-      party: a.party ?? null,
-      title: a.title ?? null,
-      docId: a.docId ?? null,
-      docName: a.docId ? docNameOf(doc) : null,
-      assetIds: a.assetIds,
-    },
+    agreement: base,
     terms,
     datesConfirmed: confirmed,
     quotedFromDocument: a.docId !== undefined,

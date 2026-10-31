@@ -1251,3 +1251,10 @@ mark {
 .grow {
   flex: 1;
 }
+
+/* Six nav links leave no room for the address beside them until the bar is wide. */
+@media (max-width: 1440px) {
+  .bar-email {
+    display: none;
+  }
+}

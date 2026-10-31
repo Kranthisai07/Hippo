@@ -1,0 +1,77 @@
+{
+  "fernwood_billing": {
+    "host": "account.fernwood-streaming.example",
+    "isSubscription": true,
+    "values": {
+      "vendor": "Fernwood Streaming",
+      "plan": "Family",
+      "amount": 15.99,
+      "cycle": "monthly",
+      "nextChargeDate": "2026-11-03",
+      "trialEndDate": null,
+      "cancelNoticeDays": 1,
+      "cancelMethod": "open Account > Membership > Cancel.",
+      "accountEmailHint": "j***@example.com"
+    }
+  },
+  "kestrel_trial": {
+    "host": "www.kestrel-learning.example",
+    "isSubscription": true,
+    "values": {
+      "vendor": "Kestrel Learning",
+      "plan": null,
+      "amount": 9.99,
+      "cycle": "monthly",
+      "nextChargeDate": "2026-10-28",
+      "trialEndDate": "2026-10-28",
+      "cancelNoticeDays": 2,
+      "cancelMethod": null,
+      "accountEmailHint": null
+    }
+  },
+  "cedar_receipt": {
+    "host": "billing.cedarcloud.example",
+    "isSubscription": true,
+    "values": {
+      "vendor": "Cedar Cloud Storage",
+      "plan": "Cedar 2 TB",
+      "amount": 99,
+      "cycle": "annual",
+      "nextChargeDate": "2027-10-02",
+      "trialEndDate": null,
+      "cancelNoticeDays": null,
+      "cancelMethod": null,
+      "accountEmailHint": null
+    }
+  },
+  "lantern_pricing": {
+    "host": "lantern-notes.example",
+    "isSubscription": false,
+    "values": {
+      "vendor": "Lantern Notes",
+      "plan": null,
+      "amount": null,
+      "cycle": null,
+      "nextChargeDate": null,
+      "trialEndDate": null,
+      "cancelNoticeDays": null,
+      "cancelMethod": null,
+      "accountEmailHint": null
+    }
+  },
+  "harbor_order": {
+    "host": "shop.harbor-goods.example",
+    "isSubscription": false,
+    "values": {
+      "vendor": "Harbor Goods",
+      "plan": null,
+      "amount": null,
+      "cycle": null,
+      "nextChargeDate": null,
+      "trialEndDate": null,
+      "cancelNoticeDays": null,
+      "cancelMethod": null,
+      "accountEmailHint": null
+    }
+  }
+}

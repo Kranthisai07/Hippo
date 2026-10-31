@@ -2,7 +2,7 @@
 // network is injected, so the pipeline itself never does. Document text is untrusted data: it is read, quoted and
 // matched, never obeyed, and never written to a log. Nothing here can set a field to `confirmed`.
 import type { Doc, Repository } from "core/src/contracts";
-import { extractPages, fillOcrPages, type Ocr } from "core/src/pages";
+import { extractPages, fillOcrPages, type Ocr, type Page } from "core/src/pages";
 import { ExtractionSchemas, leavesToAgreementFields, verifySourceRefs, type AgreementKind } from "obligation-kit";
 import { saveIngested, type IndexStore, type OnUploaded } from "../../../api/src/api/fixtureIngest";
 import { maskNumbers } from "../../../api/src/mcp/speak";
@@ -47,8 +47,12 @@ function maskQuotes(node: unknown): unknown {
   return node;
 }
 
-export function createIngest(deps: IngestDeps): OnUploaded {
-  const { repo, objectStore, extractor } = deps;
+export type ReadPage = Pick<Page, "number" | "text" | "ocrDone">;
+export type PagesDeps = Pick<IngestDeps, "repo" | "objectStore" | "indexStore" | "extractor" | "now" | "log">;
+
+/** Page text in, a needs_review document out. The part of ingest that does not care where the text came from. */
+export function createPagesIngest(deps: PagesDeps) {
+  const { extractor } = deps;
   const log = deps.log ?? (() => undefined);
 
   async function extractValid(kind: AgreementKind, pages: Parameters<Extractor["extract"]>[1]) {
@@ -60,17 +64,7 @@ export function createIngest(deps: IngestDeps): OnUploaded {
     throw new IngestFailure(BAD_OUTPUT);
   }
 
-  async function run(hh: string, doc: Doc): Promise<void> {
-    const bytes = await objectStore.get(doc.s3Key);
-    if (!bytes) throw new IngestFailure(FILE_MISSING);
-
-    let result = await extractPages(bytes, deps.maxPages === undefined ? {} : { maxPages: deps.maxPages });
-    if (result.pages.some((p) => p.needsOcr)) {
-      if (result.kind === "pdf" && result.pages.length > 1 && !deps.ocrReadsPdfPages)
-        throw new IngestFailure(PICTURE_PAGES);
-      result = await fillOcrPages(result, deps.ocr, bytes);
-    }
-    const pages = result.pages;
+  return async function ingestPages(hh: string, doc: Doc, pages: ReadPage[]): Promise<void> {
     if (pages.every((p) => p.text.trim() === "")) throw new IngestFailure(NO_TEXT);
 
     const kind = await extractor.classify(pages);
@@ -104,6 +98,25 @@ export function createIngest(deps: IngestDeps): OnUploaded {
       // One agreement per document, so a second run overwrites instead of duplicating.
       agreementId: `agr-${doc.id}`,
     });
+  };
+}
+
+export function createIngest(deps: IngestDeps): OnUploaded {
+  const { repo, objectStore } = deps;
+  const log = deps.log ?? (() => undefined);
+  const ingestPages = createPagesIngest(deps);
+
+  async function run(hh: string, doc: Doc): Promise<void> {
+    const bytes = await objectStore.get(doc.s3Key);
+    if (!bytes) throw new IngestFailure(FILE_MISSING);
+
+    let result = await extractPages(bytes, deps.maxPages === undefined ? {} : { maxPages: deps.maxPages });
+    if (result.pages.some((p) => p.needsOcr)) {
+      if (result.kind === "pdf" && result.pages.length > 1 && !deps.ocrReadsPdfPages)
+        throw new IngestFailure(PICTURE_PAGES);
+      result = await fillOcrPages(result, deps.ocr, bytes);
+    }
+    await ingestPages(hh, doc, result.pages);
   }
 
   return async ({ householdId: hh, docId }) => {

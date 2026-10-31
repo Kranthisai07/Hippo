@@ -3,6 +3,7 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import type { Repository } from "core/src/contracts";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
+import { createExtensionApi, type OnCaptured } from "./api/extension";
 import { createFixtureIngest, type IndexStore, type OnUploaded } from "./api/fixtureIngest";
 import { createWebApi } from "./api/routes";
 import { createLocalUploader, createMemoryObjectStore, type ObjectStore, type Uploader } from "./api/storage";
@@ -34,6 +35,8 @@ export interface WebDeps {
   uploader?: Uploader;
   /** Runs after the bytes are stored. Default: the fixture ingest, which only reads the demo documents. */
   onUploaded?: OnUploaded;
+  /** Saves a page sent by the browser extension. Left out, captures are refused (every public host). */
+  onCaptured?: OnCaptured;
   /** Where the clause index is written. Default: indexSource when it can be written to. */
   indexStore?: IndexStore;
   /** Browser origins other than the server's own that may send writes with the session cookie (the web dev server). */
@@ -92,6 +95,17 @@ export function createApp(deps: AppDeps): Hono {
       now,
       newId,
       origins: web.origins ?? [],
+    }),
+  );
+
+  app.route(
+    "/ext",
+    createExtensionApi({
+      auth: deps.auth,
+      repo: deps.repo,
+      onCaptured: web.onCaptured,
+      allowedOrigins: allowed,
+      now,
     }),
   );
 

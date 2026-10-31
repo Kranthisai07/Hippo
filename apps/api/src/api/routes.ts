@@ -6,6 +6,7 @@ import { HTTPException } from "hono/http-exception";
 import { addDays, parseIso } from "obligation-kit";
 import { z } from "zod";
 import { syncObligations } from "../obligations";
+import { listSubscriptions } from "../subscriptions";
 import { applyAlertAction } from "../mcp/alerts";
 import { maskNumbers } from "../mcp/speak";
 import type { IndexCache } from "../mcp/indexCache";
@@ -112,6 +113,8 @@ export function createWebApi(deps: WebApiDeps): Hono<{ Variables: { hh: string; 
     const household = await repo.getHousehold(c.var.hh);
     return c.json({ email: household?.email ?? c.var.email, digestOn: household?.digestOn ?? true });
   });
+
+  api.get("/subscriptions", async (c) => c.json(await listSubscriptions(repo, c.var.hh, today())));
 
   // Uploads
 

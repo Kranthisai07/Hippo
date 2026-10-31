@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Hippo",
+  "version": "0.1.0",
+  "description": "Save a subscription page to Hippo. Reads only the page you click it on, and sends nothing until you press Save.",
+  "minimum_chrome_version": "113",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvZCy8pjy5qpttOPuwnayNG/xBY51ImIITwyMeqDPSm8ZQcUcrjN3rVMten6JvkJBeFzZOSvLYrCZvAhO/lMS2QUmrcLm+tPI5qdPL7mDJnhgrVmIqDrrVUVxPPasGbq7e0fkcDMVqeJ/To1CoC3mtg3hEdkQ6uTtEZ5IYb+Pcw9N+RT4lRqrj7eDVnRv8ONho62YKYQbcVaAPOlMLHQcFW6QmFd2sAnvhyHCJTaMkHrMffm5s7msom6XAtpRZ3q2biPsfzWkHkrW/HaBfuynlgu49rzb4gP+Lcp9AURwUoqJA9ZJ53+vchKywdJtj+B0Y3/5M7f21UIh1EN/l8sP+QIDAQAB",
+  "action": { "default_popup": "popup.html", "default_title": "Save this page to Hippo" },
+  "background": { "service_worker": "background.js", "type": "module" },
+  "permissions": ["activeTab", "scripting", "identity", "storage"],
+  "host_permissions": ["http://localhost:8787/*"]
+}

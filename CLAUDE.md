@@ -36,6 +36,7 @@ Run `reviewer` before every merge.
 - DynamoDB suite (needs Docker): `docker compose up -d`, then `DYNAMODB_ENDPOINT=http://localhost:8000 AWS_ACCESS_KEY_ID=local AWS_SECRET_ACCESS_KEY=local AWS_REGION=us-east-1 npx vitest run test/repository.dynamo.test.ts` in `packages/core`. CI runs it on every push
 - `pnpm --filter @hippo/api demo`: the three demo moments through a real MCP client
 - `pnpm daily:run`: deadlines, alerts, recall radar, digest. A dry run on recorded fixtures; `--send` only prints, `--live-recalls` calls CPSC and NHTSA
+- `pnpm --filter @hippo/extension build`, then load `apps/extension/dist` in `chrome://extensions` (Developer mode, Load unpacked). Needs `pnpm dev` and `pnpm dev:web`. Sample pages are in `fixtures/pages`
 - `pnpm ingest:fixture <file>`: run the ingest pipeline on one fixture. `pnpm --filter @hippo/web test:e2e`: Playwright smoke test. `pnpm inspect`: not built. `pnpm deploy`: not built, ask first
 
 ## End of every session

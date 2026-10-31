@@ -8,6 +8,15 @@ async function get(over: Record<string, string | undefined>) {
   return { env, res, loc: res.headers.get("location") };
 }
 
+describe("the login page", () => {
+  it("lets the demo button submit with the email box empty, which the browser would otherwise block", async () => {
+    const { res } = await get({});
+    const html = await res.text();
+    expect(html).toContain("required");
+    expect(html).toMatch(/value="demo" formnovalidate/);
+  });
+});
+
 describe("metadata", () => {
   it("protected resource metadata has the RFC 9728 fields", async () => {
     const env = makeEnv();

@@ -28,7 +28,7 @@ export function loginPage(v: LoginView): string {
   const cont = v.sessionEmail
     ? `<p>Signed in as ${esc(v.sessionEmail)}.</p><button type="submit" name="action" value="continue">Continue</button><hr>`
     : "";
-  const demo = v.demo ? `<button type="submit" name="action" value="demo">Use the demo household</button>` : "";
+  const demo = v.demo ? `<button type="submit" name="action" value="demo" formnovalidate>Use the demo household</button>` : "";
   return page(
     "Sign in to Hippo",
     `<h1>Sign in to Hippo</h1>${msg}<form method="post" action="/oauth/authorize" autocomplete="off">${hidden}<input type="hidden" name="csrf" value="${esc(v.csrf)}">${cont}<label for="email">Email</label><input id="email" name="email" type="email" maxlength="254" value="${esc(v.email)}" required><label for="code">One time code</label><input id="code" name="code" inputmode="numeric" maxlength="12"><button type="submit" name="action" value="send">Send me a code</button><button type="submit" name="action" value="login">Sign in</button>${demo}</form>`,

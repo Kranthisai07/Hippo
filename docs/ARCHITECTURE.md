@@ -87,6 +87,16 @@ The review screen is the React web app in `apps/web`. The same steps are availab
 
 The first tool result of the day carries one extra sentence (for the demo, "Before that, your car insurance renews in 9 days."). It is built from open, high severity alerts only. Priority is renewals, expiries and notice-by dates, then recalls, then the rest. At most one sentence per household per day (D-042). The daily job in `apps/workers` is what raises deadline and recall alerts and builds the email digest.
 
+## The browser extension
+
+`apps/extension` is a Manifest V3 extension. On a click, the popup reads the visible text of the active tab and masks long numbers. On Save it calls `POST /ext/captures` with a bearer token. The service worker owns sign-in (OAuth with PKCE through `chrome.identity.launchWebAuthFlow`) and tokens, because a popup closes when the sign-in window takes focus.
+
+The server reads the text with `extractSubscriptionRules` (`packages/obligation-kit/src/rules/subscription.ts`): fixed patterns, no model. It is an `Extractor` (`apps/workers/src/ingest/ruleExtractor.ts`), so a saved page takes the same path as an upload from page text onwards: the schema, the quote check and `saveIngested`, with every field `extracted`. It never uses `add_record`, which marks fields confirmed. When a page gives two answers for a field, the field stays null. No capture code runs in an MCP handler.
+
+Limits: the rules read US dollars and English only, and a date with no year is left out. On a household with very few short documents, one word questions can fall under the search cutoff (see Retrieval).
+
+Sign-in and saving were run in real Chrome 156 against the local server, using a throwaway test copy of the build that opens the popup as a tab, with its message guard and tab lookup changed to allow that. So the click that grants `activeTab` was not automated. Saving needs a server bound to a loopback host with a loopback issuer (`isLocalOnly` in `apps/api/src/server.ts`), so no reachable server accepts saves.
+
 ## Why the voice path has no LLM and no outbound HTTP
 
 INTENT principle 3: the voice path is fast and dumb. All reading happens at upload time. A round trip has to stay under 500 ms, and a model call or a third party call inside a tool would break that and add a way for document text to steer behavior.

@@ -12,8 +12,20 @@ import { DEMO_HOUSEHOLD, seedHousehold } from "./seed";
 // Local server for the demo and for judges: in-memory repository seeded from the fixtures, the @hippo/auth server with
 // one demo user, and the MCP endpoint at /mcp. Nothing here talks to AWS.
 
+/** A server anyone can reach. The demo household there is shared, so a real page must never be saved into it. */
+export const isPublicIssuer = (issuer: string): boolean => !LOOPBACK_HOSTS.has(new URL(issuer).hostname);
+
+/**
+ * A real page may only be saved on a server that this machine alone can reach, because the demo household is shared on
+ * anything wider. All three must hold: an issuer alone is not enough, since HOST=0.0.0.0 keeps a localhost issuer.
+ */
+export const isLocalOnly = (host: string, issuer: string, env: Record<string, string | undefined>): boolean =>
+  LOOPBACK_HOSTS.has(host.toLowerCase()) && !isPublicIssuer(issuer) && !env.RAILWAY_PUBLIC_DOMAIN;
+
 /** The date every deadline in the fixtures is computed against (fixtures/README.md). */
 export const DEMO_TODAY = "2026-10-21";
+/** The id Chrome gives apps/extension, fixed by the public key in its manifest. Local servers trust it by default. */
+export const DEV_EXTENSION_ID = "gcanedelajoahpaoeeonbdlieoepcobc";
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
 
 /**
@@ -59,7 +71,7 @@ export async function startServer(opts: ServerOptions = {}): Promise<Running> {
   const issuer =
     env.HIPPO_ISSUER ??
     (env.RAILWAY_PUBLIC_DOMAIN ? `https://${env.RAILWAY_PUBLIC_DOMAIN}` : `http://localhost:${port}`);
-  const publicHost = !LOOPBACK_HOSTS.has(new URL(issuer).hostname);
+  const publicHost = isPublicIssuer(issuer);
 
   let signingKey = env.HIPPO_SIGNING_KEY;
   if (!signingKey) {
@@ -95,6 +107,10 @@ export async function startServer(opts: ServerOptions = {}): Promise<Running> {
   const redirectUris = list(env.HIPPO_REDIRECT_URIS, [
     publicHost ? `${issuer}/callback` : "http://localhost:5173/callback",
   ]);
+  // The extension signs in with the same client. Its origin may reach /mcp and /ext only, never the cookie routes.
+  const localOnly = isLocalOnly(host, issuer, env);
+  const extensionId = env.HIPPO_EXTENSION_ID ?? (localOnly ? DEV_EXTENSION_ID : undefined);
+  if (extensionId) redirectUris.push(`https://${extensionId}.chromiumapp.org/`);
   const serviceId = env.HIPPO_SERVICE_CLIENT_ID;
   const serviceSecret = env.HIPPO_SERVICE_CLIENT_SECRET;
 
@@ -124,7 +140,11 @@ export async function startServer(opts: ServerOptions = {}): Promise<Running> {
     indexSource,
     now: clock,
     // The server's own origin too: when it serves the web build itself, the /ask page calls /mcp from this origin.
-    allowedOrigins: [new URL(issuer).origin, ...allowedOrigins],
+    allowedOrigins: [
+      new URL(issuer).origin,
+      ...allowedOrigins,
+      ...(extensionId ? [`chrome-extension://${extensionId}`] : []),
+    ],
     // Web API: files in memory, the PUT route of this server, and the fixture ingest (createApp's default hook) that
     // only reads the demo documents. The web dev server may send the cookie from its own origin.
     web: {
@@ -138,6 +158,18 @@ export async function startServer(opts: ServerOptions = {}): Promise<Running> {
             ),
           }
         : {}),
+      // The browser extension saves pages only on a local server. The hook is not even loaded anywhere else.
+      ...(localOnly
+        ? {
+            onCaptured: (await import("../../workers/src/ingest/capture")).createCaptureIngest({
+              repo,
+              objectStore,
+              indexStore: indexSource,
+              now: clock,
+              log,
+            }),
+          }
+        : {}),
       uploader: createLocalUploader({ now: clock }),
       origins: [new URL(issuer).origin, ...allowedOrigins],
     },
@@ -148,7 +180,7 @@ export async function startServer(opts: ServerOptions = {}): Promise<Running> {
   // the cookie session work unchanged). The API, OAuth and MCP paths are never answered with the page.
   if (env.HIPPO_WEB_DIST) {
     const root = env.HIPPO_WEB_DIST;
-    const API_PATHS = ["/api", "/oauth", "/mcp", "/.well-known"];
+    const API_PATHS = ["/api", "/ext", "/oauth", "/mcp", "/.well-known"];
     const isApi = (p: string) => API_PATHS.some((a) => p === a || p.startsWith(`${a}/`));
     app.get("*", async (c, next) => (isApi(c.req.path) ? next() : serveStatic({ root })(c, next)));
     app.get("*", async (c, next) => (isApi(c.req.path) ? next() : serveStatic({ root, path: "index.html" })(c, next)));

@@ -9,6 +9,7 @@ import { Legal } from "./pages/Legal";
 import { Review } from "./pages/Review";
 import { SettingsPage } from "./pages/Settings";
 import { SignIn } from "./pages/SignIn";
+import { Subscriptions } from "./pages/Subscriptions";
 import { ThingDetail, Things } from "./pages/Things";
 import { UploadPage } from "./pages/Upload";
 
@@ -82,6 +83,7 @@ export function App() {
             <Route index element={<ComingUp />} />
             <Route path="/upload" element={<UploadPage />} />
             <Route path="/review/:docId" element={<Review />} />
+            <Route path="/subscriptions" element={<Subscriptions />} />
             <Route path="/things" element={<Things />} />
             <Route path="/things/:assetId" element={<ThingDetail />} />
             <Route path="/settings" element={<SettingsPage />} />
