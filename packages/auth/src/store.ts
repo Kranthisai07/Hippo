@@ -43,6 +43,8 @@ export interface AuthStore {
   putRefresh(key: string, rec: RefreshRecord): Promise<void>;
   consumeRefresh(key: string): Promise<Consumed<RefreshRecord>>;
   revokeFamily(familyId: string): Promise<void>;
+  /** Ends every web session and every refresh token of one user. A durable store needs an index by `sub` for this. */
+  revokeUser(sub: string): Promise<void>;
   putSession(key: string, rec: SessionRecord): Promise<void>;
   getSession(key: string): Promise<SessionRecord | undefined>;
   deleteSession(key: string): Promise<void>;
@@ -91,6 +93,11 @@ export function createMemoryStore(): AuthStore {
     async revokeFamily(familyId) {
       for (const e of refresh.values()) if (e.rec.familyId === familyId) e.used = true;
       for (const e of codes.values()) if (e.rec.familyId === familyId) e.used = true;
+    },
+    async revokeUser(sub) {
+      for (const e of refresh.values()) if (e.rec.sub === sub) e.used = true;
+      for (const e of codes.values()) if (e.rec.sub === sub) e.used = true;
+      for (const [k, v] of sessions) if (v.sub === sub) sessions.delete(k);
     },
     async putSession(key, rec) {
       sessions.set(key, rec);

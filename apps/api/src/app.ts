@@ -89,6 +89,24 @@ export function createApp(deps: AppDeps): Hono {
   const allowed = new Set(deps.allowedOrigins ?? []);
   const limiter = deps.limiter ?? createMemoryLimiter(now);
 
+  // One line per request, in JSON. No query string, no header and no body: a path holds ids only, never a token or text.
+  app.use("*", async (c, next) => {
+    const id = crypto.randomUUID();
+    const t0 = Date.now();
+    c.header("X-Request-Id", id);
+    await next();
+    deps.log?.(
+      JSON.stringify({
+        ts: new Date(t0).toISOString(),
+        id,
+        method: c.req.method,
+        path: c.req.path,
+        status: c.res.status,
+        ms: Date.now() - t0,
+      }),
+    );
+  });
+
   // Every response, including a fresh Response a handler returns. A route that sets its own value keeps it.
   app.use("*", async (c, next) => {
     await next();

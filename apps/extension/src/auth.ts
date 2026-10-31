@@ -65,7 +65,21 @@ export async function signIn(): Promise<void> {
   await tokenRequest({ grant_type: "authorization_code", code, redirect_uri: redirectUri, code_verifier: verifier });
 }
 
-export const signOut = (): Promise<void> => chrome.storage.session.remove(KEY);
+const clear = (): Promise<void> => chrome.storage.session.remove(KEY);
+
+/** The person pressed Sign out: end the refresh token on the server too, so a copy of it is worth nothing. */
+export async function signOut(): Promise<void> {
+  const tokens = await load();
+  if (tokens?.refresh) {
+    // Best effort. A server that does not answer must not keep the person signed in on this browser.
+    await fetch(`${API_ORIGIN}/oauth/revoke`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ token: tokens.refresh, client_id: CLIENT_ID }),
+    }).catch(() => undefined);
+  }
+  await clear();
+}
 
 export const isSignedIn = async (): Promise<boolean> => (await load()) !== null;
 
@@ -76,7 +90,7 @@ let inflight: Promise<void> | null = null;
 function refresh(rt: string): Promise<void> {
   inflight ??= tokenRequest({ grant_type: "refresh_token", refresh_token: rt })
     .catch(async (e: unknown) => {
-      if (e instanceof Refused) await signOut();
+      if (e instanceof Refused) await clear();
       throw e;
     })
     .finally(() => {
@@ -92,7 +106,7 @@ export async function accessToken(): Promise<string | null> {
   if (!tokens) return null;
   if (tokens.expiresAt - Date.now() >= 30_000) return tokens.access;
   if (!tokens.refresh) {
-    await signOut();
+    await clear();
     return null;
   }
   await refresh(tokens.refresh).catch(() => undefined);

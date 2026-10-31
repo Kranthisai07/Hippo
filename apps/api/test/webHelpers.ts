@@ -36,6 +36,7 @@ export async function makeWeb(over: { web?: WebDeps; app?: Partial<AppDeps> } = 
   const indexSource = createMemoryIndexSource();
   const objectStore = createMemoryObjectStore();
   const logs: string[] = [];
+  const requestLog: string[] = [];
   const clock = { t: NOW };
   await seedHousehold(repo, { today: ANCHOR, householdId: A, indexSource, pageStore: objectStore });
   const auth = createAuth({
@@ -56,6 +57,8 @@ export async function makeWeb(over: { web?: WebDeps; app?: Partial<AppDeps> } = 
     indexSource,
     now: () => clock.t,
     newId: () => `t${++n}`,
+    // The app's own lines (one per request) stay apart from `logs`, where the login helper looks for the last code.
+    log: (line) => requestLog.push(line),
     web: { objectStore, uploader: createLocalUploader(), origins: [DEV_ORIGIN], ...over.web },
     ...over.app,
   });
@@ -133,6 +136,7 @@ export async function makeWeb(over: { web?: WebDeps; app?: Partial<AppDeps> } = 
     indexSource,
     objectStore,
     logs,
+    requestLog,
     clock,
     a,
     b,

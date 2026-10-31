@@ -133,6 +133,7 @@ export async function startServer(opts: ServerOptions = {}): Promise<Running> {
         ? DEMO_HOUSEHOLD
         : `hh_${createHash("sha256").update(email).digest("base64url").slice(0, 16)}`,
     log,
+    audit: (e) => log(JSON.stringify({ ts: new Date().toISOString(), audit: e.event, sub: e.sub, reason: e.reason })),
     ...(demoOn ? { demoUser: { email: demoEmail, code: demoCode } } : {}),
     // Without the demo there is no mailer, so a printed code would only leak into a shared log.
     logMagicCodes: demoOn,

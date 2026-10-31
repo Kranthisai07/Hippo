@@ -36,6 +36,8 @@ export interface AuthOptions {
    * exists). Defaults to true. Turn it off anywhere the log is shared: the code is a login credential.
    */
   logMagicCodes?: boolean;
+  /** One call per security event. Carries the hashed `sub` and a reason, never an email, a code or a token. */
+  audit?: (e: AuditEvent) => void;
   /** Emails the code. When set it replaces the log line. A failure is logged by error name only and never shown. */
   mailer?: Mailer;
   /** Service credentials for the client_credentials grant (scope mcp:service only). */
@@ -47,6 +49,21 @@ export interface AuthOptions {
   random?: RandomBytes;
   /** Defaults to true when the issuer is https. */
   secureCookie?: boolean;
+}
+
+export interface AuditEvent {
+  event:
+    | "code_sent"
+    | "code_throttled"
+    | "login_ok"
+    | "login_failed"
+    | "refresh_reuse"
+    | "code_replay"
+    | "logout"
+    | "logout_all"
+    | "revoke";
+  sub?: string;
+  reason?: string;
 }
 
 export const TTL = {
@@ -155,6 +172,7 @@ export function createAuth(opts: AuthOptions): Auth {
       issuer,
       authorization_endpoint: `${issuer}/oauth/authorize`,
       token_endpoint: `${issuer}/oauth/token`,
+      revocation_endpoint: `${issuer}/oauth/revoke`,
       response_types_supported: ["code"],
       grant_types_supported: ["authorization_code", "refresh_token", "client_credentials"],
       code_challenge_methods_supported: ["S256"],
@@ -190,6 +208,8 @@ export function createAuth(opts: AuthOptions): Auth {
     return { sub: "u_" + (await sha256b64url(email)).slice(0, 22), householdId };
   };
 
+  const subOf = async (email: string): Promise<string> => "u_" + (await sha256b64url(email)).slice(0, 22);
+
   const retrySec = (ms: number): number => Math.max(1, Math.ceil(ms / 1000));
 
   /** Returns Retry-After seconds when the send is refused, otherwise null. */
@@ -201,7 +221,10 @@ export function createAuth(opts: AuthOptions): Auth {
       SEND_GAP_MS,
       now(),
     );
-    if (!gate.ok) return retrySec(gate.retryAfterMs);
+    if (!gate.ok) {
+      opts.audit?.({ event: "code_throttled", sub: await subOf(email), reason: "send" });
+      return retrySec(gate.retryAfterMs);
+    }
     const code = sixDigits(random);
     await store.putMagic(await sha256b64url(email), {
       codeHash: await sha256b64url(code),
@@ -215,12 +238,21 @@ export function createAuth(opts: AuthOptions): Auth {
         .catch((e: unknown) => opts.log(`[hippo-auth] mail failed: ${e instanceof Error ? e.name : "error"}`));
       // DELIBERATE: the only place a secret is logged. The demo has no mail provider, so the magic code goes to the server log.
     } else if (opts.logMagicCodes !== false) opts.log(`[hippo-auth] magic code for ${email}: ${code}`);
+    opts.audit?.({ event: "code_sent", sub: await subOf(email) });
     return null;
   };
 
   // Every guess takes a slot before it is compared, so parallel guesses cannot exceed the limit.
   // The demo code goes through the same counter. A success clears it.
   const checkMagic = async (email: string, code: unknown): Promise<"ok" | "bad" | { retryAfterSec: number }> => {
+    const r = await checkMagicInner(email, code);
+    if (r === "bad") opts.audit?.({ event: "login_failed", sub: await subOf(email), reason: "code" });
+    else if (typeof r === "object")
+      opts.audit?.({ event: "code_throttled", sub: await subOf(email), reason: "guesses" });
+    return r;
+  };
+
+  const checkMagicInner = async (email: string, code: unknown): Promise<"ok" | "bad" | { retryAfterSec: number }> => {
     if (typeof code !== "string" || code.length === 0 || code.length > 12) return "bad";
     const k = await sha256b64url(email);
     const slot = await store.tryHit("fail:" + k, GUESS_WINDOW_MS, MAX_GUESSES, 0, now());
@@ -249,6 +281,7 @@ export function createAuth(opts: AuthOptions): Auth {
     const id = await identity(email);
     const sid = token(random);
     await store.putSession(await sha256b64url(sid), { email, ...id, expiresAt: now() + TTL.sessionMs });
+    opts.audit?.({ event: "login_ok", sub: id.sub, reason: "session" });
     setCookie(c, SESSION_COOKIE, sid, cookieOpts("/", TTL.sessionMs / 1000));
     return { email, householdId: id.householdId };
   };
@@ -421,6 +454,7 @@ export function createAuth(opts: AuthOptions): Auth {
 
     // The household comes from the server side mapping, never from the request.
     const id = await identity(email);
+    opts.audit?.({ event: "login_ok", sub: id.sub, reason: "authorize" });
     const code = token(random);
     await store.putCode(await sha256b64url(code), {
       clientId: p.clientId,
@@ -553,6 +587,7 @@ export function createAuth(opts: AuthOptions): Auth {
       const rec = got.record;
       if (got.status === "used") {
         await store.revokeFamily(rec.familyId); // replay: kill anything already issued from this code
+        opts.audit?.({ event: "code_replay", sub: rec.sub });
         return tokErr(c, "invalid_grant", "code already used");
       }
       if (rec.expiresAt <= now()) return tokErr(c, "invalid_grant", "code expired");
@@ -576,6 +611,7 @@ export function createAuth(opts: AuthOptions): Auth {
       const rec = got.record;
       if (got.status === "used") {
         await store.revokeFamily(rec.familyId); // reuse detected
+        opts.audit?.({ event: "refresh_reuse", sub: rec.sub });
         return tokErr(c, "invalid_grant", "refresh token already used");
       }
       if (rec.expiresAt <= now()) return tokErr(c, "invalid_grant", "refresh token expired");
@@ -599,6 +635,26 @@ export function createAuth(opts: AuthOptions): Auth {
     }
 
     return tokErr(c, "unsupported_grant_type", "unsupported grant_type");
+  });
+
+  // RFC 7009. Always 200, so a caller learns nothing about whether the token was real. Revoking one refresh token ends
+  // its whole family, which includes the newest token handed out by a rotation. An access token is not revoked: it is
+  // stateless and ends by itself within TTL.accessSec.
+  app.post("/oauth/revoke", limit, async (c) => {
+    const ct = c.req.header("content-type") ?? "";
+    if (!ct.toLowerCase().startsWith("application/x-www-form-urlencoded"))
+      return c.json({ error: "invalid_request" }, 400, noStore);
+    const sp = new URLSearchParams(await c.req.text());
+    const rt = single(sp, "token");
+    const clientId = single(sp, "client_id");
+    if (typeof rt === "string" && rt.length <= 200 && typeof clientId === "string") {
+      const got = await store.consumeRefresh(await sha256b64url(rt));
+      if (got.status !== "unknown" && got.record.clientId === clientId) {
+        await store.revokeFamily(got.record.familyId);
+        opts.audit?.({ event: "revoke", sub: got.record.sub });
+      }
+    }
+    return c.body(null, 200, noStore);
   });
 
   // Web sessions (cookie). JSON only, so a cross site form cannot reach them; Origin is checked when present.
@@ -649,6 +705,18 @@ export function createAuth(opts: AuthOptions): Auth {
     return c.json(await startSession(c, email), 200, noStore);
   });
 
+  // Every browser and every extension signed in as this person. Access tokens already issued end within 15 minutes.
+  app.post("/oauth/logout-all", limit, async (c) => {
+    const g = jsonGuard(c);
+    if (g) return g;
+    const s = await sessionFromId(getCookie(c, SESSION_COOKIE));
+    if (!s) return unauthorized();
+    await store.revokeUser(s.sub);
+    deleteCookie(c, SESSION_COOKIE, { path: "/", secure, httpOnly: true, sameSite: "Lax" });
+    opts.audit?.({ event: "logout_all", sub: s.sub });
+    return c.json({ ok: true }, 200, noStore);
+  });
+
   app.get("/oauth/session", async (c) => {
     const s = await sessionFromId(getCookie(c, SESSION_COOKIE));
     if (!s) return unauthorized();
@@ -659,7 +727,9 @@ export function createAuth(opts: AuthOptions): Auth {
     const g = jsonGuard(c);
     if (g) return g;
     const sid = getCookie(c, SESSION_COOKIE);
+    const had = sid ? await sessionFromId(sid) : null;
     if (sid) await store.deleteSession(await sha256b64url(sid));
+    if (had) opts.audit?.({ event: "logout", sub: had.sub });
     deleteCookie(c, SESSION_COOKIE, { path: "/", secure, httpOnly: true, sameSite: "Lax" });
     return c.json({ ok: true }, 200, noStore);
   });
