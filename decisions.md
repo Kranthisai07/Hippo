@@ -37,3 +37,12 @@ No decisions log exists on main (MEMORY.md is only in old worktrees), so this fi
 - **Tests that passed for the wrong reason** were rewritten: the socket address test injects two addresses, and the wrong client revoke test checks that a descendant token dies.
 - **Left as is:** the revoke versus rotation race needs a tombstone in a durable store (Phase 2); the quota is not atomic (bounded by 30 saves an hour); the production check only fires on `HIPPO_ENV=production`.
 
+## 2026-10-31: Phase 2 slice 1, a D1 client for the repository (+claude)
+
+- **What:** `createD1DocumentClient` (packages/core/src/repository/d1.ts) answers the five DynamoDB requests that `dynamo.ts` sends (Put, Get, Delete, BatchWrite, Query) with SQL, over one `items` table (apps/edge/migrations/0001_items.sql). `createDynamoRepository` runs on it unchanged.
+- **Why this approach:** the repository logic (keys, escaping, cascade, ordering, paging) is already written and covered by the 1070 line shared suite. A SQL repository written from scratch would fork that logic and need the same suite to pass anyway. The adapter is about 130 lines and the suite is the proof.
+- **Why not table per entity or a JSON blob only:** DynamoDB's access pattern is key prefix and range reads inside one household partition plus one sparse index. One table with `(pk, sk)` as primary key and a partial index on `(gsi1pk, gsi1sk)` is the same shape, so ordering and paging match with no translation layer.
+- **Details that matter:** keys compare as raw bytes in SQLite's default collation, like DynamoDB (tested with upper and lower case and `%`, `_`). `begins_with` uses `substr(...) = ?`, not `LIKE`, so `%` and `_` in a key are not patterns. Every value is a bound parameter. The conditional delete used by `popUndo` is a select plus delete in one `batch` (one transaction), so two racing callers cannot both win; this assumes D1 serialises writers, to be proven on a real D1 database in slice 6 (docs/VERIFIED.md 10 says transactional rollback is documented, isolation is not).
+- **Skipped on purpose:** no TTL purge. `popUndo` already checks expiry itself, so stale undo rows only waste space, and a periodic delete can come with the daily job. Commands are matched with `instanceof`, not class names, so minified builds still work.
+- **What this does not prove:** the test database is Node's built in `node:sqlite` (experimental), not Cloudflare D1. Our SQL and logic are proven, D1's behaviour is not.
+
