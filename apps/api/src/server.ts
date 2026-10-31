@@ -5,6 +5,7 @@ import { serve, type ServerType } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { createMemoryRepository } from "core/src/repository";
 import { createApp } from "./app";
+import { productionProblems } from "./config";
 import { createLocalUploader, createMemoryObjectStore } from "./api/storage";
 import { createMemoryIndexSource } from "./mcp/indexCache";
 import { DEMO_HOUSEHOLD, seedHousehold } from "./seed";
@@ -64,6 +65,11 @@ const list = (v: string | undefined, fallback: string[]): string[] =>
 
 export async function startServer(opts: ServerOptions = {}): Promise<Running> {
   const env = opts.env ?? process.env;
+  // This entry keeps everything in memory, so production is refused here until a durable host entry replaces it.
+  if (env.HIPPO_ENV === "production") {
+    const problems = productionProblems(env, { durable: false }).map((x) => `- ${x}`);
+    throw new Error(["Refusing to start in production:", ...problems].join("\n"));
+  }
   const log = opts.log ?? ((line: string) => console.log(line));
   const port = opts.port ?? Number(env.PORT ?? 8787);
   const host = opts.host ?? env.HOST ?? "127.0.0.1";
@@ -140,6 +146,7 @@ export async function startServer(opts: ServerOptions = {}): Promise<Running> {
     indexSource,
     now: clock,
     // Set only behind a proxy that writes this header itself (cf-connecting-ip on Cloudflare).
+    hsts: issuer.startsWith("https://"),
     ...(env.HIPPO_CLIENT_IP_HEADER ? { clientIpHeader: env.HIPPO_CLIENT_IP_HEADER } : {}),
     // The server's own origin too: when it serves the web build itself, the /ask page calls /mcp from this origin.
     allowedOrigins: [

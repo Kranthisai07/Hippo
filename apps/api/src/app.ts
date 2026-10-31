@@ -27,6 +27,8 @@ export interface AppDeps {
   limiter?: RateLimiter;
   /** The header a trusted proxy sets to the caller's address (cf-connecting-ip on Cloudflare). Unset: the socket address. */
   clientIpHeader?: string;
+  /** Send Strict-Transport-Security. Set when the public address is https. */
+  hsts?: boolean;
   /** Request body limit for /mcp in bytes. */
   maxBodyBytes?: number;
   log?: (line: string) => void;
@@ -86,6 +88,15 @@ export function createApp(deps: AppDeps): Hono {
   const newId = deps.newId ?? (() => crypto.randomUUID());
   const allowed = new Set(deps.allowedOrigins ?? []);
   const limiter = deps.limiter ?? createMemoryLimiter(now);
+
+  // Every response, including a fresh Response a handler returns. A route that sets its own value keeps it.
+  app.use("*", async (c, next) => {
+    await next();
+    const h = c.res.headers;
+    if (!h.has("X-Content-Type-Options")) h.set("X-Content-Type-Options", "nosniff");
+    if (!h.has("Referrer-Policy")) h.set("Referrer-Policy", "no-referrer");
+    if (deps.hsts) h.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  });
 
   // Before auth, so a flood of bad tokens or codes is stopped without any work. OAuth clients get an OAuth error body.
   app.use("/oauth/*", async (c, next) => {
