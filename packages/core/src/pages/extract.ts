@@ -16,6 +16,7 @@
 // Lambda memory and timeout are the final backstop, and a crash or timeout there must mark the document failed.
 import { inflateSync } from "node:zlib";
 import * as pdfjs from "pdfjs-dist/legacy/build/pdf.mjs";
+import { PdfError, type PdfErrorCode } from "./errors";
 
 /** A page with fewer than this many letters and digits in its text layer is treated as scanned and sent to OCR (SPEC section 7). */
 export const OCR_MIN_CHARS = 50;
@@ -26,26 +27,7 @@ export const DEFAULT_MAX_BYTES = 25 * 1024 * 1024;
 /** Cost guard: wall clock for load plus extraction. */
 export const DEFAULT_TIMEOUT_MS = 10_000;
 
-export type PdfErrorCode =
-  | "not_pdf" // bytes that are neither a PDF nor a known format
-  | "unsupported" // a known format we do not read (TIFF, GIF, WebP, SVG, ZIP, AVIF, mp4)
-  | "corrupt"
-  | "encrypted"
-  | "too_many_pages"
-  | "too_large"
-  | "timeout"
-  | "bad_ocr" // the injected OCR function returned something other than a string
-  | "empty";
-
-export class PdfError extends Error {
-  constructor(
-    readonly code: PdfErrorCode,
-    message: string,
-  ) {
-    super(message);
-    this.name = "PdfError";
-  }
-}
+export { PdfError, type PdfErrorCode };
 
 export interface Page {
   /** 1 based and stable: this is the citation page number. */

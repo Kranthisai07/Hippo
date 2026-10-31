@@ -31,7 +31,8 @@ export interface WebApiDeps {
   repo: Repository;
   objectStore: ObjectStore;
   uploader: Uploader;
-  onUploaded: OnUploaded;
+  /** Left out, uploads are refused with a 503 until a real ingest is connected. */
+  onUploaded?: OnUploaded;
   indexStore: IndexStore | undefined;
   indexes: IndexCache;
   now: () => number;
@@ -120,6 +121,7 @@ export function createWebApi(deps: WebApiDeps): Hono<{ Variables: { hh: string; 
   // Uploads
 
   api.post("/uploads", async (c) => {
+    if (!deps.onUploaded) throw new ApiError(503, "Uploads are not available yet.");
     const hh = c.var.hh;
     const body = await readJson(c, UploadBody);
     const type = body.contentType.trim().toLowerCase();
@@ -173,7 +175,7 @@ export function createWebApi(deps: WebApiDeps): Hono<{ Variables: { hh: string; 
         receiving.delete(doc.s3Key);
       }
       try {
-        await deps.onUploaded({ householdId: hh, docId: doc.id });
+        await deps.onUploaded?.({ householdId: hh, docId: doc.id });
       } catch {
         const latest = await repo.getDoc(hh, doc.id);
         if (latest && (latest.status === "uploaded" || latest.status === "extracting")) {

@@ -5,6 +5,7 @@ import { serve, type ServerType } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { createMemoryRepository } from "core/src/repository";
 import { createApp } from "./app";
+import { createFixtureIngest } from "./api/demoIngest";
 import { productionProblems } from "./config";
 import { createLocalUploader, createMemoryObjectStore } from "./api/storage";
 import { createMemoryIndexSource } from "./mcp/indexCache";
@@ -155,19 +156,24 @@ export async function startServer(opts: ServerOptions = {}): Promise<Running> {
       ...allowedOrigins,
       ...(extensionId ? [`chrome-extension://${extensionId}`] : []),
     ],
-    // Web API: files in memory, the PUT route of this server, and the fixture ingest (createApp's default hook) that
+    // Web API: files in memory, the PUT route of this server, and the demo fixture ingest, which
     // only reads the demo documents. The web dev server may send the cookie from its own origin.
     web: {
       objectStore,
       // HIPPO_INGEST=pipeline swaps the demo-only fixture ingest for the real pipeline (apps/workers, fixture mode unless HIPPO_LIVE_AI=1).
-      ...(env.HIPPO_INGEST === "pipeline"
-        ? {
-            onUploaded: (await import("../../workers/src/ingest")).createPipelineIngest(
+      onUploaded:
+        env.HIPPO_INGEST === "pipeline"
+          ? (await import("../../workers/src/ingest")).createPipelineIngest(
               { repo, objectStore, indexStore: indexSource, now: clock, log },
               env,
-            ),
-          }
-        : {}),
+            )
+          : createFixtureIngest({
+              repo,
+              objectStore,
+              indexStore: indexSource,
+              now: clock,
+              newId: () => crypto.randomUUID(),
+            }),
       // The browser extension saves pages only on a local server. The hook is not even loaded anywhere else.
       ...(localOnly
         ? {

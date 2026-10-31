@@ -5,7 +5,7 @@ import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { errorBody } from "./api/http";
 import { createExtensionApi, type OnCaptured } from "./api/extension";
-import { createFixtureIngest, type IndexStore, type OnUploaded } from "./api/fixtureIngest";
+import type { IndexStore, OnUploaded } from "./api/fixtureIngest";
 import { clientAddress, createMemoryLimiter, type RateLimiter } from "./api/limiter";
 import { createWebApi } from "./api/routes";
 import { createLocalUploader, createMemoryObjectStore, type ObjectStore, type Uploader } from "./api/storage";
@@ -41,7 +41,7 @@ export interface WebDeps {
   objectStore?: ObjectStore;
   /** How a browser sends a file. Default: the local PUT route of this server. */
   uploader?: Uploader;
-  /** Runs after the bytes are stored. Default: the fixture ingest, which only reads the demo documents. */
+  /** Runs after the bytes are stored. Left out, uploads are refused with a 503 (the demo server passes the fixture ingest). */
   onUploaded?: OnUploaded;
   /** Saves a page sent by the browser extension. Left out, captures are refused (every public host). */
   onCaptured?: OnCaptured;
@@ -150,7 +150,7 @@ export function createApp(deps: AppDeps): Hono {
       repo: deps.repo,
       objectStore,
       uploader: web.uploader ?? createLocalUploader(),
-      onUploaded: web.onUploaded ?? createFixtureIngest({ repo: deps.repo, objectStore, indexStore, now, newId }),
+      ...(web.onUploaded ? { onUploaded: web.onUploaded } : {}),
       indexStore,
       indexes,
       now,

@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { unauthorized, type Auth } from "@hippo/auth";
 import type { Doc, Repository } from "core/src/contracts";
 import { Hono } from "hono";
@@ -7,6 +6,7 @@ import { z } from "zod";
 import { maskNumbers } from "../mcp/speak";
 import { listSubscriptions } from "../subscriptions";
 import { ApiError, errorBody, readJson } from "./http";
+import { sha256Hex } from "./hash";
 import { enforce, type RateLimiter } from "./limiter";
 import { UPLOADS_PER_HOUR } from "./routes";
 import { sanitizeFilename } from "./storage";
@@ -124,7 +124,7 @@ export function createExtensionApi(deps: ExtensionDeps): Hono<{ Variables: { hh:
     const text = `${title}\n${maskNumbers(body.text)}`;
 
     // The id comes from the text, so the same page saved twice is the same document.
-    const docId = `doc-${createHash("sha256").update(text).digest("hex").slice(0, 24)}`;
+    const docId = `doc-${(await sha256Hex(text)).slice(0, 24)}`;
     const existing = await repo.getDoc(hh, docId);
     if (existing && existing.status !== "failed") {
       throw new ApiError(409, "This page is already saved.", { "X-Hippo-Doc": docId });

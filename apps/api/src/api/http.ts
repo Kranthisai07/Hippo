@@ -1,7 +1,7 @@
 import type { Context } from "hono";
 import type { z } from "zod";
 
-export type ApiStatus = 400 | 401 | 403 | 404 | 409 | 413 | 415 | 422 | 429 | 500;
+export type ApiStatus = 400 | 401 | 403 | 404 | 409 | 413 | 415 | 422 | 429 | 500 | 503;
 
 const CODES: Record<ApiStatus, string> = {
   400: "invalid_request",
@@ -14,6 +14,7 @@ const CODES: Record<ApiStatus, string> = {
   422: "limit_reached",
   429: "rate_limited",
   500: "internal",
+  503: "unavailable",
 };
 
 /** Thrown by route code, turned into the one error shape by the app's onError. The message is for a person. */
@@ -56,7 +57,13 @@ export async function readBytes(req: Request, max: number): Promise<Uint8Array |
     }
     parts.push(value);
   }
-  return Buffer.concat(parts);
+  const out = new Uint8Array(total);
+  let at = 0;
+  for (const part of parts) {
+    out.set(part, at);
+    at += part.length;
+  }
+  return out;
 }
 
 /** Names the fields that failed and nothing else, so a value (which may be document text) is never echoed. */

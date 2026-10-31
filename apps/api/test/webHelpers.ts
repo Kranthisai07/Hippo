@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { createAuth } from "@hippo/auth";
 import { createMemoryRepository } from "core/src/repository";
 import { createApp, type AppDeps, type WebDeps } from "../src/app";
+import { createFixtureIngest } from "../src/api/demoIngest";
 import { createLocalUploader, createMemoryObjectStore } from "../src/api/storage";
 import { createIndexCache, createMemoryIndexSource } from "../src/mcp/indexCache";
 import { seedHousehold } from "../src/seed";
@@ -51,15 +52,23 @@ export async function makeWeb(over: { web?: WebDeps; app?: Partial<AppDeps> } = 
     now: () => clock.t,
   });
   let n = 0;
+  const newId = () => `t${++n}`;
   const app = createApp({
     auth,
     repo,
     indexSource,
     now: () => clock.t,
-    newId: () => `t${++n}`,
+    newId,
     // The app's own lines (one per request) stay apart from `logs`, where the login helper looks for the last code.
     log: (line) => requestLog.push(line),
-    web: { objectStore, uploader: createLocalUploader(), origins: [DEV_ORIGIN], ...over.web },
+    web: {
+      objectStore,
+      uploader: createLocalUploader(),
+      origins: [DEV_ORIGIN],
+      // The demo ingest, as createApp used to default to, so the upload tests keep their behaviour.
+      onUploaded: createFixtureIngest({ repo, objectStore, indexStore: indexSource, now: () => clock.t, newId }),
+      ...over.web,
+    },
     ...over.app,
   });
 
