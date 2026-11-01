@@ -30,6 +30,9 @@ export interface Env {
   HIPPO_CLIENT_IP_HEADER?: string;
   HIPPO_MAIL_FROM?: string;
   HIPPO_DEMO?: string;
+  /** "Continue with Google". Both or neither. The secret is a `wrangler secret`. */
+  HIPPO_GOOGLE_CLIENT_ID?: string;
+  HIPPO_GOOGLE_CLIENT_SECRET?: string;
 }
 
 const list = (v: string | undefined): string[] =>
@@ -88,6 +91,8 @@ export function buildApp(env: Env, opts: BuildOptions = {}): Hono {
       HIPPO_EXTENSION_ID: env.HIPPO_EXTENSION_ID,
       HIPPO_CLIENT_IP_HEADER: env.HIPPO_CLIENT_IP_HEADER,
       HIPPO_ALLOWED_ORIGINS: env.HIPPO_ALLOWED_ORIGINS,
+      HIPPO_GOOGLE_CLIENT_ID: env.HIPPO_GOOGLE_CLIENT_ID,
+      HIPPO_GOOGLE_CLIENT_SECRET: env.HIPPO_GOOGLE_CLIENT_SECRET,
     };
     const problems = productionProblems(settings, { durable: true, mailer: mailer !== undefined });
     if (problems.length > 0) throw new StartupError(`Refusing to start: ${problems.join(" | ")}`);
@@ -115,6 +120,9 @@ export function buildApp(env: Env, opts: BuildOptions = {}): Hono {
     log,
     ...(mailer ? { mailer } : {}),
     logMagicCodes: false,
+    ...(env.HIPPO_GOOGLE_CLIENT_ID && env.HIPPO_GOOGLE_CLIENT_SECRET
+      ? { google: { clientId: env.HIPPO_GOOGLE_CLIENT_ID, clientSecret: env.HIPPO_GOOGLE_CLIENT_SECRET } }
+      : {}),
     audit: (e) =>
       log(JSON.stringify({ ts: new Date(now()).toISOString(), audit: e.event, sub: e.sub, reason: e.reason })),
     store: authStore,

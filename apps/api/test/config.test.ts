@@ -31,6 +31,16 @@ describe("production config", () => {
   ])("refuses %s", (_name, change) => {
     expect(productionProblems({ ...GOOD, ...change }, { durable: true, mailer: true })).toHaveLength(1);
   });
+  it.each([
+    ["a Google client id with no secret", { HIPPO_GOOGLE_CLIENT_ID: "id.apps.googleusercontent.com" }],
+    ["a Google secret with no client id", { HIPPO_GOOGLE_CLIENT_SECRET: "secret" }],
+  ])("refuses %s", (_name, change) => {
+    expect(productionProblems({ ...GOOD, ...change }, { durable: true, mailer: true })).toHaveLength(1);
+  });
+  it("accepts a Google client id with its secret", () => {
+    const both = { HIPPO_GOOGLE_CLIENT_ID: "id.apps.googleusercontent.com", HIPPO_GOOGLE_CLIENT_SECRET: "secret" };
+    expect(productionProblems({ ...GOOD, ...both }, { durable: true, mailer: true })).toEqual([]);
+  });
   it("refuses no mailer", () => {
     expect(productionProblems(GOOD, { durable: true, mailer: false })).toHaveLength(1);
   });

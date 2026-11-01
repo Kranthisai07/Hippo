@@ -15,9 +15,17 @@ export function SignIn() {
   const [busy, setBusy] = useState(false);
   const [waitUntil, setWaitUntil] = useState(0);
   const [, setNow] = useState(0);
+  const [google, setGoogle] = useState(false);
   const timer = useRef<number | undefined>(undefined);
 
   useEffect(() => () => window.clearTimeout(timer.current), []);
+  // A failure here only means no Google button, never a broken page.
+  useEffect(() => {
+    api.providers().then(
+      (p) => setGoogle(p.google),
+      () => undefined,
+    );
+  }, []);
   if (status === "in") return <Navigate to={from} replace />;
 
   const waiting = Date.now() < waitUntil;
@@ -78,6 +86,12 @@ export function SignIn() {
           >
             Use the demo account
           </button>
+
+          {google && (
+            <a className="btn" href={`/oauth/google/start?return=${encodeURIComponent(window.location.origin + from)}`}>
+              Continue with Google
+            </a>
+          )}
 
           <p className="muted small">Or sign in with your email.</p>
           <form

@@ -209,6 +209,41 @@ describe("Things", () => {
   });
 });
 
+describe("Sign in with Google", () => {
+  const open = () =>
+    wrap(
+      <AuthProvider>
+        <SignIn />
+      </AuthProvider>,
+      "/signin",
+      "/signin",
+    );
+
+  it("shows a Continue with Google link only when the server offers it, and sends the person back to where they were", async () => {
+    vi.spyOn(api, "me").mockRejectedValue(new ApiError(401, "unauthenticated", "Please sign in again."));
+    vi.spyOn(api, "providers").mockResolvedValue({ google: true });
+    open();
+    const link = await screen.findByRole("link", { name: "Continue with Google" });
+    const href = new URL(link.getAttribute("href")!, window.location.origin);
+    expect(href.pathname).toBe("/oauth/google/start");
+    expect(href.searchParams.get("return")).toBe(window.location.origin + "/");
+  });
+
+  it("shows no Google link when the server does not offer it, or does not answer", async () => {
+    vi.spyOn(api, "me").mockRejectedValue(new ApiError(401, "unauthenticated", "Please sign in again."));
+    const providers = vi.spyOn(api, "providers").mockResolvedValue({ google: false });
+    open();
+    await screen.findByLabelText("Email");
+    await waitFor(() => expect(providers).toHaveBeenCalled());
+    expect(screen.queryByRole("link", { name: "Continue with Google" })).toBeNull();
+    providers.mockRejectedValue(new ApiError(500, "internal", "Boom."));
+    open();
+    await waitFor(() => expect(providers).toHaveBeenCalledTimes(2));
+    expect(screen.queryByRole("link", { name: "Continue with Google" })).toBeNull();
+    expect(screen.getAllByLabelText("Email").length).toBeGreaterThan(0);
+  });
+});
+
 describe("Sign in", () => {
   it("shows the wait message on 429, disables the buttons and does not retry", async () => {
     const send = vi

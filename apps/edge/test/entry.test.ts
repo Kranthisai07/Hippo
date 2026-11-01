@@ -22,6 +22,14 @@ import { fakeBucket } from "./fakes";
 
 const ISSUER = "https://api.hippo.test";
 const T0 = Date.UTC(2026, 9, 31, 12, 0, 0);
+const GOOD_PRODUCTION: Partial<Env> = {
+  HIPPO_ENV: "production",
+  HIPPO_DEMO: "0",
+  HIPPO_SIGNING_KEY: "k".repeat(40),
+  HIPPO_ISSUER: ISSUER,
+  HIPPO_ALLOWED_ORIGINS: "https://app.hippo.test",
+  HIPPO_CLIENT_IP_HEADER: "cf-connecting-ip",
+};
 
 const page = (name: string): string => {
   const html = readFileSync(new URL(`../../../fixtures/pages/${name}.html`, import.meta.url), "utf8");
@@ -308,4 +316,32 @@ describe("householdOf", () => {
       expect(await householdOf(email)).toBe(node);
     },
   );
+});
+
+describe("Continue with Google on the Worker", () => {
+  const ID = "1234-test.apps.googleusercontent.com";
+
+  it("is offered only when both the client id and the secret are set", async () => {
+    const off = setup();
+    expect(await (await off.req("/oauth/providers")).json()).toEqual({ google: false });
+    const on = setup({ HIPPO_GOOGLE_CLIENT_ID: ID, HIPPO_GOOGLE_CLIENT_SECRET: "secret" });
+    expect(await (await on.req("/oauth/providers")).json()).toEqual({ google: true });
+    // One without the other is not enough, and in the relaxed mode it simply stays off.
+    const half = setup({ HIPPO_GOOGLE_CLIENT_ID: ID });
+    expect(await (await half.req("/oauth/providers")).json()).toEqual({ google: false });
+  });
+  it("starts a web sign in by sending the browser to Google with the Worker's own callback address", async () => {
+    const t = setup({ HIPPO_GOOGLE_CLIENT_ID: ID, HIPPO_GOOGLE_CLIENT_SECRET: "secret" });
+    const res = await t.req("/oauth/google/start?return=%2Freview%2Fdoc-1");
+    expect(res.status).toBe(302);
+    const to = new URL(res.headers.get("location")!);
+    expect(to.origin).toBe("https://accounts.google.com");
+    expect(to.searchParams.get("client_id")).toBe(ID);
+    expect(to.searchParams.get("redirect_uri")).toBe(`${ISSUER}/oauth/google/callback`);
+    expect(res.headers.get("location")).not.toContain("secret");
+    expect(res.headers.getSetCookie().some((c) => c.startsWith("hippo_gpending="))).toBe(true);
+  });
+  it("in production a client id without its secret stops the start, naming the settings", () => {
+    expect(() => setup({ ...GOOD_PRODUCTION, HIPPO_GOOGLE_CLIENT_ID: ID })).toThrow(/HIPPO_GOOGLE_CLIENT_ID/);
+  });
 });

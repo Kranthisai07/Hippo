@@ -137,6 +137,9 @@ export async function startServer(opts: ServerOptions = {}): Promise<Running> {
     ...(demoOn ? { demoUser: { email: demoEmail, code: demoCode } } : {}),
     // Without the demo there is no mailer, so a printed code would only leak into a shared log.
     logMagicCodes: demoOn,
+    ...(env.HIPPO_GOOGLE_CLIENT_ID && env.HIPPO_GOOGLE_CLIENT_SECRET
+      ? { google: { clientId: env.HIPPO_GOOGLE_CLIENT_ID, clientSecret: env.HIPPO_GOOGLE_CLIENT_SECRET } }
+      : {}),
     ...(serviceId && serviceSecret ? { serviceClient: { clientId: serviceId, clientSecret: serviceSecret } } : {}),
     now: clock,
   });

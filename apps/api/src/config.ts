@@ -19,6 +19,9 @@ export function productionProblems(
   if (!origins) out.push("HIPPO_ALLOWED_ORIGINS must list the web app origin.");
   else if (/localhost|127\.0\.0\.1|\*/.test(origins))
     out.push("HIPPO_ALLOWED_ORIGINS must hold no localhost and no wildcard.");
+  if (Boolean(env.HIPPO_GOOGLE_CLIENT_ID) !== Boolean(env.HIPPO_GOOGLE_CLIENT_SECRET)) {
+    out.push("HIPPO_GOOGLE_CLIENT_ID and HIPPO_GOOGLE_CLIENT_SECRET must be set together.");
+  }
   if (env.HIPPO_LIVE_AI === "1" && !env.HIPPO_SERVICE_CLIENT_SECRET)
     out.push("HIPPO_SERVICE_CLIENT_SECRET is required with HIPPO_LIVE_AI.");
   if (!opts.mailer) out.push("No mailer is set, so nobody can sign in by email. A demo login must not be the way in.");
