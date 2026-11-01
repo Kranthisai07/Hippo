@@ -162,3 +162,14 @@ For the browser extension, under `/ext`, not `/api`. Auth is `Authorization: Bea
 - `POST /oauth/revoke` (RFC 7009, form body `token`, `client_id`): ends a refresh token and its whole family, including the token a rotation handed out last. Always 200, so a caller learns nothing about the token. Advertised as `revocation_endpoint`. The extension calls it on Sign out.
 - `POST /oauth/logout-all` (JSON, cookie session): ends every web session and every refresh token of the person. Access tokens already issued end by themselves within 15 minutes.
 - Every response carries `X-Request-Id`. The server logs one JSON line per request: `{ ts, id, method, path, status, ms }`, and security events as `{ ts, audit, sub, reason }` with a hashed `sub`. Query strings, headers, bodies, emails, codes and tokens are never logged.
+
+## Sign in with Google
+
+Only when the server has `HIPPO_GOOGLE_CLIENT_ID` and `HIPPO_GOOGLE_CLIENT_SECRET` (on the Worker, the secret is a `wrangler secret`). Otherwise the routes answer 404 and the login page shows no button. Google proves which email address the person controls (scopes `openid email`, ID token checked for signature, issuer, audience, expiry, our nonce and `email_verified`), and the address goes through the same household mapping as an emailed code.
+
+- `GET /oauth/providers` answers `{ "google": boolean }`, so the web app shows only buttons that work.
+- `POST /oauth/authorize` with `action=google` (an OAuth client such as the extension): needs the page's CSRF value like every other action, then redirects to Google.
+- `GET /oauth/google/start?return=<address>` (the web app): redirects to Google. `return` must be a path on this server or an address whose origin is exactly one of the configured web origins (`HIPPO_ALLOWED_ORIGINS`); anything else falls back to this server's `/`.
+- `GET /oauth/google/callback` is the one address registered in the Google console (`<issuer>/oauth/google/callback`). It needs the attempt cookie `hippo_gpending` (signed, `HttpOnly`, `SameSite=Lax`, path `/oauth/google`, 10 minutes, cleared on every outcome) and a `state` equal to the one in it. A client sign in ends with the client's own redirect (`code` and its `state`, or `access_denied` when the person said no on Google's page); a web sign in ends with the cookie session and a redirect to `return`. Every other outcome is one plain page: "Google sign in did not work. Try again or use an email code." with status 400 and no reason.
+- Audit events: `login_ok` with reason `google`, and `login_failed` with reason `google_state`, `google_token`, `google_id_token` or `google_denied`. The client secret, codes, ID tokens and addresses are never logged.
+
