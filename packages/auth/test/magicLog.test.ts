@@ -110,14 +110,18 @@ describe("a mailer", () => {
 
 describe("a mailer that does not answer", () => {
   it("is cut off after the timeout, the answer is unchanged, and the audit says mail failed", async () => {
-    vi.useFakeTimers();
+    // Only the clock is faked. The request also does real asynchronous work (hashing) before it reaches the mailer, which
+    // takes longer on a slow machine, so each round lets real time pass before the fake clock moves on.
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
     try {
       const events: AuditEvent[] = [];
       const env = makeEnv({ mailer: { send: () => new Promise(() => undefined) }, audit: (e) => events.push(e) });
-      // The request reaches the mailer after a few awaits, so time moves on until it answers.
       let res: Response | undefined;
       const pending = send(env).then((r) => (res = r));
-      for (let i = 0; i < 20 && !res; i++) await vi.advanceTimersByTimeAsync(MAIL_TIMEOUT_MS);
+      for (let i = 0; i < 200 && !res; i++) {
+        await new Promise((r) => setImmediate(r));
+        await vi.advanceTimersByTimeAsync(MAIL_TIMEOUT_MS);
+      }
       await pending;
       if (!res) throw new Error("no answer");
       expect(res.status).toBe(200);
