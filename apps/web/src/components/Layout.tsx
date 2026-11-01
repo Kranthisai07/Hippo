@@ -1,4 +1,4 @@
-import { CalendarClock, CreditCard, LogOut, MessageSquare, Package, Settings, Upload } from "lucide-react";
+import { CalendarClock, CreditCard, LogOut, Package, Settings, Upload } from "lucide-react";
 import { Link, NavLink, Outlet } from "react-router";
 import { useAuth } from "../lib/auth";
 import { BrandMark } from "./BrandMark";
@@ -6,9 +6,8 @@ import { BrandMark } from "./BrandMark";
 const LINKS = [
   { to: "/", label: "Coming up", icon: CalendarClock, end: true },
   { to: "/upload", label: "Upload", icon: Upload },
-  { to: "/subscriptions", label: "Subscriptions", icon: CreditCard },
+  { to: "/subscriptions", label: "Subscriptions", short: "Subs", icon: CreditCard },
   { to: "/things", label: "Things", icon: Package },
-  { to: "/ask", label: "Ask", icon: MessageSquare },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -40,10 +39,21 @@ export function Layout() {
       <header className="bar">
         <Brand />
         <nav className="nav" aria-label="Main">
-          {LINKS.map(({ to, label, icon: Icon, end }) => (
-            <NavLink key={to} to={to} end={end} viewTransition>
+          {LINKS.map(({ to, label, short, icon: Icon, end }) => (
+            <NavLink key={to} to={to} end={end} viewTransition aria-label={short ? label : undefined}>
               <Icon size={20} strokeWidth={1.75} aria-hidden="true" />
-              <span>{label}</span>
+              {short ? (
+                <>
+                  <span className="nav-full" aria-hidden="true">
+                    {label}
+                  </span>
+                  <span className="nav-short" aria-hidden="true">
+                    {short}
+                  </span>
+                </>
+              ) : (
+                <span>{label}</span>
+              )}
             </NavLink>
           ))}
         </nav>

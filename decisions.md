@@ -139,3 +139,9 @@ No decisions log exists on main (MEMORY.md is only in old worktrees), so this fi
 - **What:** `apps/web/src/components/BrandMark.tsx` holds the 32px accent tile with the arch and two eyes. Layout `Brand` (so Legal and the sign in page too) and the landing header use it; the landing header's calendar icon is gone.
 - **Why:** the mark was drawn inline in one place and the landing page used a different icon, so the product had two faces. One component keeps them equal.
 - **Checked:** typecheck passes. The landing rule `.lp-brand svg { color: accent }` would have painted the arch accent on an accent tile, so it was replaced with a hover rule for the mark.
+
+## 2026-11-01: phone navigation, five tabs (+claude)
+- **What:** the bottom tab bar has five tabs (Coming up, Upload, Subscriptions, Things, Settings); Ask left the main nav. Below 441 px the Subscriptions tab shows "Subs" with the full name kept as its accessible name. On a phone the review bar is one row (count and Confirm all dates), its date chips are hidden, and it sits above the tab bar. New `apps/web/e2e/d-layout.spec.ts` measures boxes at 320, 360, 390, 430, 768.
+- **Why:** six tabs wrapped and spilled out of the active pill. Measured, not guessed: with the full word the "Subscriptions" text overran its tab at 390 and at 360 (the test failed on it), so the short label is needed up to 440 px.
+- **Cost:** the chips are only hidden by CSS, so they stay mounted and the "every date was shown" check still counts them, but on a phone the person confirms against the dates in the field cards above, not against the chips.
+- **Checked:** the layout spec passes (tab text inside its own tab, one line, review bar centred on one row and clear of the tab bar, no sideways scroll on 8 pages at 5 widths); web unit tests 128 pass.
