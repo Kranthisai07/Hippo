@@ -128,7 +128,7 @@ export function createMemoryStore(): AuthStore {
       const last = hits[hits.length - 1];
       const waits: number[] = [];
       if (hits.length >= max) waits.push(hits[hits.length - max]! + windowMs - nowMs);
-      if (last !== undefined && nowMs - last < minGapMs) waits.push(last + minGapMs - nowMs);
+      if (minGapMs > 0 && last !== undefined && nowMs - last < minGapMs) waits.push(last + minGapMs - nowMs);
       if (waits.length > 0) {
         counters.set(key, hits);
         return { ok: false, retryAfterMs: Math.max(...waits) };

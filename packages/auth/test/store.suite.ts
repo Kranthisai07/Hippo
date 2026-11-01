@@ -201,6 +201,16 @@ export function runAuthStoreSuite(name: string, make: () => AuthStore): void {
         expect(await s.tryHit("g", 3_600_000, 5, 60_000, T0 + 10_000)).toEqual({ ok: false, retryAfterMs: 50_000 });
         expect(await s.tryHit("g", 3_600_000, 5, 60_000, T0 + 60_000)).toEqual({ ok: true });
       });
+      it("without a minimum gap, a caller whose clock is a little behind another's is still admitted while there is room", async () => {
+        // Callers on different machines read slightly different clocks, and their requests reach the store in any order.
+        const s = make();
+        expect(await s.tryHit("skew", 60_000, 5, 0, T0 + 900)).toEqual({ ok: true });
+        expect(await s.tryHit("skew", 60_000, 5, 0, T0 + 100)).toEqual({ ok: true });
+        expect(await s.tryHit("skew", 60_000, 5, 0, T0 + 500)).toEqual({ ok: true });
+        expect(await s.tryHit("skew", 60_000, 5, 0, T0)).toEqual({ ok: true });
+        expect(await s.tryHit("skew", 60_000, 5, 0, T0 + 300)).toEqual({ ok: true });
+        expect((await s.tryHit("skew", 60_000, 5, 0, T0 + 200)).ok).toBe(false);
+      });
       it("counts each key on its own, and clearCounter forgets one key only", async () => {
         const s = make();
         await s.tryHit("a", 60_000, 1, 0, T0);

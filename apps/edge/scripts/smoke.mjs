@@ -29,8 +29,8 @@ const fixturePage = (name) => {
     .replaceAll("&gt;", ">");
 };
 
-async function codeFor(email, since) {
-  for (let i = 0; i < 40; i++) {
+async function codeFor(email, since, seconds = 10) {
+  for (let i = 0; i < seconds * 4; i++) {
     const text = readFileSync(logFile, "utf8").slice(since);
     const m = new RegExp(`sign in code for ${email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}: (\\d{6})`).exec(text);
     if (m) return m[1];
@@ -39,7 +39,7 @@ async function codeFor(email, since) {
   throw new Error(`no sign in code for ${email} in the log`);
 }
 
-async function signIn(email, sessionCookie) {
+async function signIn(email, sessionCookie, { holdCode = false } = {}) {
   const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
   const challenge = b64url(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))));
   const redirect = "http://localhost:5173/callback";
@@ -80,18 +80,22 @@ async function signIn(email, sessionCookie) {
   const location = done.headers.get("location");
   const authCode = location && new URL(location).searchParams.get("code");
   if (!authCode) throw new Error(`login gave no code (status ${done.status})`);
-  const tokenRes = await fetch(`${base}/oauth/token`, {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "authorization_code",
-      code: authCode,
-      redirect_uri: redirect,
-      client_id: "hippo-demo",
-      code_verifier: verifier,
-      resource: `${origin}/mcp`,
-    }),
-  });
+  const exchange = () =>
+    fetch(`${base}/oauth/token`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        code: authCode,
+        redirect_uri: redirect,
+        client_id: "hippo-demo",
+        code_verifier: verifier,
+        resource: `${origin}/mcp`,
+      }),
+    });
+  // The concurrency checks need to fire the exchange themselves, many times at once.
+  if (holdCode) return { exchange };
+  const tokenRes = await exchange();
   const tokens = await tokenRes.json();
   if (!tokens.access_token) throw new Error(`token exchange failed (${tokenRes.status})`);
   return tokens;
@@ -260,24 +264,33 @@ step(
 );
 
 // 8. A web session, the same person's tokens through it, and delete all data. (One emailed code per address a minute.)
-const since = readFileSync(logFile, "utf8").length;
-await fetch(`${base}/oauth/magic-code`, {
-  method: "POST",
-  headers: { "content-type": "application/json", origin },
-  body: JSON.stringify({ email: who("carol") }),
-});
-const sessionCode = await codeFor(who("carol"), since);
+// `wrangler tail` (used against a deployed Worker) is best effort and can drop log lines under a burst, so if a code does not
+// show up the script asks again for a new address instead of blaming the Worker. A local run reads a complete log file.
+let carolEmail = "";
+let sessionCode = "";
+for (let attempt = 1; attempt <= 4 && !sessionCode; attempt++) {
+  carolEmail = who(attempt === 1 ? "carol" : `carol${attempt}`);
+  const since = readFileSync(logFile, "utf8").length;
+  await fetch(`${base}/oauth/magic-code`, {
+    method: "POST",
+    headers: { "content-type": "application/json", origin },
+    body: JSON.stringify({ email: carolEmail }),
+  });
+  sessionCode = await codeFor(carolEmail, since, 20).catch(() => "");
+  if (!sessionCode) console.log(`note  no code in the log for attempt ${attempt}, trying a new address`);
+}
+if (!sessionCode) throw new Error("no sign in code reached the log after 4 tries");
 const session = await fetch(`${base}/oauth/session`, {
   method: "POST",
   headers: { "content-type": "application/json", origin },
-  body: JSON.stringify({ email: who("carol"), code: sessionCode }),
+  body: JSON.stringify({ email: carolEmail, code: sessionCode }),
 });
 const cookie = session.headers
   .getSetCookie()
   .map((c) => c.split(";")[0])
   .join("; ");
 step("carol gets a web session", session.status === 200 && cookie.includes("hippo_session"));
-const carol = await signIn(who("carol"), cookie);
+const carol = await signIn(carolEmail, cookie);
 step("the session gives the extension tokens without a second code", !!carol.access_token);
 const carolSaved = await call(carol.access_token, "/ext/captures", {
   title: "Billing | Fernwood Plus",
@@ -309,6 +322,57 @@ const aliceStill = await (await call(alice.access_token, "/ext/subscriptions")).
 step(
   "alice's page is untouched by carol's delete (her access token still works until it expires)",
   aliceStill.subscriptions?.length === 1,
+);
+
+// 9. Many callers at once. These are the guarantees the D1 stores rest on (docs/VERIFIED.md 10.14), asked of the real
+// service when this runs against a deployed Worker: exactly one caller may win a one time record, and a rate limit must
+// admit exactly its maximum, however the requests are spread over isolates.
+const parallel = (n, make) =>
+  Promise.all(
+    Array.from({ length: n }, () =>
+      make().then(
+        (r) => r.status,
+        () => 0,
+      ),
+    ),
+  );
+const tally = (statuses) => statuses.reduce((m, s) => ({ ...m, [s]: (m[s] ?? 0) + 1 }), {});
+const held = await signIn(carolEmail, cookie, { holdCode: true });
+const exchanges = tally(await parallel(25, held.exchange));
+step(
+  "25 parallel exchanges of one authorization code: exactly one wins",
+  exchanges[200] === 1,
+  JSON.stringify(exchanges),
+);
+const fresh = await signIn(carolEmail, cookie);
+const refreshAll = () =>
+  fetch(`${base}/oauth/token`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: refreshBody(fresh.refresh_token),
+  });
+const refreshes = tally(await parallel(25, refreshAll));
+step("25 parallel uses of one refresh token: exactly one wins", refreshes[200] === 1, JSON.stringify(refreshes));
+console.log("note  waiting 65 seconds so the per address window is empty before the rate limit burst");
+await sleep(65_000);
+const OAUTH_PER_MINUTE = 120;
+const burst = tally(
+  await parallel(200, () =>
+    fetch(`${base}/oauth/token`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: "grant_type=nope",
+    }),
+  ),
+);
+const refused = burst[429] ?? 0;
+const admitted = (burst[400] ?? 0) + (burst[401] ?? 0);
+step(
+  `200 parallel calls against a limit of ${OAUTH_PER_MINUTE} a minute: exactly ${OAUTH_PER_MINUTE} admitted`,
+  admitted === OAUTH_PER_MINUTE &&
+    refused === 200 - OAUTH_PER_MINUTE &&
+    Object.keys(burst).every((k) => ["400", "401", "429"].includes(k)),
+  JSON.stringify(burst),
 );
 
 console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILED`);

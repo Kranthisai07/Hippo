@@ -127,7 +127,8 @@ export function createD1AuthStore(
       //    (true for every key in this repo, not enforced); two lengths on one key would delete hits the longer one needs;
       // 2. read the window, for the wait in case of a refusal;
       // 3. take the slot only if there is room and the last hit is old enough, in one statement, so two callers cannot
-      //    both take the last slot. The row carries this call's own random value;
+      //    both take the last slot. With no minimum gap the gap test is skipped: callers' clocks differ a little and their
+      //    requests arrive in any order, so a hit stamped later than this call's own clock must not turn it away;
       // 4. read that value back: if it is there, this call and not another one got the slot.
       const mine = crypto.randomUUID();
       const [, window, , taken] = await db.batch([
@@ -137,9 +138,9 @@ export function createD1AuthStore(
           .prepare(
             `INSERT INTO auth_hits (key, ts, nonce)
              SELECT ?, ?, ? WHERE (SELECT count(*) FROM auth_hits WHERE key = ? AND ts > ?) < ?
-               AND NOT EXISTS (SELECT 1 FROM auth_hits WHERE key = ? AND ts > ?)`,
+               AND (? <= 0 OR NOT EXISTS (SELECT 1 FROM auth_hits WHERE key = ? AND ts > ?))`,
           )
-          .bind(key, nowMs, mine, key, since, max, key, nowMs - minGapMs),
+          .bind(key, nowMs, mine, key, since, max, minGapMs, key, nowMs - minGapMs),
         db.prepare("SELECT 1 AS got FROM auth_hits WHERE key = ? AND nonce = ?").bind(key, mine),
       ]);
       if ((taken?.results?.length ?? 0) > 0) return { ok: true };
@@ -148,7 +149,7 @@ export function createD1AuthStore(
       const waits: number[] = [];
       if (before.length >= max) waits.push(before[before.length - max]! + windowMs - nowMs);
       const last = before[before.length - 1];
-      if (last !== undefined && nowMs - last < minGapMs) waits.push(last + minGapMs - nowMs);
+      if (minGapMs > 0 && last !== undefined && nowMs - last < minGapMs) waits.push(last + minGapMs - nowMs);
       // Other callers filled the window between the look and the insert: ask for a short wait.
       return { ok: false, retryAfterMs: waits.length > 0 ? Math.max(...waits) : 1000 };
     },

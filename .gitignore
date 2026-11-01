@@ -13,3 +13,6 @@ docs/SUBMISSION.md
 .dev.vars*
 .env*
 .wrangler/
+
+# Staging settings with this account database id (apps/edge/wrangler.staging.toml)
+apps/edge/wrangler.staging.toml

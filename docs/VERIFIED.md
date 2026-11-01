@@ -538,3 +538,23 @@ Sources are live developers.cloudflare.com pages, read through a summarising fet
 | `structuredClone` | Not mentioned on the pages read | UNVERIFIED | web-standards page |
 | Wrangler version | Raw: `version = '4.156.0'`, `engines = { node: '>=22.0.0' }` (npm view, run 2026-10-31) | CONFIRMED | npm registry |
 | Windows | Docs list Windows 11 as supported; no Visual C++ note in the docs. Community and workerd issues report `wrangler dev` crashes (access violation 0xc0000005, "write EOF") fixed by the latest x64 VC++ 2015+ Redistributable. Not an official requirement | UNVERIFIED (as requirement) | https://developers.cloudflare.com/workers/wrangler/install-and-update/ , https://github.com/cloudflare/workerd/issues/4668 |
+
+### 10.16 Slice 6: the staging run on real Cloudflare (2026-11-01, free plan)
+
+A private staging Worker (`hippo-api-staging`) was deployed with a real D1 database and an R2 bucket, in the relaxed mode (`HIPPO_ENV=development`), and `apps/edge/scripts/smoke.mjs` was run against it from this machine over the internet, with sign in codes read from `wrangler tail`. This checks the open items of 10.14. Nothing here is a proof, only what was observed.
+
+| Open check (10.14) | Observed on the real service | Status |
+| :--- | :--- | :--- |
+| One statement is applied atomically under concurrent requests | 25 parallel exchanges of one authorization code gave exactly one 200, in 3 runs; 25 parallel uses of one refresh token gave exactly one 200, in 3 runs | OBSERVED, not proven |
+| The counter admits exactly its maximum | 200 parallel calls against a limit of 120 a minute: 120 admitted, 80 refused (429). Before a fix the same test admitted only 64 (see decisions.md 2026-11-01: a gap check with no gap refused callers whose clock read earlier than another's hit) | OBSERVED after the fix |
+| A read after a write in the same batch sees the write (no stale replica) | No run showed a missing read back (it would have appeared as zero or two winners, or too few admitted). Whether D1 read replication is on for this database was not checked | NO STALE READ SEEN, setting UNVERIFIED |
+| `db.batch` accepts the chunk size used (25) | The capture path wrote through `write` in chunks of at most 25 and worked. No larger size was tried | NOT STRESSED |
+| Latency per rate check | Access log timings (n = sample, tail drops lines): `/ext/subscriptions` 200, median 99 ms (n 9); `/oauth/token` 400, median 98 ms (n 64), measured from this machine over the internet and including the rate check round trips. Under the 200 parallel burst 300 to 360 ms. | OBSERVED (one location) |
+| Web Crypto and `crypto.randomUUID()` work without `nodejs_compat` | The whole sign in flow ran on the deployed Worker with no `nodejs_compat` flag | CONFIRMED |
+| `ajv` and `new Function` are not blocked in a way that breaks `/mcp` | `/mcp` initialize, `tools/list` and tool calls with valid and invalid arguments all answered correctly on the deployed Worker | CONFIRMED for these calls |
+| Free plan CPU limit (10 ms) is enough | No exception or CPU limit line appeared in the tail and every status was an expected one. The tail drops lines under bursts, so this is not conclusive. Worker startup time was 38 ms at deploy | NOT CONCLUSIVE |
+| Upload size | 1835 KiB, 349 KiB gzip, accepted on the free plan | CONFIRMED |
+| `wrangler tail` completeness | It dropped log lines under bursts, including lines of requests that succeeded (seen in 2 runs) | OBSERVED |
+
+Not checked: the Email Sending binding (paid plan, verified sender domain), R2 write races, a second region, strict mode on the deployed Worker, read replication.
+

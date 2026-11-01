@@ -23,3 +23,18 @@ The Worker is strict by default: only `HIPPO_ENV=development` or `local` relaxes
 ## Checks
 
 `pnpm --filter @hippo/edge test` runs the stores against a worst case model of D1, the app in process, and a bundle check that fails if a Node only module returns. `scripts/smoke.mjs` is the same path on the real Workers runtime, locally. Staging repeats it on Cloudflare (slice 6).
+
+## Staging on Cloudflare (free plan)
+
+`wrangler.staging.toml` is not committed (it holds the account's database id). Copy `wrangler.toml`, set `name`, the D1 `database_id` from `wrangler d1 create`, an R2 `bucket_name`, `HIPPO_ISSUER` to the Worker's own address and `HIPPO_ENV = "development"` (the free plan has no Email Sending, so the sign in code is read from `wrangler tail`). Then:
+
+```bash
+npx wrangler d1 migrations apply <database> --remote --config wrangler.staging.toml
+npx wrangler secret put HIPPO_SIGNING_KEY --config wrangler.staging.toml   # pipe a random value in, never type it
+npx wrangler deploy --config wrangler.staging.toml
+npx wrangler tail --config wrangler.staging.toml --format pretty > tail.log &
+node scripts/smoke.mjs https://<worker address> tail.log
+```
+
+The script ends with three concurrency checks that need about 70 seconds. Results of the last run are in docs/VERIFIED.md 10.16. To remove staging: `npx wrangler delete --config wrangler.staging.toml`.
+
