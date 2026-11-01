@@ -164,3 +164,7 @@ No decisions log exists on main (MEMORY.md is only in old worktrees), so this fi
 - **A bug in my own item 1 work, found by axe:** the Subs tab used `aria-label="Subscriptions"` over visible "Subs", which fails WCAG 2.5.3 (label in name; axe `label-content-name-mismatch`). The full word is now real text, clipped to 1px on narrow screens, and "Subs" is the visible, aria-hidden text. d-layout.spec measures the visible one.
 - **Why not hide the full label with display none:** that would drop it from the accessible name.
 - **Checked:** web unit tests 133; full Playwright run 8 of 8 (a-smoke 3, b-screens with axe A and AA in light and dark at 1280 and 390, c-authorize 2, d-layout 2). Looked at screenshots of 320 and 390 for Upload, Subscriptions, Things, thing detail, Settings, Ask, review. Not looked at by eye: 360 and 768 images (only measured: no sideways scroll, tab text inside its tab).
+
+## 2026-11-01: b-screens covers subscriptions and the phone in both schemes (+claude)
+- **What:** `apps/web/e2e/b-screens.spec.ts` now visits `/subscriptions` and runs axe (wcag2a, wcag2aa, wcag21a, wcag21aa) at 390 px in light and dark as well as at 1280. Screenshots under `apps/web/docs/screens` were regenerated; new files are the `*-phone-dark.png` set and `web-subscriptions-*`.
+- **Checked:** zero axe violations on every page in all four variants (the run caught the Subs tab name, fixed above). I looked at a sample of the new images, not all 50.
