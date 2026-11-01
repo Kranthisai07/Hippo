@@ -54,10 +54,15 @@ export async function signIn(): Promise<void> {
     code_challenge_method: "S256",
     resource: RESOURCE,
   });
-  const answer = await chrome.identity.launchWebAuthFlow({
-    url: `${API_ORIGIN}/oauth/authorize?${params}`,
-    interactive: true,
-  });
+  const answer = await chrome.identity
+    .launchWebAuthFlow({ url: `${API_ORIGIN}/oauth/authorize?${params}`, interactive: true })
+    .catch((e: unknown) => {
+      // Chrome refuses a second flow while one is open (a hidden sign in window, or a click made before it finished).
+      if (e instanceof Error && /only one web auth flow/i.test(e.message)) {
+        throw new Error("A Hippo sign-in window is already open. Finish or close it, then try again.");
+      }
+      throw e;
+    });
   const q = new URL(answer ?? redirectUri).searchParams;
   if (!stateMatches(state, q.get("state"))) throw new Error("The sign-in answer did not match. Please sign in again.");
   const code = q.get("code");

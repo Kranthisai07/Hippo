@@ -1,10 +1,15 @@
 import { accessToken, isSignedIn, signIn, signOut } from "./auth";
 import type { Reply, Request } from "./messages";
 
+// Chrome allows one web auth flow at a time, and closing the popup does not cancel it. A second click while the sign in
+// window is still open joins the first attempt instead of starting a second flow that Chrome would refuse.
+let signingIn: Promise<void> | null = null;
+const signInOnce = (): Promise<void> => (signingIn ??= signIn().finally(() => (signingIn = null)));
+
 async function handle(request: Request): Promise<Reply> {
   switch (request.type) {
     case "signIn":
-      await signIn();
+      await signInOnce();
       return { ok: true, signedIn: true };
     case "signOut":
       await signOut();
