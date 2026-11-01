@@ -16,3 +16,7 @@ docs/SUBMISSION.md
 
 # Staging settings with this account database id (apps/edge/wrangler.staging.toml)
 apps/edge/wrangler.staging.toml
+
+# Logs from wrangler dev and tail hold sign in codes and email addresses; browser tool output holds account ids
+*.log
+.playwright-mcp/

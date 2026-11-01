@@ -336,6 +336,8 @@ const parallel = (n, make) =>
       ),
     ),
   );
+// Everyone but the winner must have been refused (400 for a used record, 429 from the rate limit), never a crash or a dropped request.
+const refusedOnly = (t) => Object.keys(t).every((k) => ["200", "400", "429"].includes(k));
 const tally = (statuses) => statuses.reduce((m, s) => ({ ...m, [s]: (m[s] ?? 0) + 1 }), {});
 const held = await signIn(carolEmail, cookie, { holdCode: true });
 const exchanges = tally(await parallel(25, held.exchange));
@@ -352,9 +354,14 @@ const refreshAll = () =>
     body: refreshBody(fresh.refresh_token),
   });
 const refreshes = tally(await parallel(25, refreshAll));
-step("25 parallel uses of one refresh token: exactly one wins", refreshes[200] === 1, JSON.stringify(refreshes));
+step(
+  "25 parallel uses of one refresh token: exactly one wins",
+  refreshes[200] === 1 && refusedOnly(refreshes),
+  JSON.stringify(refreshes),
+);
 console.log("note  waiting 65 seconds so the per address window is empty before the rate limit burst");
 await sleep(65_000);
+// Keep in step with OAUTH_PER_MINUTE in apps/api/src/app.ts.
 const OAUTH_PER_MINUTE = 120;
 const burst = tally(
   await parallel(200, () =>

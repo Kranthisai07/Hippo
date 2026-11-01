@@ -133,7 +133,9 @@ export function createMemoryStore(): AuthStore {
         counters.set(key, hits);
         return { ok: false, retryAfterMs: Math.max(...waits) };
       }
+      // Sorted, because callers on different machines arrive out of clock order and the wait is read from the ends.
       hits.push(nowMs);
+      hits.sort((a, b) => a - b);
       counters.set(key, hits);
       return { ok: true };
     },
