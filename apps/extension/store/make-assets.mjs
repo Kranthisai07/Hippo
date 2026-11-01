@@ -15,7 +15,14 @@ const screens = path.join(root, "apps/web/docs/screens");
 const out = path.join(here, "assets");
 mkdirSync(out, { recursive: true });
 
-const types = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".woff2": "font/woff2", ".png": "image/png" };
+const types = {
+  ".html": "text/html",
+  ".js": "text/javascript",
+  ".css": "text/css",
+  ".svg": "image/svg+xml",
+  ".woff2": "font/woff2",
+  ".png": "image/png",
+};
 const serve = (dir, index) =>
   http
     .createServer((q, r) => {
@@ -32,31 +39,85 @@ const fixUrl = `http://localhost:${fixSrv.address().port}/`;
 const fontUrl = `http://localhost:${popupSrv.address().port}/geist-latin-wght-normal.woff2`;
 
 const subs = [
-  { agreementId: "a1", docId: "d1", vendor: "Kestrel Learning", plan: "Premium", amount: 9.99, cycle: "monthly", nextChargeDate: "2026-10-28", confirmed: false, source: { docName: "kestrel_trial.html", page: null } },
-  { agreementId: "a2", docId: "d2", vendor: "Fernwood Streaming", plan: "Standard", amount: 15.99, cycle: "monthly", nextChargeDate: "2026-11-03", confirmed: true, source: { docName: "subscription_fernwood.pdf", page: 1 } },
-  { agreementId: "a3", docId: "d3", vendor: "Lantern Cloud Storage", plan: "Plus", amount: 4.99, cycle: "monthly", nextChargeDate: "2026-11-12", confirmed: true, source: { docName: "lantern_pricing.html", page: null } },
+  {
+    agreementId: "a1",
+    docId: "d1",
+    vendor: "Kestrel Learning",
+    plan: "Premium",
+    amount: 9.99,
+    cycle: "monthly",
+    nextChargeDate: "2026-10-28",
+    confirmed: false,
+    source: { docName: "kestrel_trial.html", page: null },
+  },
+  {
+    agreementId: "a2",
+    docId: "d2",
+    vendor: "Fernwood Streaming",
+    plan: "Standard",
+    amount: 15.99,
+    cycle: "monthly",
+    nextChargeDate: "2026-11-03",
+    confirmed: true,
+    source: { docName: "subscription_fernwood.pdf", page: 1 },
+  },
+  {
+    agreementId: "a3",
+    docId: "d3",
+    vendor: "Lantern Cloud Storage",
+    plan: "Plus",
+    amount: 4.99,
+    cycle: "monthly",
+    nextChargeDate: "2026-11-12",
+    confirmed: true,
+    source: { docName: "lantern_pricing.html", page: null },
+  },
 ];
 
 const browser = await chromium.launch();
 
 async function popupShot(file, { page: hasPage, list, scheme = "light", save = false }) {
-  const ctx = await browser.newContext({ viewport: { width: 360, height: 700 }, deviceScaleFactor: 2, colorScheme: scheme, reducedMotion: "reduce" });
+  const ctx = await browser.newContext({
+    viewport: { width: 360, height: 700 },
+    deviceScaleFactor: 2,
+    colorScheme: scheme,
+    reducedMotion: "reduce",
+  });
   const pg = await ctx.newPage();
-  await pg.addInitScript(({ hasPage, list }) => {
-    window.chrome = {
-      runtime: { sendMessage: async (m) => ({ ok: true, signedIn: true, token: m.type === "token" ? "t" : undefined }), id: "x" },
-      tabs: { query: async () => [{ id: 1 }], create: () => {} },
-      scripting: { executeScript: async () => (hasPage ? [{ result: { title: "Billing", host: "kestrel.example", text: "Your Premium plan renews on Oct 28. ".repeat(60) } }] : []) },
-      action: { setBadgeText: () => {}, setBadgeBackgroundColor: () => {} },
-    };
-    const real = window.fetch;
-    window.fetch = async (u, i) =>
-      String(u).includes("/ext/subscriptions")
-        ? new Response(JSON.stringify({ subscriptions: list, monthlyTotal: 20.98 }), { status: 200 })
-        : String(u).includes("/ext/captures")
-          ? new Response(JSON.stringify({ saved: true, reviewUrl: "/review/d1" }), { status: 200 })
-          : real(u, i);
-  }, { hasPage, list });
+  await pg.addInitScript(
+    ({ hasPage, list }) => {
+      window.chrome = {
+        runtime: {
+          sendMessage: async (m) => ({ ok: true, signedIn: true, token: m.type === "token" ? "t" : undefined }),
+          id: "x",
+        },
+        tabs: { query: async () => [{ id: 1 }], create: () => {} },
+        scripting: {
+          executeScript: async () =>
+            hasPage
+              ? [
+                  {
+                    result: {
+                      title: "Billing",
+                      host: "kestrel.example",
+                      text: "Your Premium plan renews on Oct 28. ".repeat(60),
+                    },
+                  },
+                ]
+              : [],
+        },
+        action: { setBadgeText: () => {}, setBadgeBackgroundColor: () => {} },
+      };
+      const real = window.fetch;
+      window.fetch = async (u, i) =>
+        String(u).includes("/ext/subscriptions")
+          ? new Response(JSON.stringify({ subscriptions: list, monthlyTotal: 20.98 }), { status: 200 })
+          : String(u).includes("/ext/captures")
+            ? new Response(JSON.stringify({ saved: true, reviewUrl: "/review/d1" }), { status: 200 })
+            : real(u, i);
+    },
+    { hasPage, list },
+  );
   await pg.goto(popupUrl);
   await pg.waitForSelector("main:not([aria-busy])");
   await pg.waitForTimeout(300);
@@ -114,16 +175,62 @@ const shot = (n, title, sub, picHtml) => `
   <p class="sub" style="font-size:21px;line-height:1.45;margin-top:20px">${sub}</p>
 </div>${picHtml}`;
 
-const wide = (f) => `<div class="card" style="position:absolute;left:500px;top:50%;transform:translateY(-50%);width:720px"><img src="${b64(f)}" style="width:720px"></div>`;
+const wide = (f) =>
+  `<div class="card" style="position:absolute;left:500px;top:50%;transform:translateY(-50%);width:720px"><img src="${b64(f)}" style="width:720px"></div>`;
 const billing = `<div class="card" style="position:absolute;left:520px;top:90px;width:700px"><img src="${b64(path.join(out, "_billing.png"))}" style="width:700px"></div>
 <div class="card" style="position:absolute;left:880px;top:150px;width:300px"><img src="${b64(popupA)}" style="width:300px"></div>`;
 const listOnly = `<div class="card" style="position:absolute;left:700px;top:60px;width:360px"><img src="${b64(popupB)}" style="width:360px"></div>`;
 
-await compose("screenshot-1-save.png", 1280, 800, shot(1, "Save a billing page in one click", "Nothing is read until you click, and nothing is sent until you press Save.", billing));
-await compose("screenshot-2-list.png", 1280, 800, shot(2, "Your subscriptions in one list", "See what you pay each month and what still needs your review.", listOnly));
-await compose("screenshot-3-review.png", 1280, 800, shot(3, "Every date shows where it came from", "Check each value against the exact words and page in your document.", wide(path.join(screens, "web-review-desktop-light.png"))));
-await compose("screenshot-4-coming.png", 1280, 800, shot(4, "Nothing alerts you until you confirm", "Hippo only reminds you about dates you have reviewed.", wide(path.join(screens, "web-coming-up-desktop-light.png"))));
-await compose("screenshot-5-subscriptions.png", 1280, 800, shot(5, "The whole picture, on any screen", "Subscriptions, deadlines and things, in the app and in the popup.", wide(path.join(screens, "web-subscriptions-desktop-light.png"))));
+await compose(
+  "screenshot-1-save.png",
+  1280,
+  800,
+  shot(
+    1,
+    "Save a billing page in one click",
+    "Nothing is read until you click, and nothing is sent until you press Save.",
+    billing,
+  ),
+);
+await compose(
+  "screenshot-2-list.png",
+  1280,
+  800,
+  shot(2, "Your subscriptions in one list", "See what you pay each month and what still needs your review.", listOnly),
+);
+await compose(
+  "screenshot-3-review.png",
+  1280,
+  800,
+  shot(
+    3,
+    "Every date shows where it came from",
+    "Check each value against the exact words and page in your document.",
+    wide(path.join(screens, "web-review-desktop-light.png")),
+  ),
+);
+await compose(
+  "screenshot-4-coming.png",
+  1280,
+  800,
+  shot(
+    4,
+    "Nothing alerts you until you confirm",
+    "Hippo only reminds you about dates you have reviewed.",
+    wide(path.join(screens, "web-coming-up-desktop-light.png")),
+  ),
+);
+await compose(
+  "screenshot-5-subscriptions.png",
+  1280,
+  800,
+  shot(
+    5,
+    "The whole picture, on any screen",
+    "Subscriptions, deadlines and things, in the app and in the popup.",
+    wide(path.join(screens, "web-subscriptions-desktop-light.png")),
+  ),
+);
 
 await compose(
   "promo-small-440x280.png",
