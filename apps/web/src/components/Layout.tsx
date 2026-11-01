@@ -40,13 +40,11 @@ export function Layout() {
         <Brand />
         <nav className="nav" aria-label="Main">
           {LINKS.map(({ to, label, short, icon: Icon, end }) => (
-            <NavLink key={to} to={to} end={end} viewTransition aria-label={short ? label : undefined}>
+            <NavLink key={to} to={to} end={end} viewTransition>
               <Icon size={20} strokeWidth={1.75} aria-hidden="true" />
               {short ? (
                 <>
-                  <span className="nav-full" aria-hidden="true">
-                    {label}
-                  </span>
+                  <span className="nav-full">{label}</span>
                   <span className="nav-short" aria-hidden="true">
                     {short}
                   </span>

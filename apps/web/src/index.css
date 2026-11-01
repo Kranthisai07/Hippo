@@ -1117,8 +1117,14 @@ mark {
   }
 }
 @media (max-width: 440px) {
+  /* Still the link's name for screen readers; only hidden from the eye. */
   .nav-full {
-    display: none;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
   .nav-short {
     display: inline;
@@ -1353,4 +1359,71 @@ mark {
   .bar-email {
     display: none;
   }
+}
+
+/* Section cards: an icon beside the heading, rows inside a card read as rows, not nested cards. */
+.card-h {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+}
+.card-h svg {
+  flex: none;
+  color: var(--accent);
+}
+.danger-zone .card-h svg {
+  color: var(--urgent);
+}
+.card-row {
+  padding: var(--s3) var(--s4);
+  border: 1px solid var(--line);
+  border-radius: var(--r2);
+  background: var(--surface-2);
+}
+.card .empty.card {
+  padding: var(--s4);
+  gap: var(--s2);
+  box-shadow: none;
+  background: transparent;
+  border-style: dashed;
+}
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+  background: var(--accent-wash);
+}
+.stat-label {
+  font-size: 0.875rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.stat-value {
+  font-size: clamp(2.2rem, 1.6rem + 2.4vw, 3rem);
+  font-weight: 750;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  color: var(--accent);
+}
+
+/* Settings on a phone: the checkbox stays beside its sentence, and a file name shares its row with Delete. */
+label.row {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+}
+label.row input[type="checkbox"] {
+  flex: none;
+  margin: 2px 0 0;
+}
+.card .list > li.row > .grow {
+  flex: 1 1 7rem;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+.card .empty.card .empty-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
 }

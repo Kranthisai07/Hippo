@@ -25,21 +25,22 @@ test("phone tab bar fits at every width and the review bar is one row above it",
     expect(tabs).toHaveLength(5);
     const navBox = (await nav.boundingBox())!;
     for (const tab of tabs) {
-      const name = await tab.getAttribute("aria-label").then(async (a) => a ?? (await tab.innerText()).trim());
+      const name = (await tab.textContent())!.trim();
       const box = (await tab.boundingBox())!;
       expect(box.x, `${name} at ${w}`).toBeGreaterThanOrEqual(navBox.x - 0.5);
       expect(box.x + box.width, `${name} at ${w}`).toBeLessThanOrEqual(navBox.x + navBox.width + 0.5);
       // The visible label must sit inside its own tab and on one line.
       // A Range around the text gives the real ink box even when the span itself is clamped.
-      const lb = await tab
-        .locator("span:visible")
-        .first()
-        .evaluate((el) => {
+      const lb = await tab.evaluate((a) => {
+        // The label the eye sees: the span wider than the 1px screen reader copy.
+        const rects = [...a.querySelectorAll("span")].map((el) => {
           const r = document.createRange();
           r.selectNodeContents(el);
-          const b = r.getBoundingClientRect();
-          return { x: b.x, width: b.width, height: b.height };
+          return r.getBoundingClientRect();
         });
+        const b = rects.filter((r) => r.width > 2).at(-1)!;
+        return { x: b.x, width: b.width, height: b.height };
+      });
       expect(lb.x, `${name} label left at ${w}`).toBeGreaterThanOrEqual(box.x - 0.5);
       expect(lb.x + lb.width, `${name} label right at ${w}`).toBeLessThanOrEqual(box.x + box.width + 0.5);
       expect(lb.height, `${name} label wraps at ${w}`).toBeLessThan(20);
