@@ -598,3 +598,28 @@ Follow-up, same day (I fetched the zip myself):
 - `https://developers.google.com/static/identity/images/signin-assets.zip` downloaded (HTTP 200, 855303 bytes). The "G" in `packages/auth/src/googleG.ts` is the one in `Android + Web/SVG/Light/Theme=Light, Show text=No, Shape=Pill`, taken as is. Only the circle behind it was dropped and the view box cropped to the G (10 10 20 20). Status: VERIFIED as the official asset. It is a gradient and filter drawing, rendered as intended in Chromium (screenshots in `apps/web/docs/screens/auth-*`); other browsers are UNVERIFIED.
 - Button: the shipped button uses the page's own surface colours and a pill shape, not the exact #FFFFFF / #747775 values above, because the guidelines do not forbid it (radius and width are unspecified) and the dark theme needs a dark fill. UNVERIFIED whether Google's consent screen review accepts that; if it asks, switch `.btn-google` in `packages/auth/src/theme.ts` to the listed light and dark values.
 - Worker bundle with the font and G: 1009800 bytes, 283561 gzip (measured by `apps/edge/test/bundle.test.ts`).
+
+### 10.19 Chrome Web Store listing assets and rules (2026-11-01)
+
+Read live (page fetch, summarised by a tool, not read raw): the developer.chrome.com pages named in the Source column. Our manifest (`apps/extension/public/manifest.json`) asks for `activeTab`, `scripting`, `identity`, `storage` and host permission `http://localhost:8787/*` (a dev value that must change for a store build).
+
+| Item | Observed | Status | Source |
+| :--- | :--- | :--- | :--- |
+| Mandatory assets | Only the store icon and at least one screenshot are mandatory | VERIFIED | https://developer.chrome.com/docs/webstore/images |
+| Store icon | 128x128 PNG, artwork 96x96 with 16 px transparent padding per side. Uploaded in the listing; the page says "in the extension's ZIP file", whether the listing icon must be the same file as the manifest 128 icon is not stated | VERIFIED size and padding; same-file rule UNVERIFIED | https://developer.chrome.com/docs/webstore/images |
+| Icon alpha | Transparent padding expected; an image without alpha is put in a frame with 12 px rounded corners. Must work on light and dark, no own edge | VERIFIED | same |
+| Screenshots | Min 1, max 5. 1280x800 preferred, 640x400 allowed. Square corners, full bleed, no padding. Format not stated (examples are JPG); alpha rule not stated | VERIFIED count and sizes; format and alpha UNVERIFIED | https://developer.chrome.com/docs/webstore/images and https://developer.chrome.com/docs/webstore/cws-dashboard-listing |
+| Small promo tile | 440x280, optional, PNG or JPEG, not localizable. Listings without it rank after those with it | VERIFIED | same |
+| Marquee | 1400x560, optional (needed to be featured in the marquee), PNG or JPEG, not localizable | VERIFIED | same |
+| Name | Manifest `name` max 75 characters. Store listing name limit not stated on the listing page | VERIFIED manifest; listing limit UNVERIFIED | https://developer.chrome.com/docs/extensions/reference/manifest/name |
+| Summary | Manifest `description`: plain text, no more than 132 characters, used for both chrome://extensions and the store. That page is marked last updated 2013, so recheck in the dashboard. Ours is about 112 characters by hand count | VERIFIED (old page); our count UNVERIFIED | https://developer.chrome.com/docs/extensions/reference/manifest/description |
+| Detailed description | No character limit stated; must follow the Keyword spam policy; localizable | VERIFIED no limit stated | https://developer.chrome.com/docs/webstore/cws-dashboard-listing |
+| Category | One primary category, listing page does not enumerate them | VERIFIED one; list UNVERIFIED | same |
+| Single purpose | Must be "narrow and easy to understand": a narrow subject or a narrow browser function. A dashboard field asks you to describe it. Unneeded permissions can count as a violation | VERIFIED | https://developer.chrome.com/docs/webstore/program-policies/quality-guidelines-faq and https://developer.chrome.com/docs/webstore/cws-dashboard-privacy |
+| Permission justifications | Request the minimum permissions; each requested permission needs a justification in the dashboard. The pages do NOT give per-permission rules for `activeTab`, `scripting`, `storage`, `identity` or host permissions | VERIFIED general rule; per-permission rules UNVERIFIED | https://developer.chrome.com/docs/webstore/cws-dashboard-privacy |
+| Remote code | Undeclared remote code is rejected; MV3 disallows remotely hosted code | VERIFIED | same |
+| Privacy policy | Required for any product handling user data, even only local storage or Chrome Storage Sync. Must be posted in the Developer Dashboard; says what is collected, used, shared. Sign in counts as handling user data | VERIFIED | https://developer.chrome.com/docs/webstore/program-policies/user-data-faq |
+| Limited Use | Disclosure on the homepage or one click away. Four elements: allowed use (single purpose or user-facing features only), allowed transfer (necessary functionality, law, security, merger), no personalized or interest-based ads, no human reading except narrow exceptions | VERIFIED | same |
+| Privacy practices form | Must be completed before publish or update; inconsistencies between form, policy and behaviour are policy violations | VERIFIED | same |
+| Visibility: Unlisted | No store listing; anyone with the direct store URL can install | VERIFIED | https://developer.chrome.com/docs/webstore/cws-dashboard-distribution |
+| Visibility: Public / Private | Public lists for all; Private limits install to specified users, typically for testing | VERIFIED | same |

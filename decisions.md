@@ -168,3 +168,10 @@ No decisions log exists on main (MEMORY.md is only in old worktrees), so this fi
 ## 2026-11-01: b-screens covers subscriptions and the phone in both schemes (+claude)
 - **What:** `apps/web/e2e/b-screens.spec.ts` now visits `/subscriptions` and runs axe (wcag2a, wcag2aa, wcag21a, wcag21aa) at 390 px in light and dark as well as at 1280. Screenshots under `apps/web/docs/screens` were regenerated; new files are the `*-phone-dark.png` set and `web-subscriptions-*`.
 - **Checked:** zero axe violations on every page in all four variants (the run caught the Subs tab name, fixed above). I looked at a sample of the new images, not all 50.
+
+## 2026-11-01: store readiness pass, popup polish, and what it cannot fix (+claude)
+- **What:** popup header shows a labelled "Signed in" and an "Open Hippo" button with an arrow, targets enlarged (`026ed7c`). Privacy and terms rewritten from what the product does, landing "Planned" section became "Hippo for Chrome" (worded as "being prepared for the Chrome Web Store", not available), landing screenshots refreshed (`584b968`). `apps/extension/store/` holds `listing.md`, `make-assets.mjs` and the generated images (five 1280x800, 440x280, 1400x560; sizes from `docs/VERIFIED.md` 10.19).
+- **Why this way:** the images are built from the real popup (mocked chrome API, demo data), the demo billing fixture and real app screens, so nothing is invented. Privacy wording avoids claims the code cannot back (no encryption or hosting claims, no retention periods, no contact address).
+- **Correction to the audit:** the popup is fixed at 360 px in every state. The wider look in a screenshot was screen scaling.
+- **Open, not fixable by UI:** saving a page is refused on any hosted server (`isLocalOnly`) and the manifest only allows localhost, so the extension cannot serve real users until a hosted capture path exists. Listed as blocker 1 in `apps/extension/store/listing.md`. Owner decisions: publisher name, support contact, legal review of the privacy and terms text.
+- **Checked:** web 133, extension 35 tests, rendered popup and every store image looked at. Not checked: real Chrome popup, Web Store review.
