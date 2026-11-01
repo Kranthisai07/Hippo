@@ -15,7 +15,7 @@ import {
 } from "./google";
 import type { Mailer } from "./mailer";
 import { defaultRandom, safeEqual, sha256b64url, sixDigits, token, type RandomBytes } from "./crypto";
-import { errorPage, loginPage } from "./pages";
+import { errorPage as renderErrorPage, loginPage, type PageLinks } from "./pages";
 import { createMemoryStore, type AuthStore } from "./store";
 import { keyBytes, signAccess, verifyAccess } from "./tokens";
 
@@ -28,6 +28,8 @@ export interface ClientConfig {
   redirectUris: string[];
   /** Omit for a public client (the Alexa client). */
   secret?: string;
+  /** Shown on the sign in page as "to continue to <name>". */
+  name?: string;
 }
 
 export interface AuthOptions {
@@ -55,6 +57,8 @@ export interface AuthOptions {
    * address then goes through the same household mapping as an emailed code.
    */
   google?: GoogleOptions;
+  /** Public pages linked from the sign in window (privacy, terms, home). Absolute http or https addresses only. */
+  links?: PageLinks;
   /** Emails the code. When set it replaces the log line. A failure is logged by error name only and never shown. */
   mailer?: Mailer;
   /** Service credentials for the client_credentials grant (scope mcp:service only). */
@@ -166,6 +170,7 @@ export function createAuth(opts: AuthOptions): Auth {
   const secure = opts.secureCookie ?? issuer.startsWith("https:");
   const origins = new Set(opts.allowedOrigins ?? [new URL(issuer).origin]);
   const clients = new Map(opts.clients.map((c) => [c.clientId, c]));
+  const clientName = (id: string): string | undefined => clients.get(id)?.name;
   const allScopes = [...USER_SCOPES, SCOPE_SERVICE];
 
   const app = new Hono();
@@ -216,7 +221,7 @@ export function createAuth(opts: AuthOptions): Auth {
     c.header("Cache-Control", "no-store");
     c.header(
       "Content-Security-Policy",
-      "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'",
+      "default-src 'none'; style-src 'unsafe-inline'; font-src data:; frame-ancestors 'none'; base-uri 'none'",
     );
     c.header("X-Frame-Options", "DENY");
     c.header("Referrer-Policy", "no-referrer");
@@ -410,11 +415,13 @@ export function createAuth(opts: AuthOptions): Auth {
     return h;
   };
 
+  const errorPage = (message: string): string => renderErrorPage(message, opts.links);
+
   const renderLogin = async (
     c: Context,
     p: AuthzParams,
     csrf: string,
-    extra: { email?: string; notice?: string; error?: string } = {},
+    extra: { email?: string; notice?: string; error?: string; step?: "email" | "code" } = {},
     status: 200 | 401 | 429 = 200,
   ): Promise<Response> => {
     const s = await sessionFromId(getCookie(c, SESSION_COOKIE));
@@ -427,6 +434,9 @@ export function createAuth(opts: AuthOptions): Auth {
       demo: Boolean(opts.demoUser),
       google: Boolean(opts.google),
       sessionEmail: s?.email,
+      step: extra.step ?? "email",
+      links: opts.links,
+      ...(clientName(p.clientId) ? { clientName: clientName(p.clientId) } : {}),
     });
     return c.html(html, status);
   };
@@ -581,16 +591,26 @@ export function createAuth(opts: AuthOptions): Auth {
       return renderLogin(c, p, csrfCookie, {
         email: e ?? "",
         notice: "If that address can sign in, a code was sent. Enter it below.",
+        step: "code",
       });
     } else if (action === "login") {
       const e = normalizeEmail(single(sp, "email"));
       const r = e ? await checkMagic(e, single(sp, "code")) : "bad";
       if (typeof r === "object") {
         c.header("Retry-After", String(r.retryAfterSec));
-        return renderLogin(c, p, csrfCookie, { email: e ?? "", error: "Too many tries. Try again later." }, 429);
+        return renderLogin(
+          c,
+          p,
+          csrfCookie,
+          { email: e ?? "", error: "Too many tries. Try again later.", step: "code" },
+          429,
+        );
       }
       if (e && r === "ok") email = e;
-      else return renderLogin(c, p, csrfCookie, { email: e ?? "", error: "That code did not work." }, 401);
+      else
+        return renderLogin(c, p, csrfCookie, { email: e ?? "", error: "That code did not work.", step: "code" }, 401);
+    } else if (action === "change") {
+      return renderLogin(c, p, csrfCookie, { email: normalizeEmail(single(sp, "email")) ?? "" });
     } else if (action === "google") {
       if (!opts.google) return bad();
       return startGoogle(c, { mode: "authorize", params: hiddenFor(p) });

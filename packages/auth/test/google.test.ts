@@ -338,7 +338,8 @@ describe("what is refused, and what the person sees", () => {
   const refused = async (res: Response) => {
     expect(res.status).toBe(400);
     expect(res.headers.get("location")).toBeNull();
-    const html = await res.text();
+    // The stylesheet and embedded font are not what the person reads, so only the text outside <style> is checked.
+    const html = (await res.text()).replace(/<style>[\s\S]*?<\/style>/, "");
     expect(html).toContain(FAILED_PAGE);
     expect(html).not.toMatch(/invalid_grant|nonce|signature|JWT|exception/i);
     // The attempt cookie is cleared even on a failure.
