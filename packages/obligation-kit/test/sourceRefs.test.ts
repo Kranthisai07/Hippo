@@ -4,7 +4,8 @@ import { describe, expect, it } from "vitest";
 import { quoteOnPage, verifySourceRefs, type PageText } from "../src";
 
 const leaf = (value: unknown, page: number, quote: string) => ({ value, sourceRef: { page, quote } });
-const page1 = "Section 4. How to make a claim\nYou must report a defect within thirty (30) days of discovering it.\nCall 1-800-555-0142.";
+const page1 =
+  "Section 4. How to make a claim\nYou must report a defect within thirty (30) days of discovering it.\nCall 1-800-555-0142.";
 const verify = (fields: unknown, pages: PageText[] = [page1]) => verifySourceRefs(fields, pages);
 
 describe("quoteOnPage: folding", () => {
@@ -18,7 +19,9 @@ describe("quoteOnPage: folding", () => {
     expect(quoteOnPage("report  a defect\nwithin   thirty (30)\ndays", page1)).toBe(true);
   });
   it("ignores a line wrapped across the page text", () => {
-    expect(quoteOnPage("a defect within thirty (30) days", "must report a\ndefect within\nthirty (30)\ndays of")).toBe(true);
+    expect(quoteOnPage("a defect within thirty (30) days", "must report a\ndefect within\nthirty (30)\ndays of")).toBe(
+      true,
+    );
   });
   it("ignores hyphenation and punctuation", () => {
     expect(quoteOnPage("improperly connected supply", "improperly con-\nnected supply or drain")).toBe(true);
@@ -98,11 +101,20 @@ describe("quoteOnPage: numbers keep their boundaries (text layer pages)", () => 
 
 describe("verifySourceRefs: only the checked claim survives, and bad input fails closed", () => {
   it("returns just value and sourceRef, so extra claims beside a good quote are dropped", () => {
-    const r = verify({ a: { value: "x", sourceRef: { page: 1, quote: "How to make a claim" }, note: "FAKE claim", extra: { value: "FAKE", sourceRef: { page: 1, quote: "nope nope" } } } });
+    const r = verify({
+      a: {
+        value: "x",
+        sourceRef: { page: 1, quote: "How to make a claim" },
+        note: "FAKE claim",
+        extra: { value: "FAKE", sourceRef: { page: 1, quote: "nope nope" } },
+      },
+    });
     expect(r.fields).toEqual({ a: { value: "x", sourceRef: { page: 1, quote: "How to make a claim" } } });
   });
   it("does not carry a fabricated source on a null value", () => {
-    expect(verify({ a: { value: null, sourceRef: { page: 1, quote: "made up quote here" } } }).fields).toEqual({ a: { value: null } });
+    expect(verify({ a: { value: null, sourceRef: { page: 1, quote: "made up quote here" } } }).fields).toEqual({
+      a: { value: null },
+    });
   });
   it("rejects every quote on a page with no text, or a missing page, instead of throwing", () => {
     const f = { a: leaf(1, 1, "How to make a claim") };
@@ -112,7 +124,12 @@ describe("verifySourceRefs: only the checked claim survives, and bad input fails
   it("does not stall on a huge OCR page: fuzzy matching is capped", () => {
     const big = "lorem ipsum dolor sit amet ".repeat(40000); // about 1 MB
     const t = performance.now();
-    const r = verify({ a: leaf(1, 1, "a two hundred character quote that is nowhere on this very large page ".repeat(3).slice(0, 200)) }, [{ text: big, ocr: true }]);
+    const r = verify(
+      {
+        a: leaf(1, 1, "a two hundred character quote that is nowhere on this very large page ".repeat(3).slice(0, 200)),
+      },
+      [{ text: big, ocr: true }],
+    );
     expect(r.rejected.length).toBe(1);
     expect(performance.now() - t).toBeLessThan(1000);
   });
@@ -120,7 +137,9 @@ describe("verifySourceRefs: only the checked claim survives, and bad input fails
 
 describe("quoteOnPage: OCR pages", () => {
   const ocr = (text: string) => ({ text, ocr: true });
-  const page = ocr("You must report a defect within thirty (30) days of discovering it. Call Northwind Warranty Service.");
+  const page = ocr(
+    "You must report a defect within thirty (30) days of discovering it. Call Northwind Warranty Service.",
+  );
   it("forgives a letter OCR got wrong", () => {
     expect(quoteOnPage("You must report a defect within thirty (30) days of discovcring it.", page)).toBe(true);
   });
@@ -171,7 +190,9 @@ describe("verifySourceRefs", () => {
     expect(r.rejected).toEqual([{ path: "x", reason: "page_out_of_range", page: p }]);
   });
   it("rejects a non-integer page as a missing source", () => {
-    expect(verify({ x: { value: 1, sourceRef: { page: 1.5, quote: "within thirty (30) days" } } }).rejected[0]?.reason).toBe("missing_source_ref");
+    expect(
+      verify({ x: { value: 1, sourceRef: { page: 1.5, quote: "within thirty (30) days" } } }).rejected[0]?.reason,
+    ).toBe("missing_source_ref");
   });
   it("rejects a value with no source", () => {
     const r = verify({ x: { value: 30 }, y: { value: 30, sourceRef: null }, z: { value: 30, sourceRef: { page: 1 } } });
@@ -189,9 +210,15 @@ describe("verifySourceRefs", () => {
   });
   it("removes failed array items and keeps the good ones in order", () => {
     const r = verify({
-      exclusions: [leaf("a", 1, "How to make a claim"), leaf("b", 1, "invented exclusion text"), leaf("c", 1, "Call 1-800-555-0142")],
+      exclusions: [
+        leaf("a", 1, "How to make a claim"),
+        leaf("b", 1, "invented exclusion text"),
+        leaf("c", 1, "Call 1-800-555-0142"),
+      ],
     });
-    expect(r.fields).toEqual({ exclusions: [leaf("a", 1, "How to make a claim"), leaf("c", 1, "Call 1-800-555-0142")] });
+    expect(r.fields).toEqual({
+      exclusions: [leaf("a", 1, "How to make a claim"), leaf("c", 1, "Call 1-800-555-0142")],
+    });
     expect(r.rejected).toEqual([{ path: "exclusions[1]", reason: "quote_not_found", page: 1 }]);
   });
   it("reports nested paths", () => {
@@ -236,8 +263,14 @@ describe("verifySourceRefs", () => {
   it("copes with a large page quickly", () => {
     const big = `${"lorem ipsum dolor sit amet ".repeat(800)} within thirty (30) days of discovering it`;
     const t = performance.now();
-    expect(verify({ a: leaf(1, 1, "within thirty (30) days of discovering it") }, [{ text: big, ocr: true }]).rejected).toEqual([]);
-    expect(verify({ a: leaf(1, 1, "a quote that is not anywhere on this very large page at all") }, [{ text: big, ocr: true }]).rejected.length).toBe(1);
+    expect(
+      verify({ a: leaf(1, 1, "within thirty (30) days of discovering it") }, [{ text: big, ocr: true }]).rejected,
+    ).toEqual([]);
+    expect(
+      verify({ a: leaf(1, 1, "a quote that is not anywhere on this very large page at all") }, [
+        { text: big, ocr: true },
+      ]).rejected.length,
+    ).toBe(1);
     expect(performance.now() - t).toBeLessThan(2000);
   });
 });
@@ -253,18 +286,29 @@ describe("the fixture documents", () => {
 
   it("has page text for all six documents", () => {
     expect(stems.sort()).toEqual(
-      ["insurance_auto", "lease", "subscription_fernwood", "subscription_kestrel", "warranty_dishwasher", "warranty_dishwasher_photo"].sort(),
+      [
+        "insurance_auto",
+        "lease",
+        "subscription_fernwood",
+        "subscription_kestrel",
+        "warranty_dishwasher",
+        "warranty_dishwasher_photo",
+      ].sort(),
     );
   });
-  it.each(["insurance_auto", "lease", "subscription_fernwood", "subscription_kestrel", "warranty_dishwasher", "warranty_dishwasher_photo"])(
-    "%s: every expected quote is on its cited page",
-    (stem) => {
-      const doc = load(stem) as { fields: unknown; pages: number };
-      const r = verifySourceRefs(doc.fields, pagesOf(stem));
-      expect(r.rejected).toEqual([]);
-      expect(r.fields).toEqual(doc.fields);
-    },
-  );
+  it.each([
+    "insurance_auto",
+    "lease",
+    "subscription_fernwood",
+    "subscription_kestrel",
+    "warranty_dishwasher",
+    "warranty_dishwasher_photo",
+  ])("%s: every expected quote is on its cited page", (stem) => {
+    const doc = load(stem) as { fields: unknown; pages: number };
+    const r = verifySourceRefs(doc.fields, pagesOf(stem));
+    expect(r.rejected).toEqual([]);
+    expect(r.fields).toEqual(doc.fields);
+  });
   it("nulls a tampered warranty exclusion and a tampered claim window", () => {
     const doc = load("warranty_dishwasher") as { fields: Record<string, any> };
     doc.fields.claimWindowDays.sourceRef.quote = "You must report a defect within sixty (60) days of discovering it.";

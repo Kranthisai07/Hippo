@@ -1,0 +1,29 @@
+# Local and staging settings for the Hippo API on Cloudflare Workers. No secret belongs in this file: HIPPO_SIGNING_KEY
+# is set with `wrangler secret put HIPPO_SIGNING_KEY`, and for a local run it goes in apps/edge/.dev.vars (git ignored).
+name = "hippo-api"
+main = "src/index.ts"
+# No nodejs_compat flag: the bundle imports no Node module (apps/edge/test/bundle.test.ts keeps it that way).
+compatibility_date = "2026-07-01"
+
+[vars]
+HIPPO_ISSUER = "http://localhost:8787"
+HIPPO_CLIENT_ID = "hippo-demo"
+HIPPO_REDIRECT_URIS = "http://localhost:5173/callback"
+HIPPO_ALLOWED_ORIGINS = "http://localhost:5173"
+HIPPO_MAIL_FROM = "Hippo <login@localhost>"
+
+# The database id is a placeholder until a real database exists (slice 6). A local run does not use it.
+[[d1_databases]]
+binding = "DB"
+database_name = "hippo"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "hippo-docs"
+
+# The Email Sending binding (beta, paid plan, a verified sender domain) is added at staging:
+# [[send_email]]
+# name = "EMAIL"
+# Without it a non production run writes the sign in code to the log instead.

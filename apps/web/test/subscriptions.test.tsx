@@ -33,8 +33,8 @@ describe("Subscriptions page", () => {
   it("shows the confirmed total and each subscription", async () => {
     show([sub({})], 15.99);
     expect(await screen.findByText("Fernwood Streaming")).toBeInTheDocument();
-    expect(screen.getByText("$15.99")).toBeInTheDocument();
-    expect(screen.getByText(/next charge 2026-11-03/)).toBeInTheDocument();
+    expect(screen.getByText("$15.99")).toHaveClass("stat-value");
+    expect(screen.getByText(/next charge Nov 3, 2026/)).toBeInTheDocument();
     expect(screen.getByText("Confirmed")).toBeInTheDocument();
   });
 

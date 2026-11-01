@@ -16,6 +16,7 @@
 // Lambda memory and timeout are the final backstop, and a crash or timeout there must mark the document failed.
 import { inflateSync } from "node:zlib";
 import * as pdfjs from "pdfjs-dist/legacy/build/pdf.mjs";
+import { PdfError, type PdfErrorCode } from "./errors";
 
 /** A page with fewer than this many letters and digits in its text layer is treated as scanned and sent to OCR (SPEC section 7). */
 export const OCR_MIN_CHARS = 50;
@@ -26,23 +27,7 @@ export const DEFAULT_MAX_BYTES = 25 * 1024 * 1024;
 /** Cost guard: wall clock for load plus extraction. */
 export const DEFAULT_TIMEOUT_MS = 10_000;
 
-export type PdfErrorCode =
-  | "not_pdf" // bytes that are neither a PDF nor a known format
-  | "unsupported" // a known format we do not read (TIFF, GIF, WebP, SVG, ZIP, AVIF, mp4)
-  | "corrupt"
-  | "encrypted"
-  | "too_many_pages"
-  | "too_large"
-  | "timeout"
-  | "bad_ocr" // the injected OCR function returned something other than a string
-  | "empty";
-
-export class PdfError extends Error {
-  constructor(readonly code: PdfErrorCode, message: string) {
-    super(message);
-    this.name = "PdfError";
-  }
-}
+export { PdfError, type PdfErrorCode };
 
 export interface Page {
   /** 1 based and stable: this is the citation page number. */
@@ -117,9 +102,27 @@ const DICT_LOOKBACK = 4096; // shortcut: only this many bytes of a stream dictio
 
 const isWs = (c: number): boolean => c === 0x20 || c === 0x0a || c === 0x0d || c === 0x09 || c === 0x0c || c === 0x00;
 const isDelim = (c: number): boolean =>
-  isWs(c) || c === 0x2f || c === 0x25 || c === 0x28 || c === 0x29 || c === 0x3c || c === 0x3e || c === 0x5b || c === 0x5d || c === 0x7b || c === 0x7d;
+  isWs(c) ||
+  c === 0x2f ||
+  c === 0x25 ||
+  c === 0x28 ||
+  c === 0x29 ||
+  c === 0x3c ||
+  c === 0x3e ||
+  c === 0x5b ||
+  c === 0x5d ||
+  c === 0x7b ||
+  c === 0x7d;
 const hexVal = (c: number | undefined): number =>
-  c === undefined ? -1 : c >= 0x30 && c <= 0x39 ? c - 0x30 : c >= 0x41 && c <= 0x46 ? c - 0x37 : c >= 0x61 && c <= 0x66 ? c - 0x57 : -1;
+  c === undefined
+    ? -1
+    : c >= 0x30 && c <= 0x39
+      ? c - 0x30
+      : c >= 0x41 && c <= 0x46
+        ? c - 0x37
+        : c >= 0x61 && c <= 0x66
+          ? c - 0x57
+          : -1;
 
 /** Reads the name after the slash at `i`, decoding #xx escapes; null when longer than 16 bytes. `end` is the next unread offset. */
 function readName(b: Buffer, i: number): { name: string; end: number } | null {
@@ -177,14 +180,20 @@ interface Scan {
   opaqueObjStm: boolean;
 }
 
-const unescapeNames = (s: string): string => s.replace(/#([0-9A-Fa-f]{2})/g, (_, h: string) => String.fromCharCode(parseInt(h, 16)));
+const unescapeNames = (s: string): string =>
+  s.replace(/#([0-9A-Fa-f]{2})/g, (_, h: string) => String.fromCharCode(parseInt(h, 16)));
 
 /**
  * The zlib header test zlib and pdf.js both apply: deflate method, a window size of at most 32 KB, a header checksum divisible by 31 and no
  * preset dictionary. Matching only the four common headers (78 01, 78 5e, 78 9c, 78 da) let a bomb behind 68 DE reach pdf.js unchecked.
  */
 const looksZlib = (b0: number | undefined, b1: number | undefined): boolean =>
-  b0 !== undefined && b1 !== undefined && (b0 & 0x0f) === 8 && b0 >> 4 <= 7 && ((b0 << 8) | b1) % 31 === 0 && (b1 & 0x20) === 0;
+  b0 !== undefined &&
+  b1 !== undefined &&
+  (b0 & 0x0f) === 8 &&
+  b0 >> 4 <= 7 &&
+  ((b0 << 8) | b1) % 31 === 0 &&
+  (b1 & 0x20) === 0;
 
 /** Walks the file once, strictly forward. Throws too_large when decoding would exceed the caps. Never touches pdf.js. */
 function prescan(b: Buffer): Scan {
@@ -224,7 +233,8 @@ function prescan(b: Buffer): Scan {
           total += out.length;
           if (isObjStm) scan.pages += countPageObjects(out);
         } catch (e) {
-          if ((e as { code?: string }).code === "ERR_BUFFER_TOO_LARGE") throw new PdfError("too_large", "stream decodes past the cap");
+          if ((e as { code?: string }).code === "ERR_BUFFER_TOO_LARGE")
+            throw new PdfError("too_large", "stream decodes past the cap");
           total += Math.max(1, end - after); // a failed inflate still costs budget
           if (isObjStm) scan.opaqueObjStm = true;
         }
@@ -255,7 +265,10 @@ export async function extractPages(input: Uint8Array, opts: ExtractOptions = {})
   const maxPages = opts.maxPages ?? DEFAULT_MAX_PAGES;
   // Bounds decompression work for pdf.js and counts page objects; throws too_large before pdf.js sees the bytes.
   const scan = prescan(Buffer.from(bytes.buffer, bytes.byteOffset, bytes.length));
-  const timers = opts.timers ?? { setTimeout: (fn, ms) => setTimeout(fn, ms), clearTimeout: (h) => clearTimeout(h as NodeJS.Timeout) };
+  const timers = opts.timers ?? {
+    setTimeout: (fn, ms) => setTimeout(fn, ms),
+    clearTimeout: (h) => clearTimeout(h as NodeJS.Timeout),
+  };
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   let handle: unknown;
   const deadline = new Promise<never>((_, reject) => {
@@ -288,7 +301,8 @@ export async function extractPages(input: Uint8Array, opts: ExtractOptions = {})
         ? new PdfError("too_many_pages", `${scan.pages} page objects, cap is ${maxPages}`)
         : new PdfError("corrupt", "page tree disagrees with /Count");
     }
-    if (scan.pages < doc.numPages || scan.opaqueObjStm) throw new PdfError("unsupported", "page structure cannot be verified");
+    if (scan.pages < doc.numPages || scan.opaqueObjStm)
+      throw new PdfError("unsupported", "page structure cannot be verified");
     const pages: Page[] = [];
     for (let n = 1; n <= doc.numPages; n++) {
       // A page whose content stream is corrupt yields empty text, so it is flagged needsOcr just like a scanned page.

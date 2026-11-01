@@ -4,3 +4,6 @@ fixtures
 *.md
 .claude
 dist
+packages/auth/src/geistFont.ts
+packages/auth/src/googleG.ts
+test-results

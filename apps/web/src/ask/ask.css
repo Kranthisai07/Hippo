@@ -94,17 +94,6 @@
   font-size: var(--t-xl);
   line-height: 1.1;
 }
-.ha-logo {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  background: var(--accent);
-  color: var(--on-accent);
-  display: grid;
-  place-items: center;
-  font-weight: 700;
-  font-size: var(--t-xl);
-}
 .ha-conn {
   display: flex;
   align-items: center;
@@ -934,10 +923,6 @@
   top: 0;
   z-index: var(--z-sticky);
 }
-.ha-logo {
-  border-radius: var(--r1);
-  box-shadow: var(--shadow1);
-}
 .ha-brand h1 {
   letter-spacing: -0.02em;
 }
@@ -1105,4 +1090,34 @@
   .ha-two--wide {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* The page header uses the shared brand mark; the protocol notes live under a closed disclosure. */
+.ha-how {
+  max-width: 760px;
+  margin: var(--s6) auto 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r2);
+  background: var(--surface);
+}
+.ha-how > summary {
+  cursor: pointer;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--s4);
+  font-weight: 600;
+}
+.ha-how__body {
+  display: grid;
+  gap: var(--s3);
+  padding: 0 var(--s4) var(--s4);
+  color: var(--muted);
+  font-size: var(--t-sm);
+}
+.ha-solo {
+  min-width: 0;
+}
+.ha-hero + .ha-how {
+  max-width: 640px;
 }

@@ -1,3 +1,4 @@
+import "@fontsource-variable/geist";
 import { createRoot } from "react-dom/client";
 import "./popup.css";
 import { Popup } from "./Popup";

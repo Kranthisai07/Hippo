@@ -359,3 +359,267 @@ Sources: https://amazonappdev2026.devpost.com/ and https://amazonappdev2026.devp
 ## Independent check of this file (2026-10-18)
 
 A second agent re-checked the claims that drive decisions against primary sources (curl, `npm view`, AWS and Devpost pages). Confirmed: the Open Source challenge needs no published package and the deadline is Oct 23, 12:00 pm PDT; Textract supports JPEG, PNG, PDF and TIFF only, with synchronous PDF and TIFF limited to 1 page and 10 MB; `@modelcontextprotocol/sdk` 1.32.1 and `ext-apps` 2.0.3 (which peers on the split `@modelcontextprotocol/*` v2 packages, not sdk 1.x) and 1.7.x (peers on sdk 1.29 or newer); `@alexa-ai/cli` and `@alexa-ai/addon-local-inspector` return E404 on public npm; the Alexa docs require `client_credentials` in the AS metadata and refresh tokens, a 401 without `WWW-Authenticate`, and Node 24 or newer for the CLI; the five Bedrock model IDs as printed on their model cards, with structured outputs shown as supported for Haiku 4.5 and Sonnet 4.6 and not for Haiku 5.5, Sonnet 5.5 and Nova 2 Lite (read from the model cards' feature tables, not a Converse page), and a JSON schema subset without `minLength`, `maxLength`, `minimum`, `maximum` or `additionalProperties` other than false; the October 2025 Lambda Function URL permission change; CloudFront OAC needing `AWS_IAM` and `x-amz-content-sha256` on POST; MiniSearch 7.2.0 being BM25+. Corrected above: the `expires_in` wording, the `client_credentials` qualifier, the Haiku 4.5 base ID, the UPC filter behavior, and the public repo note for the mini challenge. Still unverified here: the Alexa 2025-03-26 versus 2025-11-25 protocol discrepancy, SES, NHTSA, the Converse document limits, and which video clause of the rules applies to Alexa+ (the rules text also mentions a Ring device, which looks like another track's wording).
+
+---
+
+## 10. Cloudflare, Google sign-in and Chrome Web Store (Phase 0 of the production plan)
+
+Checked on 2026-10-31. Pages read with WebFetch (small-model summaries), so quoted numbers are as summarized; load-bearing items should be re-read in the browser before spending money. One live request was made: Google's OIDC discovery document, saved at `fixtures/verify/google-oidc-discovery-2026-10-31.json` (HTTP 200). No Cloudflare, Google or Chrome account call was made and nothing was deployed. Verdict values: CONFIRMED, CHANGED, UNVERIFIED.
+
+### 10.1 Workers runtime
+- CONFIRMED: `nodejs_compat` is needed in `compatibility_flags` for compatibility dates 2024-09-23 through 2026-08-03; for dates of 2026-08-04 or later "Workers enables both `nodejs_compat` and `nodejs_compat_v2` by default". https://developers.cloudflare.com/workers/runtime-apis/nodejs/
+- CONFIRMED: `node:crypto` is "fully supported" with exceptions: no DSA/DH key pair generation, no `argon2`/`argon2Sync`, no `randomUUIDv7`, no `ed448`/`x448`, no FIPS toggle. https://developers.cloudflare.com/workers/runtime-apis/nodejs/crypto/ . Web Crypto is available without the flag (same page).
+- UNVERIFIED per function: `createHash`, `randomBytes` and `timingSafeEqual` are not named on the page; they are covered only by the "all APIs except these" sentence and are not in the exceptions list. `crypto.subtle.timingSafeEqual` is not mentioned on that page. Plan: a 10-line `wrangler dev` smoke test of the three functions before relying on them.
+- CONFIRMED: compatibility_date guidance is "set the date to the current date when you start" for new projects; old dates are supported indefinitely; API uploads without a date default to 2021-11-02. https://developers.cloudflare.com/workers/configuration/compatibility-dates/
+- CONFIRMED: Hono runs as the Worker's `fetch` handler (`export default app`); to add `scheduled`, export `{ fetch: app.fetch, scheduled }`. Bindings are typed with `new Hono<{ Bindings: Bindings }>()` and read from `c.env`; `process.env` is not available by default. https://hono.dev/docs/getting-started/cloudflare-workers (Hono's own docs; the Cloudflare Hono guide https://developers.cloudflare.com/workers/framework-guides/web-apps/more-web-frameworks/hono/ only shows a Vite template).
+- Limits (https://developers.cloudflare.com/workers/platform/limits/):
+
+| Limit | Free | Paid |
+| :--- | :--- | :--- |
+| Request body (incoming) | 100 MB (set by the domain's Cloudflare plan) | 100 MB |
+| CPU time per HTTP request | 10 ms | default 30 s, up to 5 min |
+| Duration (HTTP) | no limit | no limit |
+| Cron Trigger duration | 15 min | 15 min |
+| Subrequests per invocation | 50 | 10,000 |
+| Requests per day | 100,000 | no limit |
+| Worker size | 64 MiB | 64 MiB |
+| Cron Triggers per account | 5 | 250 |
+
+- Verdict on plan: 10 ms CPU per request on Free is tight for JSON parsing plus hashing plus D1 calls; token signing and code hashing may exceed it. Treat Workers Paid ($5/month) as the realistic floor. This is an inference from the 10 ms figure, not a measurement.
+
+### 10.2 D1
+- CONFIRMED: binding API has `prepare(sql).bind(...)` then `run()`, `all()`, `first()`, `raw()`; plus `db.batch([...])` and `db.exec()`. `run()` is equivalent to `all()`; only `?` and `?NNN` placeholders. https://developers.cloudflare.com/d1/worker-api/d1-database/ and https://developers.cloudflare.com/d1/worker-api/prepared-statements/
+- CONFIRMED: `batch()` is transactional: statements run as a SQL transaction and "it aborts or rolls back the entire sequence" on failure. https://developers.cloudflare.com/d1/worker-api/d1-database/
+- UNVERIFIED: `exec()` rollback behavior (page says only that execution stops at the first error and that it is for maintenance and one-shot tasks). Do not use `exec()` for request-path writes.
+- CONFIRMED (shape only): result `meta` includes `changes`, `rows_read`, `rows_written`, `last_row_id`, `changed_db`, `size_after`, `duration`; `changes` is "the number of changes made to the database". https://developers.cloudflare.com/d1/worker-api/return-object/ . `results` is empty for UPDATE/DELETE/INSERT.
+- UNVERIFIED: that `meta.changes === 1` is a reliable one-time-consume signal for `UPDATE ... WHERE used_at IS NULL AND ...`. The docs do not show a conditional UPDATE example or define `changes` for zero-match updates. A single SQL statement is atomic in SQLite, so the plan's design is sound in principle, but it must be proven by the contract test (plan risk already says so). Alternatives: `UPDATE ... RETURNING` (RETURNING support not confirmed in the pages read, UNVERIFIED) or run the consume inside a Durable Object.
+- UNVERIFIED: interactive `BEGIN`/`COMMIT` in Workers D1. The pages read do not document it; `batch()` is the documented transaction mechanism.
+- CONFIRMED limits: 500 MB per database and 10 databases on Free, 10 GB per database on Paid; max string/BLOB/row 2 MB; SQL statement 100 KB; 100 bound parameters per query; 100 columns per table; query duration 30 s; queries per Worker invocation 50 Free, 1,000 Paid (a batch counts as one query); query result size 50 MB enforced starting 2026-11-04. https://developers.cloudflare.com/d1/platform/limits/
+- CONFIRMED: Time Travel retention 30 days on Paid, 7 days on Free; restore is destructive and in place; 10 restores per 10 minutes. https://developers.cloudflare.com/d1/reference/time-travel/ and the limits page. Time Travel price: not listed on the pricing page (UNVERIFIED, treat as included).
+
+### 10.3 Durable Objects
+- CONFIRMED: each object is "single-threaded and cooperatively multi-tasked", one active instance per globally unique ID, storage is "durable, transactional, and strongly consistent". https://developers.cloudflare.com/durable-objects/what-are-durable-objects/
+- CONFIRMED: writes with no intervening `await` are coalesced and committed atomically; during an `await` on a storage read the runtime prevents other events from running (input/output gates, mechanism not detailed on the page); `allowConcurrency: true` opts out of that on `get()`. https://developers.cloudflare.com/durable-objects/api/storage-api/
+- CONFIRMED: SQLite API `ctx.storage.sql.exec()` returns a cursor with `rowsWritten`; `sql.exec()` cannot run `BEGIN`/`SAVEPOINT`; use `ctx.storage.transactionSync(() => ...)` (callback must be synchronous) or `transaction()`. https://developers.cloudflare.com/durable-objects/api/sqlite-storage-api/
+- CONFIRMED: Cloudflare recommends SQLite-backed storage for all new namespaces; enable with `new_sqlite_classes` in a migration with a unique `tag`. "Creating new namespaces with the key-value storage backend is no longer supported" for accounts without an existing KV-backed namespace. https://developers.cloudflare.com/durable-objects/best-practices/access-durable-objects-storage/
+- CONFIRMED: Free plan supports only SQLite-backed objects. https://developers.cloudflare.com/durable-objects/platform/pricing/
+- CONFIRMED: alarms: one alarm per object (`setAlarm` replaces), `alarm()` is at-least-once, retried with exponential backoff from 2 s up to 6 retries, only one `alarm()` runs at a time. https://developers.cloudflare.com/durable-objects/api/alarms/
+- CONFIRMED: soft limit 1,000 requests per second per object; CPU 30 s default per request (up to 5 min). https://developers.cloudflare.com/durable-objects/platform/limits/
+- CHANGED (doc conflict): per-object SQLite storage is "10 GB" in the limits table but the same page's FAQ says "1 GB on the Free plan"; account total on Free is 5 GB. Not relevant to small per-key counters, so no action beyond not relying on either number.
+
+### 10.4 R2
+- CONFIRMED: bucket binding methods `head`, `get`, `put`, `delete` (one key or up to 1000), `list` (up to 1000, paginate on `truncated` and `cursor`), `createMultipartUpload`. `put` accepts `httpMetadata`, `customMetadata`, one checksum, and `onlyIf` (`etagMatches`, `etagDoesNotMatch`, `uploadedBefore`, `uploadedAfter`); a failed precondition returns `null`. https://developers.cloudflare.com/r2/api/workers/workers-api-reference/
+- CONFIRMED limits: object 5 TiB (effective 4.995 TiB), single PUT 5 GiB, key 1,024 bytes, metadata 8,192 bytes, 1 write per second to the same key (429 above that). https://developers.cloudflare.com/r2/platform/limits/ . The same-key rate matters if one object (for example an index) is rewritten often.
+- CONFIRMED pricing (page updated 2026-10-30): Standard storage $0.015/GB-month, Class A $4.50 per million, Class B $0.36 per million, egress to the internet free. Free tier per month: 10 GB-month, 1 million Class A, 10 million Class B. https://developers.cloudflare.com/r2/pricing/
+- UNVERIFIED: whether R2 requires a payment method on file even for the free tier (not on the pages read).
+
+### 10.5 Rate limiting and Turnstile
+- CONFIRMED: Workers Rate Limiting binding: wrangler `ratelimits` entry with `name`, `namespace_id` (string of a positive integer) and `simple: { limit, period }`; `period` may be only 10 or 60 seconds; call `env.X.limit({ key })`, read `success` (false means block). Wrangler 4.36.0 or later is required. https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/
+- CONFIRMED: counts are per Cloudflare location ("These counts do not combine into one worldwide limit"), cached locally and eventually consistent, so the limit is "approximate" and bursts can exceed it. The page recommends a Durable Object for a strict global limit and advises against IP or region as the key.
+- Verdict: DIFFERS from the plan if it expects the binding to be a strict per-email or per-IP limit. Use the binding only as a coarse edge limit (period 10 or 60 s); keep the exact per-email send/guess throttle in `AuthStore.tryHit` (D1 conditional write or a Durable Object).
+- UNVERIFIED: whether the Rate Limiting binding is available on Workers Free (page is silent).
+- CONFIRMED: WAF rate limiting rules by plan (https://developers.cloudflare.com/waf/rate-limiting-rules/): Free 1 rule, fields Path and Verified Bot, counts by IP, period 10 s, mitigation timeout 10 s; Pro 2 rules, period up to 1 min, timeout up to 1 h; Business 5 rules; throttling with a block action is Enterprise only. Zone WAF rules need a zone on Cloudflare, so a custom domain is a prerequisite (inference, UNVERIFIED on the page).
+- CONFIRMED: Turnstile siteverify is `POST https://challenges.cloudflare.com/turnstile/v0/siteverify` with `secret`, `response`, optional `remoteip` and `idempotency_key`; token valid 300 s, single use, max 2048 characters; response has `success`, `challenge_ts`, `hostname`, `error-codes`, `action`, `cdata`. https://developers.cloudflare.com/turnstile/get-started/server-side-validation/ . Free plan: free, 20 widgets, 10 hostnames per widget. https://developers.cloudflare.com/turnstile/plans/
+
+### 10.6 Secrets and env in Hono
+- CONFIRMED: `npx wrangler secret put <KEY>` (deploys a new version at once; use `wrangler versions secret put` for gradual deployments), `wrangler secret delete`, bulk via `--secrets-file` (up to 100 per request). Local values go in `.dev.vars` or `.env` (one of them), both to be git-ignored. Read as `env.NAME` (Hono: `c.env.NAME`); `import { env } from "cloudflare:workers"` works outside handlers. https://developers.cloudflare.com/workers/configuration/secrets/
+- UNVERIFIED: `wrangler secret list` (not on that page).
+
+### 10.7 Email from a Worker
+- CONFIRMED: Cloudflare Email Service "Email Sending" is Beta, needs Workers Paid for arbitrary recipients; sends to verified destination addresses are free on all plans. https://developers.cloudflare.com/email-service/
+- CONFIRMED: binding is `send_email = [{ name = "EMAIL" }]`; `await env.EMAIL.send({ from, to, subject, text, html })`; returns `messageId`; errors throw with a `code` such as `E_SENDER_NOT_VERIFIED`. https://developers.cloudflare.com/email-service/api/send-emails/workers-api/
+- CONFIRMED pricing (page updated 2026-06-09): 3,000 emails per month included on Paid, then $0.35 per 1,000; not available on Workers Free. https://developers.cloudflare.com/email-service/platform/pricing/
+- CONFIRMED limits: 50 recipients, 998-char subject, 25 MiB message; a new account gets "a conservative daily quota" that grows (number not published). https://developers.cloudflare.com/email-service/platform/limits/
+- CONFIRMED: onboarding adds MX on a `cf-bounce` subdomain, SPF, DKIM and DMARC TXT records automatically, and "You must be using Cloudflare DNS". https://developers.cloudflare.com/email-service/get-started/send-emails/ . Until a domain is onboarded you can only send to verified destination addresses (limits page).
+- Verdict: Cloudflare sending is Beta with an unpublished daily quota; for a sign-in code that must arrive, keep the `Mailer` interface and decide between Cloudflare and Resend after a test send. Resend was not checked (no primary doc fetched; UNVERIFIED), including its SPF/DKIM record requirements.
+
+### 10.8 Cron Triggers
+- CONFIRMED: declare in wrangler `triggers.crons`; handler `async scheduled(controller, env, ctx)`; schedules run in UTC; changes take up to 15 minutes to propagate; local test at `/cdn-cgi/local/scheduled`. https://developers.cloudflare.com/workers/configuration/cron-triggers/
+- CONFIRMED: 5 triggers per account on Free, 250 on Paid; cron duration 15 min (limits page above).
+- CHANGED (doc conflict): the Durable Objects alarms page says Cron Triggers are "capped at three per Worker"; the Workers limits page says 5 (Free) and 250 (Paid) per account. Use the limits page; one daily trigger is needed anyway.
+
+### 10.9 Google sign-in (OIDC)
+- CONFIRMED live (curl 2026-10-31, fixture saved): issuer `https://accounts.google.com`; authorization `https://accounts.google.com/o/oauth2/v2/auth`; token `https://oauth2.googleapis.com/token`; userinfo `https://openidconnect.googleapis.com/v1/userinfo`; JWKS `https://www.googleapis.com/oauth2/v3/certs` (HTTP 200); discovery URL `https://accounts.google.com/.well-known/openid-configuration`; `code_challenge_methods_supported` is `["plain","S256"]`; ID token alg `RS256`; `claims_supported` includes `aud`, `email`, `email_verified`.
+- CONFIRMED: ID token checks: signature against the JWKS, `iss` is `https://accounts.google.com` or `accounts.google.com`, `aud` equals our client ID, `exp` not passed. `sub` is stable and is the user key ("never changed"); do not key on `email`. https://developers.google.com/identity/openid-connect/openid-connect
+- CONFIRMED: the authorization request lists `nonce` as required and `state` as strongly recommended. The page's validation list does not itself list a nonce or `email_verified` check, so we must check both ourselves.
+- UNVERIFIED (PKCE for web server clients): the discovery document advertises S256, but the web-server guide (https://developers.google.com/identity/protocols/oauth2/web-server, first 100,000 characters read) and the OpenID Connect reference (https://developers.google.com/identity/openid-connect/reference) do not list `code_challenge`, `code_challenge_method` or `code_verifier`, and the reference marks `client_secret` Required for the code grant. Plan: send S256 PKCE as defense in depth AND the client secret AND `state` and `nonce`; test against the real endpoint in staging. Do not treat PKCE as a replacement for the secret.
+- CONFIRMED: consent screen. Scopes `openid`, `userinfo.email`, `userinfo.profile` are non-sensitive: with only these, users need not be in a test list, see no warning, and authorizations do not expire after 7 days; External user type is open to any Google Account once the app is In production; in Testing, access is limited to 100 listed test users and test-user authorizations expire after 7 days. https://support.google.com/cloud/answer/15549945
+- CONFIRMED: production apps need a public home page that links to a privacy policy, and Google verifies the domains used for home page, privacy policy, terms and redirect URIs (ownership via Search Console). https://developers.google.com/identity/protocols/oauth2/production-readiness/policy-compliance
+- CONFIRMED (conditional): brand verification applies when the app is External, Published and shows a logo or display name on the consent screen. https://developers.google.com/identity/protocols/oauth2/production-readiness/brand-verification . Whether a consent screen without a logo can skip it is UNVERIFIED. https://support.google.com/cloud/answer/13463073 says apps with only non-sensitive scopes are not required to complete app verification.
+- Verdict: no sensitive or restricted scope review is needed for `openid email profile`; budget for a public home page, privacy policy URL and verified domain before moving from Testing to In production. Whether a `*.workers.dev` host can be an authorized domain is UNVERIFIED; plan on a custom domain.
+
+### 10.10 Chrome Web Store and extension APIs
+- UNVERIFIED (current amount): the register page says "pay a one-time registration fee" but states no amount, and the Developer Agreement says the amount is set in Google's sole discretion. https://developer.chrome.com/docs/webstore/register . Lead only, not proof: 2020 coverage of the new dashboard said $5. The dashboard shows the live amount at payment time.
+- CONFIRMED: visibility is Public, Unlisted or Private; Unlisted "does not create a listing" but anyone with the store URL can install; all three have the same policy requirements and review. Private uses trusted testers (email tied to a Google Account; group emails not accepted in the account-level list). https://developer.chrome.com/docs/webstore/cws-dashboard-distribution and https://developer.chrome.com/docs/webstore/set-up-account
+- CONFIRMED: Privacy tab fields: single purpose description, a justification for each permission, remote-code declaration (select No if none), data usage disclosures, privacy policy URL, and limited-use certification. https://developer.chrome.com/docs/webstore/cws-dashboard-privacy
+- CONFIRMED: upload is a zip (max 2 GB); tabs are Package, Store Listing, Privacy, Distribution, Test instructions; after review you have 30 days to publish; new publishers are limited to two published extensions. https://developer.chrome.com/docs/webstore/publish
+- CONFIRMED: review "within a few days" for most, up to weeks for new developers or dangerous permissions; broad host patterns (`<all_urls>`, `https://*/*`) slow review; the page does not discuss `activeTab` or `identity`. https://developer.chrome.com/docs/webstore/review-process
+- CONFIRMED: `activeTab` gives temporary host access to the current tab after a user gesture (action click, context menu, command, omnibox), shows no install warning, and with `scripting` allows `executeScript` on that tab; not granted on restricted pages such as `chrome://`. https://developer.chrome.com/docs/extensions/develop/concepts/activeTab
+- UNVERIFIED: the install-time warning text for `identity`, `storage`, `scripting` and a single host permission (the permission-warnings page defers to the permissions list, not read).
+- UNVERIFIED: what the store does with a `key` present in an uploaded manifest. The `key` page says the field keeps a stable ID during development and gives the method to obtain it (upload the zip without publishing, Package tab, View public key, paste into `key`, check that the loaded ID equals the dashboard Item ID). https://developer.chrome.com/docs/extensions/reference/manifest/key . Safest path: upload without `key`, then copy the dashboard public key into a local-only dev manifest so the unpacked ID matches the store ID (this also yields `HIPPO_EXTENSION_ID` before publishing).
+- CONFIRMED: `chrome.identity.launchWebAuthFlow({ url, interactive })` needs the `identity` permission; redirect URLs match `https://<app-id>.chromiumapp.org/*` and `chrome.identity.getRedirectURL(path?)` builds it; the window closes at that redirect and the final URL is returned; do not start an interactive flow at launch. https://developer.chrome.com/docs/extensions/reference/api/identity . `<app-id>` is the extension ID, so a Google redirect URI list would need the store ID. Our plan routes Google through our own server, so this matters only if the extension itself starts the flow.
+- CONFIRMED storage: `storage.session` is memory only, "cleared if the extension is disabled, reloaded, updated, and when the browser restarts", 10 MB, hidden from content scripts by default. `storage.local` survives restarts, cleared only when the extension is removed, 10 MB (more with `unlimitedStorage`), exposed to content scripts by default (change with `setAccessLevel`). `storage.sync` about 100 KB total, 8 KB per item, 512 items. The `storage` permission is required. https://developer.chrome.com/docs/extensions/reference/api/storage . Consequence: an access token in `storage.session` is lost on every extension update, so the popup must refresh from the refresh token in `storage.local` on start (matches plan Phase 4). Consider `setAccessLevel` to trusted contexts for `storage.local`.
+
+### 10.11 Prices as published (checked 2026-10-31)
+
+| Product | Free | Paid |
+| :--- | :--- | :--- |
+| Workers (page updated 2026-10-02) https://developers.cloudflare.com/workers/platform/pricing/ | $0; 100,000 requests/day; 10 ms CPU | $5/month minimum; 10 M requests included then $0.30 per million; 30 M CPU ms included then $0.02 per million CPU ms |
+| D1 (page updated 2026-10-30) https://developers.cloudflare.com/d1/platform/pricing/ | 5 M rows read/day; 100,000 rows written/day; 5 GB total; 10 databases | 25 B rows read/month then $0.001 per million; 50 M rows written/month then $1.00 per million; 5 GB then $0.75/GB-month |
+| R2 (page updated 2026-10-30) https://developers.cloudflare.com/r2/pricing/ | 10 GB-month; 1 M Class A; 10 M Class B per month; egress free | $0.015/GB-month; Class A $4.50 per million; Class B $0.36 per million; egress free |
+| Durable Objects (page updated 2026-10-18) https://developers.cloudflare.com/durable-objects/platform/pricing/ | SQLite only; 100,000 requests/day; 13,000 GB-s/day; 5 M rows read/day; 100,000 rows written/day; 5 GB stored | 1 M requests then $0.15 per million; 400,000 GB-s then $12.50 per million GB-s; 25 B rows read then $0.001 per million; 50 M rows written then $1.00 per million; 5 GB-month then $0.20/GB-month |
+| Email Sending (page updated 2026-06-09) https://developers.cloudflare.com/email-service/platform/pricing/ | not available | 3,000/month included then $0.35 per 1,000 |
+| Turnstile | free, 20 widgets | Enterprise only, contact sales |
+
+- Caveat: the DO pricing page says SQLite storage billing was targeted to start 2026-01-07; the current billing status was not checked in the changelog (UNVERIFIED).
+
+### 10.12 Mismatches with the production plan
+
+| # | Plan says | Docs say | Action |
+| :--- | :--- | :--- | :--- |
+| 1 | Workers free to build; implied free hosting | Free CPU limit is 10 ms per request; Email Sending needs Paid | Assume Workers Paid ($5/month) for production; ask before purchase |
+| 2 | Edge rate limit per IP via binding or rule | Binding counts are per location, approximate, 10 s or 60 s only; WAF Free plan has 1 rule, 10 s window, IP only, needs a zone on Cloudflare | Use binding and WAF as coarse protection only; exact limits stay in `AuthStore.tryHit` |
+| 3 | D1 conditional update as atomic consume | One-statement atomicity is standard SQLite but `meta.changes` semantics and RETURNING are not documented on the pages read | Contract test with concurrent consumers before launch; fall back to a Durable Object |
+| 4 | Google code flow with PKCE | Web-server docs list `client_secret` and no PKCE parameters; discovery advertises S256 | Send both secret and S256; staging test |
+| 5 | Remove dev `key` from the store build | Docs do not state what the store does with `key` | Upload without `key`; derive the dev key from the dashboard public key |
+| 6 | Chrome fee | No amount in current docs | Confirm in the dashboard at payment; ask the dev first |
+| 7 | Cloudflare email or Resend, decided after Phase 0 | CF Email Sending is Beta, Paid only, unpublished daily quota; automatic DNS records only on Cloudflare DNS; Resend not checked | Keep `Mailer` interface; test send before choosing |
+
+### 10.13 Unverified list for this section
+- Per-function `node:crypto` support for `createHash`, `randomBytes`, `timingSafeEqual`; `crypto.subtle.timingSafeEqual`.
+- D1 `exec()` rollback, `RETURNING`, interactive transactions, `changes` on a zero-row UPDATE.
+- Rate Limiting binding on Workers Free; `wrangler secret list`.
+- Resend (API, limits, domain setup); Cloudflare Email Sending daily quota number.
+- Google PKCE with web clients; `*.workers.dev` as an authorized domain; brand verification for a consent screen without a logo.
+- Chrome registration fee amount today; store handling of manifest `key`; install warnings for `identity`, `storage`, `scripting`.
+- Durable Objects SQLite billing status as of 2026-10-31.
+
+### 10.14 Open checks for the staging run (slice 6)
+
+Written by the slice 3 work. Each item is something the code assumes about Cloudflare D1 and the test database cannot prove. Status of all of them: unverified.
+
+| Assumption in the code | Where it matters | How to check on a real D1 database |
+| :--- | :--- | :--- |
+| One statement is applied atomically, also under concurrent requests | `consume`, `tryHit`, `deleteIfExists` (apps/edge/src/d1AuthStore.ts, packages/core/src/repository/d1.ts) | Run packages/auth/test/store.suite.ts against the real binding with 20 to 50 parallel callers, many times |
+| A SELECT after an UPDATE in the same request reads the primary, not a stale replica | The "read your own winner" step of `consume` and `tryHit` | Leave read replication off, and repeat the parallel run; if it is on, use the session bookmark API |
+| `db.batch` accepts the chunk size used (25 statements) | `write` in d1.ts | Write 25 and 100 item batches, note any limit error |
+| Latency of 3 to 4 statements per `tryHit` is acceptable on every /oauth and /ext call | slice 4 | Time 100 sequential calls from a Worker in the same region as the database |
+| `crypto.randomUUID()` and Web Crypto `crypto.subtle.digest` work in Workers without `nodejs_compat` (confirmed in 10.15). `Buffer` and `node:crypto` are no longer used by the Workers build (apps/edge/test/bundle.test.ts fails if they return) | d1 stores, apps/api | Run under `wrangler dev --local` (done, apps/edge/scripts/smoke.mjs) and again on staging |
+
+
+### 10.15 Slice 5b: bindings, wrangler config and runtime (checked 2026-10-31)
+
+Sources are live developers.cloudflare.com pages, read through a summarising fetch tool (quotes are as returned by it, not re-read raw).
+
+| Item | Result | Status | Source |
+| :--- | :--- | :--- | :--- |
+| R2 `head` | `head(key: string): Promise<R2Object \| null>` | CONFIRMED | https://developers.cloudflare.com/r2/api/workers/workers-api-reference/ |
+| R2 `get` | `get(key: string, options?: R2GetOptions): Promise<R2ObjectBody \| R2Object \| null>`; `null` when the key does not exist; a failed precondition returns an `R2Object` with no `body` | CONFIRMED | same |
+| R2 `put` | `put(key: string, value: ReadableStream \| ArrayBuffer \| ArrayBufferView \| string \| null \| Blob, options?: R2PutOptions): Promise<R2Object \| null>`; options: `onlyIf`, `httpMetadata`, `customMetadata`, one of `md5`/`sha1`/`sha256`/`sha384`/`sha512`, `storageClass`, `ssecKey` | CONFIRMED | same |
+| R2 `delete` | `delete(key: string \| string[]): Promise<void>`; "Up to 1000 keys may be deleted per call." | CONFIRMED | same |
+| R2 `R2ObjectBody` | `body: ReadableStream`, `arrayBuffer(): Promise<ArrayBuffer>`, `text(): Promise<string>`; `size` is inherited from `R2Object` ("Size of the object in bytes") | CONFIRMED | same |
+| R2 put size limit | Single-part upload 5 GiB (footnote: 4.995 GiB). No Worker specific put limit is stated; the page says a Worker's inbound request size is bounded by Workers request limits. Those are 100 MB (Free, Pro), 200 MB (Business) per the zone plan | CONFIRMED (limits), UNVERIFIED (any extra Worker put cap) | https://developers.cloudflare.com/r2/platform/limits/ , https://developers.cloudflare.com/workers/platform/limits/ |
+| Email binding config | `[[send_email]]` with `name = "EMAIL"` (read as `env.EMAIL`). Optional `destination_address` or `allowed_destination_addresses` restrict recipients. Config page also lists `send_email` with `name` | CONFIRMED | https://developers.cloudflare.com/email-service/api/send-emails/workers-api/ , https://developers.cloudflare.com/workers/wrangler/configuration/ |
+| Email `send` argument | Object with `to` (string, address object, or array; max 50 counting `cc` and `bcc`), `from` (string or address object), `subject`, `html`, `text`, `cc`, `bcc`, `replyTo`, `attachments` (`content`, `filename`, `type`, `disposition`, optional `contentId`), `headers` (key-value, 16 KB total). Total message 25 MiB, 32 attachments | CONFIRMED | workers-api page above |
+| Email return and errors | Returns `Promise<EmailSendResult>` = `{ messageId: string }`. Errors thrown as `Error` with a `code` property: `E_SENDER_NOT_VERIFIED`, `E_SENDER_DOMAIN_NOT_AVAILABLE`, `E_RECIPIENT_NOT_ALLOWED`, `E_RATE_LIMIT_EXCEEDED`, `E_DAILY_LIMIT_EXCEEDED` | CONFIRMED | same |
+| Email `from` | Must be on a domain onboarded and verified in Email Service (else `E_SENDER_NOT_VERIFIED` or `E_SENDER_DOMAIN_NOT_AVAILABLE`). Verification steps not on this page | CONFIRMED (rule), UNVERIFIED (steps) | same |
+| Legacy `EmailMessage` | Still shown: `import { EmailMessage } from "cloudflare:email"`, raw MIME (example uses `mimetext`), `env.EMAIL.send(message)`. Kept for backward compatibility; structured `send()` recommended for new code | CONFIRMED | same |
+| Email under `wrangler dev` | Simulated by default: "logs emails to the console but does not send them"; text and html bodies written to files in a miniflare temp dir. `remote: true` on the binding sends real mail while code runs locally. `ArrayBuffer` attachments fail locally ("Cannot serialize value"); use strings | CONFIRMED | https://developers.cloudflare.com/email-service/local-development/sending/ |
+| Email beta and quota | Email Sending is labelled Beta, Workers Paid for arbitrary recipients; sending to verified destination addresses is free on Free and Paid. No daily number: "New accounts start with a conservative daily quota and scale up over time", with a limit increase form | CONFIRMED (beta, no number) | https://developers.cloudflare.com/email-service/ , https://developers.cloudflare.com/email-service/platform/limits/ |
+| D1 binding keys | `[[d1_databases]]`: `binding`, `database_name`, `database_id`, optional `migrations_dir` (default `migrations`) | CONFIRMED | https://developers.cloudflare.com/workers/wrangler/configuration/ , https://developers.cloudflare.com/d1/get-started/ |
+| D1 local migrations | `wrangler d1 migrations apply <DATABASE>` with `--local`, `--remote`, `--persist-to` (needs `--local`), `--preview`. Default when no flag is given is not stated. `wrangler dev` persists local data across runs | CONFIRMED (flags), UNVERIFIED (default target) | https://developers.cloudflare.com/workers/wrangler/commands/d1/ , https://developers.cloudflare.com/d1/best-practices/local-development/ |
+| Placeholder `database_id` with `wrangler dev --local` | Not stated in any page read | UNVERIFIED | tried the two D1 pages above |
+| Worker config keys | `name` (letters, digits, dashes), `main`, `compatibility_date` (yyyy-mm-dd), `compatibility_flags` (string array), `[[r2_buckets]]` (`binding`, `bucket_name`), `[vars]` (non-inheritable, not for secrets). Docs say Cloudflare recommends `wrangler.jsonc` for new projects; JSON config since wrangler 3.91.0; toml still shown | CONFIRMED | https://developers.cloudflare.com/workers/wrangler/configuration/ |
+| Secrets | `npx wrangler secret put <KEY>` (creates and deploys a new version at once; `wrangler versions secret put` for gradual rollout). Read as `env.KEY`, or `import { env } from "cloudflare:workers"` | CONFIRMED | https://developers.cloudflare.com/workers/configuration/secrets/ |
+| `.dev.vars` | Next to the wrangler config, dotenv syntax; `.env` is an alternative, use one not both (`.dev.vars` wins). Docs: "should not be committed to git"; add `.dev.vars*` and `.env*` to `.gitignore` | CONFIRMED | same |
+| `eval` / `new Function` | `eval()` is listed under "For security reasons, the following are not allowed". `new Function` was not named by the summary, so it is UNVERIFIED on this page. No allow flag found | CONFIRMED (eval), UNVERIFIED (new Function, any opt-in flag) | https://developers.cloudflare.com/workers/runtime-apis/web-standards/ |
+| Web Crypto | `digest()` supports SHA-1, SHA-256, SHA-384, SHA-512, MD5; `crypto.randomUUID()` is v4; `nodejs_compat` is not needed for Web Crypto | CONFIRMED | https://developers.cloudflare.com/workers/runtime-apis/web-crypto/ |
+| `TextEncoder` | Available (UTF-8) | CONFIRMED | web-standards page |
+| `structuredClone` | Not mentioned on the pages read | UNVERIFIED | web-standards page |
+| Wrangler version | Raw: `version = '4.156.0'`, `engines = { node: '>=22.0.0' }` (npm view, run 2026-10-31) | CONFIRMED | npm registry |
+| Windows | Docs list Windows 11 as supported; no Visual C++ note in the docs. Community and workerd issues report `wrangler dev` crashes (access violation 0xc0000005, "write EOF") fixed by the latest x64 VC++ 2015+ Redistributable. Not an official requirement | UNVERIFIED (as requirement) | https://developers.cloudflare.com/workers/wrangler/install-and-update/ , https://github.com/cloudflare/workerd/issues/4668 |
+
+### 10.16 Slice 6: the staging run on real Cloudflare (2026-11-01, free plan)
+
+A private staging Worker (`hippo-api-staging`) was deployed with a real D1 database and an R2 bucket, in the relaxed mode (`HIPPO_ENV=development`), and `apps/edge/scripts/smoke.mjs` was run against it from this machine over the internet, with sign in codes read from `wrangler tail`. This checks the open items of 10.14. Nothing here is a proof, only what was observed.
+
+| Open check (10.14) | Observed on the real service | Status |
+| :--- | :--- | :--- |
+| One statement is applied atomically under concurrent requests | 25 parallel exchanges of one authorization code gave exactly one 200, and so did 25 parallel uses of one refresh token, in each of 2 runs (one before and one after the rate counter fix; in the first, 6 and 8 of the 25 were refused by the rate limit with a 429 because of that bug, the rest with a 400) | OBSERVED, not proven |
+| The counter admits exactly its maximum | 200 parallel calls against a limit of 120 a minute: 120 admitted, 80 refused (429). Before a fix the same test admitted only 64 (see decisions.md 2026-11-01: a gap check with no gap refused callers whose clock read earlier than another's hit) | OBSERVED after the fix |
+| A read after a write in the same batch sees the write (no stale replica) | The two runs showed no missing read back (it would have appeared as zero or two winners). The first run also under admitted because of the rate counter bug, which could have hidden a stale read there, so only the second run is clean evidence. Whether D1 read replication is on for this database was not checked | NO STALE READ SEEN, setting UNVERIFIED |
+| `db.batch` accepts the chunk size used (25) | The capture path wrote through `write` in chunks of at most 25 and worked. No larger size was tried | NOT STRESSED |
+| Latency per rate check | Access log timings (n = sample, tail drops lines): `/ext/subscriptions` 200, median 99 ms (a sample of 9); `/oauth/token` 400, median 98 ms (a sample of 64), measured from this machine over the internet and including the rate check round trips. Under the 200 parallel burst about 300 to 360 ms (sample size not recorded). Samples from a lossy tail: not a performance claim. | OBSERVED (one location) |
+| Web Crypto and `crypto.randomUUID()` work without `nodejs_compat` | The whole sign in flow ran on the deployed Worker with no `nodejs_compat` flag | CONFIRMED |
+| `ajv` and `new Function` are not blocked in a way that breaks `/mcp` | `/mcp` initialize, `tools/list` and tool calls with valid and invalid arguments all answered correctly on the deployed Worker | CONFIRMED for these calls |
+| Free plan CPU limit (10 ms) is enough | No exception or CPU limit line appeared in the tail and every status was an expected one. The tail drops lines under bursts, so this is not conclusive. Worker startup time was 38 ms at deploy | NOT CONCLUSIVE |
+| Upload size | 1835 KiB, 349 KiB gzip, accepted on the free plan | CONFIRMED |
+| `wrangler tail` completeness | It dropped log lines under bursts, including lines of requests that succeeded (seen in 2 runs) | OBSERVED |
+
+Not checked: the Email Sending binding (paid plan, verified sender domain), R2 write races, a second region, strict mode on the deployed Worker, read replication.
+
+### 10.17 Continue with Google on the real Google (2026-11-01, local server)
+
+A Google Cloud project (`hippo-signin`), an External app in Testing mode with scopes `openid email`, and one Web application client with the redirect address `http://localhost:8787/oauth/google/callback` were created by driving the console, and the Node server was run locally with the client id and secret from an ignored file. One person (the project owner) signed in. This settles the open items of 10.9 only as far as one real sign in can.
+
+| Item | Observed | Status |
+| :--- | :--- | :--- |
+| Google accepts our authorization request (client id, redirect address, `openid email`, state, nonce, S256 challenge) | Google showed its own account chooser for the app, then returned to our callback | CONFIRMED |
+| The token endpoint takes the client secret, the PKCE verifier and the redirect address together | The code exchange succeeded with all three sent (10.9 listed PKCE for web clients as unverified). Whether Google enforces the verifier is not shown by one success | ACCEPTED, enforcement UNVERIFIED |
+| Our ID token checks pass a real token | Real signature (RS256, Google's published keys fetched live), issuer, audience, expiry, our nonce, `email_verified` true: the session was created | CONFIRMED |
+| Web sign in (`/oauth/google/start`) | Session created for the right address, browser returned to the allowed web origin | CONFIRMED |
+| Authorize page sign in (the extension's path) | `POST /oauth/authorize` redirected to Google, the callback issued our code (audit `login_ok`, reason `google`, the same hashed user id as the web sign in). The client side exchange of that code was not run (a dummy challenge was used) | CONFIRMED up to the redirect |
+| Time of the callback | 383 ms for the first (real code exchange and key fetch), 157 ms for the second (keys cached) | OBSERVED, one run |
+| Secrets in logs | The client secret does not appear in the server log | CONFIRMED |
+| Real Chrome with the extension's `launchWebAuthFlow` | Not run | UNVERIFIED |
+| Other people signing in | The app is in Testing with 0 test users and "Publish app" disabled: only the project owner can sign in. Publishing needs a public home page, a privacy policy link and a verified domain (10.9) | OPEN |
+
+### 10.18 Sign-in page: Google button branding and Geist licence (2026-11-01)
+
+Read live: https://developers.google.com/identity/branding-guidelines (via page fetch, summarised by a tool, not read raw) and `apps/web/node_modules/@fontsource-variable/geist/LICENSE` plus its `package.json`.
+
+| Item | Observed | Status |
+| :--- | :--- | :--- |
+| Button text | "Sign in with Google", "Sign up with Google" and "Continue with Google" are the recommended strings, so "Continue with Google" is allowed. Localising is allowed. "Google" alone is not | VERIFIED |
+| G logo | Must be the standard multicolour "super G" on a white background. Size and colour cannot be changed, monochrome not allowed. No minimum size or separate clear space rule found on the page | VERIFIED (no min size stated) |
+| Padding (web) | 12px before the logo, 10px between logo and text, 12px after the text | VERIFIED |
+| Light theme | Fill #FFFFFF, stroke #747775 1px inside, text #1F1F1F | VERIFIED |
+| Dark theme | Fill #131314, stroke #8E918F 1px inside, text #E3E3E3 | VERIFIED |
+| Neutral theme | Fill #F2F2F2, no stroke, text #1F1F1F | VERIFIED |
+| Font | Google Sans Medium, listed as 14/20 (not Roboto Medium as often quoted). The page does not spell out "14px" | VERIFIED as Google Sans; size reading UNVERIFIED |
+| Corner radius, full width, custom height | Not specified. Only rule: scaling is allowed if the aspect ratio keeps the logo unstretched; show it about as prominently as other sign in options | UNVERIFIED (no rule found, so not forbidden either) |
+| Official G asset | Pre-approved icon bundle (PNG and SVG) linked from the page as `/static/identity/images/signin-assets.zip`. No SVG path data on the page, so none is reproduced here | Download link VERIFIED from page text; zip itself not fetched; path data UNVERIFIED |
+| Geist licence | LICENSE is SIL Open Font License 1.1; `package.json` license field is `OFL-1.1` | VERIFIED |
+| Embedding woff2 as a base64 data URI | OFL permission text lists "use, study, copy, merge, embed, modify, redistribute"; bundling is allowed provided each copy carries the copyright notice and the licence text, as a text file, human readable header or metadata. A CSS comment header counts as a human readable header | VERIFIED (reading of the licence text, not legal advice) |
+| Copyright line to keep | `Copyright 2024 The Geist Project Authors (https://github.com/vercel/geist-font)` | VERIFIED |
+| Other OFL conditions | Font may not be sold by itself; no Reserved Font Name is declared in the file; the font stays under OFL even inside a bundle | VERIFIED |
+
+Follow-up, same day (I fetched the zip myself):
+- `https://developers.google.com/static/identity/images/signin-assets.zip` downloaded (HTTP 200, 855303 bytes). The "G" in `packages/auth/src/googleG.ts` is the one in `Android + Web/SVG/Light/Theme=Light, Show text=No, Shape=Pill`, taken as is. Only the circle behind it was dropped and the view box cropped to the G (10 10 20 20). Status: VERIFIED as the official asset. It is a gradient and filter drawing, rendered as intended in Chromium (screenshots in `apps/web/docs/screens/auth-*`); other browsers are UNVERIFIED.
+- Button: the shipped button uses the page's own surface colours and a pill shape, not the exact #FFFFFF / #747775 values above, because the guidelines do not forbid it (radius and width are unspecified) and the dark theme needs a dark fill. UNVERIFIED whether Google's consent screen review accepts that; if it asks, switch `.btn-google` in `packages/auth/src/theme.ts` to the listed light and dark values.
+- Worker bundle with the font and G: 1009800 bytes, 283561 gzip (measured by `apps/edge/test/bundle.test.ts`).
+
+### 10.19 Chrome Web Store listing assets and rules (2026-11-01)
+
+Read live (page fetch, summarised by a tool, not read raw): the developer.chrome.com pages named in the Source column. Our manifest (`apps/extension/public/manifest.json`) asks for `activeTab`, `scripting`, `identity`, `storage` and host permission `http://localhost:8787/*` (a dev value that must change for a store build).
+
+| Item | Observed | Status | Source |
+| :--- | :--- | :--- | :--- |
+| Mandatory assets | Only the store icon and at least one screenshot are mandatory | VERIFIED | https://developer.chrome.com/docs/webstore/images |
+| Store icon | 128x128 PNG, artwork 96x96 with 16 px transparent padding per side. Uploaded in the listing; the page says "in the extension's ZIP file", whether the listing icon must be the same file as the manifest 128 icon is not stated | VERIFIED size and padding; same-file rule UNVERIFIED | https://developer.chrome.com/docs/webstore/images |
+| Icon alpha | Transparent padding expected; an image without alpha is put in a frame with 12 px rounded corners. Must work on light and dark, no own edge | VERIFIED | same |
+| Screenshots | Min 1, max 5. 1280x800 preferred, 640x400 allowed. Square corners, full bleed, no padding. Format not stated (examples are JPG); alpha rule not stated | VERIFIED count and sizes; format and alpha UNVERIFIED | https://developer.chrome.com/docs/webstore/images and https://developer.chrome.com/docs/webstore/cws-dashboard-listing |
+| Small promo tile | 440x280, optional, PNG or JPEG, not localizable. Listings without it rank after those with it | VERIFIED | same |
+| Marquee | 1400x560, optional (needed to be featured in the marquee), PNG or JPEG, not localizable | VERIFIED | same |
+| Name | Manifest `name` max 75 characters. Store listing name limit not stated on the listing page | VERIFIED manifest; listing limit UNVERIFIED | https://developer.chrome.com/docs/extensions/reference/manifest/name |
+| Summary | Manifest `description`: plain text, no more than 132 characters, used for both chrome://extensions and the store. That page is marked last updated 2013, so recheck in the dashboard. Ours is about 112 characters by hand count | VERIFIED (old page); our count UNVERIFIED | https://developer.chrome.com/docs/extensions/reference/manifest/description |
+| Detailed description | No character limit stated; must follow the Keyword spam policy; localizable | VERIFIED no limit stated | https://developer.chrome.com/docs/webstore/cws-dashboard-listing |
+| Category | One primary category, listing page does not enumerate them | VERIFIED one; list UNVERIFIED | same |
+| Single purpose | Must be "narrow and easy to understand": a narrow subject or a narrow browser function. A dashboard field asks you to describe it. Unneeded permissions can count as a violation | VERIFIED | https://developer.chrome.com/docs/webstore/program-policies/quality-guidelines-faq and https://developer.chrome.com/docs/webstore/cws-dashboard-privacy |
+| Permission justifications | Request the minimum permissions; each requested permission needs a justification in the dashboard. The pages do NOT give per-permission rules for `activeTab`, `scripting`, `storage`, `identity` or host permissions | VERIFIED general rule; per-permission rules UNVERIFIED | https://developer.chrome.com/docs/webstore/cws-dashboard-privacy |
+| Remote code | Undeclared remote code is rejected; MV3 disallows remotely hosted code | VERIFIED | same |
+| Privacy policy | Required for any product handling user data, even only local storage or Chrome Storage Sync. Must be posted in the Developer Dashboard; says what is collected, used, shared. Sign in counts as handling user data | VERIFIED | https://developer.chrome.com/docs/webstore/program-policies/user-data-faq |
+| Limited Use | Disclosure on the homepage or one click away. Four elements: allowed use (single purpose or user-facing features only), allowed transfer (necessary functionality, law, security, merger), no personalized or interest-based ads, no human reading except narrow exceptions | VERIFIED | same |
+| Privacy practices form | Must be completed before publish or update; inconsistencies between form, policy and behaviour are policy violations | VERIFIED | same |
+| Visibility: Unlisted | No store listing; anyone with the direct store URL can install | VERIFIED | https://developer.chrome.com/docs/webstore/cws-dashboard-distribution |
+| Visibility: Public / Private | Public lists for all; Private limits install to specified users, typically for testing | VERIFIED | same |

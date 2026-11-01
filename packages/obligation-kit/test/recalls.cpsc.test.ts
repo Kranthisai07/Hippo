@@ -23,7 +23,16 @@ const asset = (id: string) => seeded.find((a) => a.id === id)!;
 
 // Same shape as the real captured body: one fake record, RecallID 0, no RecallNumber.
 const errorRecord = [
-  { RecallID: 0, RecallNumber: null, RecallDate: null, Title: "Error retrieving Recalls: The underlying provider failed on Open.", Products: [], ProductUPCs: [], Hazards: [], Remedies: [] },
+  {
+    RecallID: 0,
+    RecallNumber: null,
+    RecallDate: null,
+    Title: "Error retrieving Recalls: The underlying provider failed on Open.",
+    Products: [],
+    ProductUPCs: [],
+    Hazards: [],
+    Remedies: [],
+  },
 ];
 
 const recall = (o: Partial<CpscRecall> = {}): CpscRecall => ({
@@ -43,7 +52,9 @@ const recall = (o: Partial<CpscRecall> = {}): CpscRecall => ({
 
 describe("buildCpscUrl", () => {
   it("always sends format=json", () => {
-    expect(buildCpscUrl({ RecallNumber: "26530" })).toBe("https://www.saferproducts.gov/RestWebServices/Recall?RecallNumber=26530&format=json");
+    expect(buildCpscUrl({ RecallNumber: "26530" })).toBe(
+      "https://www.saferproducts.gov/RestWebServices/Recall?RecallNumber=26530&format=json",
+    );
   });
   it("refuses a request with no filter, which would return the whole database (10,053 records on 2026-10-18)", () => {
     expect(() => buildCpscUrl({})).toThrow(CpscApiError);
@@ -54,24 +65,36 @@ describe("buildCpscUrl", () => {
   it.each(["RecallDateStart", "LastPublishDateStart"])("allows %s on its own as a date", (k) => {
     expect(buildCpscUrl({ [k]: "2026-10-01" })).toContain(`${k}=2026-10-01`);
   });
-  it.each([["RecallDateStart", "RecallDateEnd"], ["LastPublishDateStart", "LastPublishDateEnd"]])("allows %s with %s", (a, b) => {
+  it.each([
+    ["RecallDateStart", "RecallDateEnd"],
+    ["LastPublishDateStart", "LastPublishDateEnd"],
+  ])("allows %s with %s", (a, b) => {
     const url = buildCpscUrl({ [a]: "2026-10-01", [b]: "2026-10-08" });
     expect(url).toContain(`${a}=2026-10-01`);
     expect(url).toContain(`${b}=2026-10-08`);
   });
-  it.each(["RecallDateEnd", "LastPublishDateEnd"])("refuses %s without its Start (End alone returned 10,047 records)", (k) => {
-    expect(() => buildCpscUrl({ [k]: "2026-10-08" })).toThrow(CpscApiError);
-  });
-  it.each(["10/01/2026", "2026-1-5", "2026-10-01T00:00:00", "yesterday", "2026-13-01", "2026-02-30"])("refuses the date %s", (d) => {
-    expect(() => buildCpscUrl({ RecallDateStart: d })).toThrow(CpscApiError);
-    expect(() => buildCpscUrl({ LastPublishDateStart: d })).toThrow(CpscApiError);
-  });
+  it.each(["RecallDateEnd", "LastPublishDateEnd"])(
+    "refuses %s without its Start (End alone returned 10,047 records)",
+    (k) => {
+      expect(() => buildCpscUrl({ [k]: "2026-10-08" })).toThrow(CpscApiError);
+    },
+  );
+  it.each(["10/01/2026", "2026-1-5", "2026-10-01T00:00:00", "yesterday", "2026-13-01", "2026-02-30"])(
+    "refuses the date %s",
+    (d) => {
+      expect(() => buildCpscUrl({ RecallDateStart: d })).toThrow(CpscApiError);
+      expect(() => buildCpscUrl({ LastPublishDateStart: d })).toThrow(CpscApiError);
+    },
+  );
   it("encodes values", () => {
     expect(buildCpscUrl({ ProductName: "baby & bottle" })).toContain("ProductName=baby+%26+bottle");
   });
-  it.each(["UPC", "format", "recalldatestart", "Foo", "Hazard"])("throws on %s (UPC returned an empty array for a UPC that exists)", (k) => {
-    expect(() => buildCpscUrl({ [k]: "x" })).toThrow(CpscApiError);
-  });
+  it.each(["UPC", "format", "recalldatestart", "Foo", "Hazard"])(
+    "throws on %s (UPC returned an empty array for a UPC that exists)",
+    (k) => {
+      expect(() => buildCpscUrl({ [k]: "x" })).toThrow(CpscApiError);
+    },
+  );
   it.each(["", "   "])("throws on empty value %j", (v) => {
     expect(() => buildCpscUrl({ ProductName: v })).toThrow(CpscApiError);
   });
@@ -106,7 +129,8 @@ describe("parseCpscResponse", () => {
     expect(() => parseCpscResponse([null])).toThrow(CpscApiError);
   });
   it("default ceiling is 2000 and a full 2000 is truncation", () => {
-    const many = (n: number) => Array.from({ length: n }, (_, i) => ({ ...boonRaw, RecallID: i + 1, RecallNumber: String(i + 1) }));
+    const many = (n: number) =>
+      Array.from({ length: n }, (_, i) => ({ ...boonRaw, RecallID: i + 1, RecallNumber: String(i + 1) }));
     expect(parseCpscResponse(many(1999))).toHaveLength(1999);
     expect(() => parseCpscResponse(many(2000))).toThrow(CpscApiError);
     expect(() => parseCpscResponse(many(2001))).toThrow(CpscApiError);
@@ -146,7 +170,10 @@ describe("normalizeCpscRecall", () => {
   });
   it("empty Model gives no models", () => expect(n.models).toEqual([]));
   it("structured Models are kept, empties dropped", () => {
-    const m = normalizeCpscRecall({ ...boonRaw, Products: [{ Name: "A", Model: "B11654" }, { Name: "B", Model: " " }, { Name: "C" }] });
+    const m = normalizeCpscRecall({
+      ...boonRaw,
+      Products: [{ Name: "A", Model: "B11654" }, { Name: "B", Model: " " }, { Name: "C" }],
+    });
     expect(m.models).toEqual(["B11654"]);
   });
   it("brand evidence has products, description, importers but never Title or retailers", () => {
@@ -157,7 +184,11 @@ describe("normalizeCpscRecall", () => {
     expect(ev).not.toContain("Choking Hazard; Sold at Walmart");
   });
   it("includes manufacturers and distributors", () => {
-    const m = normalizeCpscRecall({ ...boonRaw, Manufacturers: [{ Name: "MfgCo" }], Distributors: [{ Name: "DistCo" }] });
+    const m = normalizeCpscRecall({
+      ...boonRaw,
+      Manufacturers: [{ Name: "MfgCo" }],
+      Distributors: [{ Name: "DistCo" }],
+    });
     expect(m.brandEvidence).toEqual(expect.arrayContaining(["MfgCo", "DistCo"]));
   });
   it("tolerates missing arrays", () => {
@@ -184,17 +215,29 @@ describe("matchCpscRecall: high", () => {
     expect(matchCpscRecall({ id: "a", name: "x", upc: "669028116546" }, r)?.evidence).toBe("upc");
   });
   it("UPC wins even with a different brand and name", () => {
-    expect(matchCpscRecall({ id: "a", name: "Thing", brand: "Other", upc: "669028116546" }, boon)?.confidence).toBe("high");
+    expect(matchCpscRecall({ id: "a", name: "Thing", brand: "Other", upc: "669028116546" }, boon)?.confidence).toBe(
+      "high",
+    );
   });
   it("a different UPC does not match by itself", () => {
     expect(matchCpscRecall({ id: "a", name: "Thing", upc: "012345678905" }, boon)).toBeNull();
   });
-  const withModel = recall({ models: ["B-11654"], products: [{ name: "Boon Widget", model: "B-11654" }], productNames: ["Boon Widget"], brandEvidence: ["Boon Widget"] });
+  const withModel = recall({
+    models: ["B-11654"],
+    products: [{ name: "Boon Widget", model: "B-11654" }],
+    productNames: ["Boon Widget"],
+    brandEvidence: ["Boon Widget"],
+  });
   it("model plus brand is high", () => {
-    expect(matchCpscRecall({ id: "a", name: "x", brand: "Boon", modelNumber: "b11654" }, withModel)).toEqual({ confidence: "high", evidence: "model_brand" });
+    expect(matchCpscRecall({ id: "a", name: "x", brand: "Boon", modelNumber: "b11654" }, withModel)).toEqual({
+      confidence: "high",
+      evidence: "model_brand",
+    });
   });
   it("model folds spaces, case and punctuation", () => {
-    expect(matchCpscRecall({ id: "a", name: "x", brand: "boon", modelNumber: " B 11654 " }, withModel)?.confidence).toBe("high");
+    expect(
+      matchCpscRecall({ id: "a", name: "x", brand: "boon", modelNumber: " B 11654 " }, withModel)?.confidence,
+    ).toBe("high");
   });
   it("model without brand is not high", () => {
     expect(matchCpscRecall({ id: "a", name: "x", modelNumber: "B11654" }, withModel)).toBeNull();
@@ -212,7 +255,11 @@ describe("matchCpscRecall: high", () => {
     expect(matchCpscRecall({ id: "a", name: "zzz", brand: "Boon", modelNumber: "B11654" }, r)).toBeNull();
   });
   it("brand is whole word for model matches", () => {
-    const r = recall({ models: ["B11654"], products: [{ name: "Boone Widget", model: "B11654" }], brandEvidence: ["Boone Widget"] });
+    const r = recall({
+      models: ["B11654"],
+      products: [{ name: "Boone Widget", model: "B11654" }],
+      brandEvidence: ["Boone Widget"],
+    });
     expect(matchCpscRecall({ id: "a", name: "x", brand: "Boon", modelNumber: "B11654" }, r)).toBeNull();
   });
 });
@@ -220,7 +267,10 @@ describe("matchCpscRecall: high", () => {
 describe("matchCpscRecall: possible and none", () => {
   const boon = normalizeCpscRecall(boonRaw);
   it("brand plus shared content word is possible", () => {
-    expect(matchCpscRecall({ id: "a", name: "Boon baby bottle", brand: "Boon" }, boon)).toEqual({ confidence: "possible", evidence: "brand_name" });
+    expect(matchCpscRecall({ id: "a", name: "Boon baby bottle", brand: "Boon" }, boon)).toEqual({
+      confidence: "possible",
+      evidence: "brand_name",
+    });
   });
   it("seeded asset without UPC would be possible by name", () => {
     expect(matchCpscRecall({ ...asset("A-baby-bottles"), upc: null }, boon)?.confidence).toBe("possible");
@@ -233,7 +283,12 @@ describe("matchCpscRecall: possible and none", () => {
     expect(matchCpscRecall({ id: "a", name: "baby bottles" }, boon)).toBeNull();
   });
   it("stopwords do not count as overlap", () => {
-    expect(matchCpscRecall({ id: "a", name: "the baby set", brand: "Boon" }, recall({ productNames: ["Boon the set"], brandEvidence: ["Boon"] }))).toBeNull();
+    expect(
+      matchCpscRecall(
+        { id: "a", name: "the baby set", brand: "Boon" },
+        recall({ productNames: ["Boon the set"], brandEvidence: ["Boon"] }),
+      ),
+    ).toBeNull();
   });
   it("brand words do not count as overlap", () => {
     expect(matchCpscRecall({ id: "a", name: "Boon", brand: "Boon" }, boon)).toBeNull();
@@ -272,7 +327,9 @@ describe("Title is never brand evidence", () => {
   });
   it("a Joolz asset does not match", () => {
     expect(matchCpscRecall({ id: "a", name: "Aer2 car seat adapters", brand: "Joolz" }, joolz)).toBeNull();
-    expect(matchCpscRecall({ id: "a", name: "stroller adapters", brand: "Joolz", modelNumber: "AER2" }, joolz)).toBeNull();
+    expect(
+      matchCpscRecall({ id: "a", name: "stroller adapters", brand: "Joolz", modelNumber: "AER2" }, joolz),
+    ).toBeNull();
   });
   it("a CooCooBaby asset does match", () => {
     expect(matchCpscRecall({ id: "a", name: "baby lounger", brand: "CooCooBaby" }, joolz)?.confidence).toBe("possible");
@@ -296,15 +353,25 @@ describe("matchCpscRecalls", () => {
     const r2 = recall({ recallNumber: "20", productNames: ["Boon baby bottles"], brandEvidence: ["Boon"] });
     const r3 = recall({ recallNumber: "10", productNames: ["Boon baby bottles"], brandEvidence: ["Boon"] });
     const out = matchCpscRecalls(
-      [{ id: "b", name: "Boon baby bottles", brand: "Boon" }, { id: "a", name: "Boon baby bottles", brand: "Boon", upc: "669028116546" }],
+      [
+        { id: "b", name: "Boon baby bottles", brand: "Boon" },
+        { id: "a", name: "Boon baby bottles", brand: "Boon", upc: "669028116546" },
+      ],
       [r2, boon, r3],
     );
     expect(out.map((m) => `${m.assetId}:${m.recallNumber}:${m.confidence}`)).toEqual([
-      "a:26530:high", "a:10:possible", "a:20:possible", "b:10:possible", "b:20:possible", "b:26530:possible",
+      "a:26530:high",
+      "a:10:possible",
+      "a:20:possible",
+      "b:10:possible",
+      "b:20:possible",
+      "b:26530:possible",
     ]);
   });
   it("suppression drops only the suppressed pair", () => {
-    expect(matchCpscRecalls(seeded, [boon], { suppressed: (a, r) => a === "A-baby-bottles" && r === "26530" })).toEqual([]);
+    expect(matchCpscRecalls(seeded, [boon], { suppressed: (a, r) => a === "A-baby-bottles" && r === "26530" })).toEqual(
+      [],
+    );
     expect(matchCpscRecalls(seeded, [boon], { suppressed: (a) => a === "A-car" })).toHaveLength(1);
   });
   it("duplicate recalls collapse", () => {

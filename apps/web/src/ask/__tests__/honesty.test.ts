@@ -13,6 +13,11 @@ describe("the /ask page says what its cards are", () => {
     expect(page).toMatch(/not the MCP Apps host bridge/);
   });
 
+  it("keeps that note on the page, under the closed How this works disclosure", () => {
+    expect(page).toMatch(/<details className="ha-how">\s*<summary>How this works<\/summary>/);
+    expect(page.indexOf("not the MCP Apps host bridge")).toBeGreaterThan(page.indexOf("How this works"));
+  });
+
   it("does not claim the cards are MCP Apps", () => {
     expect(page).not.toMatch(/MCP Apps (card|host|view)s? (are|is) (rendered|shown)/i);
   });

@@ -7,6 +7,7 @@ import { ToastProvider } from "../src/components/ui";
 import { ApiError, api } from "../src/lib/api";
 import { ComingUp } from "../src/pages/ComingUp";
 import { Review } from "../src/pages/Review";
+import { SettingsPage } from "../src/pages/Settings";
 import { SignIn } from "../src/pages/SignIn";
 import { Things } from "../src/pages/Things";
 import type { AgreementView, Doc, ObligationItem } from "../src/lib/types";
@@ -209,6 +210,41 @@ describe("Things", () => {
   });
 });
 
+describe("Sign in with Google", () => {
+  const open = () =>
+    wrap(
+      <AuthProvider>
+        <SignIn />
+      </AuthProvider>,
+      "/signin",
+      "/signin",
+    );
+
+  it("shows a Continue with Google link only when the server offers it, and sends the person back to where they were", async () => {
+    vi.spyOn(api, "me").mockRejectedValue(new ApiError(401, "unauthenticated", "Please sign in again."));
+    vi.spyOn(api, "providers").mockResolvedValue({ google: true });
+    open();
+    const link = await screen.findByRole("link", { name: "Continue with Google" });
+    const href = new URL(link.getAttribute("href")!, window.location.origin);
+    expect(href.pathname).toBe("/oauth/google/start");
+    expect(href.searchParams.get("return")).toBe(window.location.origin + "/");
+  });
+
+  it("shows no Google link when the server does not offer it, or does not answer", async () => {
+    vi.spyOn(api, "me").mockRejectedValue(new ApiError(401, "unauthenticated", "Please sign in again."));
+    const providers = vi.spyOn(api, "providers").mockResolvedValue({ google: false });
+    open();
+    await screen.findByLabelText("Email");
+    await waitFor(() => expect(providers).toHaveBeenCalled());
+    expect(screen.queryByRole("link", { name: "Continue with Google" })).toBeNull();
+    providers.mockRejectedValue(new ApiError(500, "internal", "Boom."));
+    open();
+    await waitFor(() => expect(providers).toHaveBeenCalledTimes(2));
+    expect(screen.queryByRole("link", { name: "Continue with Google" })).toBeNull();
+    expect(screen.getAllByLabelText("Email").length).toBeGreaterThan(0);
+  });
+});
+
 describe("Sign in", () => {
   it("shows the wait message on 429, disables the buttons and does not retry", async () => {
     const send = vi
@@ -231,5 +267,47 @@ describe("Sign in", () => {
     expect(screen.getByRole("button", { name: "Use the demo account" })).toBeDisabled();
     await new Promise((r) => setTimeout(r, 100));
     expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it("moves to a code step after the email, and a different email goes back", async () => {
+    vi.spyOn(api, "me").mockRejectedValue(new ApiError(401, "unauthenticated", "Please sign in again."));
+    vi.spyOn(api, "providers").mockResolvedValue({ google: true });
+    const send = vi.spyOn(api, "magicCode").mockResolvedValue(undefined as never);
+    wrap(
+      <AuthProvider>
+        <SignIn />
+      </AuthProvider>,
+      "/signin",
+      "/signin",
+    );
+    expect(await screen.findByRole("heading", { name: "Sign in" })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "Continue with Google" })).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("Email"), "a@b.co");
+    await userEvent.click(screen.getByRole("button", { name: "Send me a code" }));
+    expect(await screen.findByRole("heading", { name: "Enter your code" })).toBeInTheDocument();
+    expect(screen.getByText("a@b.co")).toBeInTheDocument();
+    const code = screen.getByLabelText("Code from your email");
+    expect(code).toHaveAttribute("autocomplete", "one-time-code");
+    expect(code).toHaveAttribute("inputmode", "numeric");
+    expect(screen.queryByRole("link", { name: "Continue with Google" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Use the demo account" })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Send a new code" }));
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(await screen.findByRole("status")).toHaveTextContent("A new code was sent");
+    await userEvent.click(screen.getByRole("button", { name: "Use a different email" }));
+    expect(await screen.findByRole("heading", { name: "Sign in" })).toBeInTheDocument();
+  });
+});
+
+describe("Settings", () => {
+  it("links to the voice assistant demo, since Ask is not in the main nav", async () => {
+    vi.spyOn(api, "me").mockRejectedValue(new ApiError(401, "unauthenticated", "Please sign in again."));
+    vi.spyOn(api, "listDocs").mockResolvedValue({ docs: [] });
+    wrap(
+      <AuthProvider>
+        <SettingsPage />
+      </AuthProvider>,
+    );
+    expect(await screen.findByRole("link", { name: "Voice assistant demo" })).toHaveAttribute("href", "/ask");
   });
 });

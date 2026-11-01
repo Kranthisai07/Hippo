@@ -42,9 +42,11 @@ export function EmptyState({
   title,
   children,
   action,
+  as: Heading = "h2",
 }: {
   icon: LucideIcon;
   title: string;
+  as?: "h2" | "h3";
   children?: ReactNode;
   action?: ReactNode;
 }) {
@@ -53,7 +55,7 @@ export function EmptyState({
       <span className="empty-icon" aria-hidden="true">
         <Icon size={28} strokeWidth={1.75} />
       </span>
-      <h2>{title}</h2>
+      <Heading>{title}</Heading>
       {children && <p className="muted">{children}</p>}
       {action && <div>{action}</div>}
     </div>

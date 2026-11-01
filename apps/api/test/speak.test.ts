@@ -249,3 +249,30 @@ describe("speak", () => {
     expect(countWords(speak(huge))).toBeLessThanOrEqual(45);
   });
 });
+
+describe("numbers typed one digit at a time", () => {
+  it.each([
+    ["card 4 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1", "card ending 1111"],
+    ["acct 1-2-3-4-5-6-7-8", "acct ending 5678"],
+    ["id 9.8.7.6.5.4.3 done", "id ending 6543 done"],
+    ["pay 4 1 1 1 1 1 1 1 now", "pay ending 1111 now"],
+  ])("%j is masked", (input, out) => {
+    expect(maskNumbers(input)).toBe(out);
+  });
+  it.each([
+    "on 2026-10-21 it renews",
+    "Oct 21, 2026",
+    "call 555-123-4567",
+    "plan A 1 2 3 are options",
+    "$1 2 3 4 5 6 7",
+    "3 of 5 steps",
+  ])("%j is left alone", (input) => {
+    expect(maskNumbers(input)).toBe(input);
+  });
+  it("stays fast on a long run of digits and spaces", () => {
+    const t = performance.now();
+    maskNumbers("1 ".repeat(9000) + "x");
+    maskNumbers("1 ".repeat(9000));
+    expect(performance.now() - t).toBeLessThan(500);
+  });
+});

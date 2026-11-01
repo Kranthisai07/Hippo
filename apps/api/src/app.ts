@@ -3,8 +3,10 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import type { Repository } from "core/src/contracts";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
+import { errorBody } from "./api/http";
 import { createExtensionApi, type OnCaptured } from "./api/extension";
-import { createFixtureIngest, type IndexStore, type OnUploaded } from "./api/fixtureIngest";
+import type { IndexStore, OnUploaded } from "./api/fixtureIngest";
+import { clientAddress, createMemoryLimiter, type RateLimiter } from "./api/limiter";
 import { createWebApi } from "./api/routes";
 import { createLocalUploader, createMemoryObjectStore, type ObjectStore, type Uploader } from "./api/storage";
 import { createIndexCache, type IndexSource } from "./mcp/indexCache";
@@ -21,6 +23,12 @@ export interface AppDeps {
   newId?: () => string;
   /** Browser origins allowed to call /mcp (the web demo page). A request with no Origin header is always fine. */
   allowedOrigins?: string[];
+  /** Counts hits for every rate limit. Default: in memory, one process. A hosted server passes a durable one. */
+  limiter?: RateLimiter;
+  /** The header a trusted proxy sets to the caller's address (cf-connecting-ip on Cloudflare). Unset: the socket address. */
+  clientIpHeader?: string;
+  /** Send Strict-Transport-Security. Set when the public address is https. */
+  hsts?: boolean;
   /** Request body limit for /mcp in bytes. */
   maxBodyBytes?: number;
   log?: (line: string) => void;
@@ -33,7 +41,7 @@ export interface WebDeps {
   objectStore?: ObjectStore;
   /** How a browser sends a file. Default: the local PUT route of this server. */
   uploader?: Uploader;
-  /** Runs after the bytes are stored. Default: the fixture ingest, which only reads the demo documents. */
+  /** Runs after the bytes are stored. Left out, uploads are refused with a 503 (the demo server passes the fixture ingest). */
   onUploaded?: OnUploaded;
   /** Saves a page sent by the browser extension. Left out, captures are refused (every public host). */
   onCaptured?: OnCaptured;
@@ -47,6 +55,9 @@ export interface WebDeps {
 const SERVICE_METHODS: ReadonlySet<string> = new Set(["initialize", "tools/list", "ping", "notifications/initialized"]);
 
 export const DEFAULT_MAX_BODY_BYTES = 128 * 1024;
+/** Coarse per address limits in front of the sign-in and extension routes. The exact limits sit behind them. */
+export const OAUTH_PER_MINUTE = 120;
+export const EXT_PER_MINUTE = 300;
 const MCP_PATH = "/mcp";
 
 const rpcError = (
@@ -76,6 +87,57 @@ export function createApp(deps: AppDeps): Hono {
   const now = deps.now ?? Date.now;
   const newId = deps.newId ?? (() => crypto.randomUUID());
   const allowed = new Set(deps.allowedOrigins ?? []);
+  const limiter = deps.limiter ?? createMemoryLimiter(now);
+
+  // One line per request, in JSON. No query string, no header and no body: a path holds ids only, never a token or text.
+  app.use("*", async (c, next) => {
+    const id = crypto.randomUUID();
+    const t0 = Date.now();
+    await next();
+    // After the handler, because a handler that returns its own Response (a bare 401) would drop a header set before it.
+    c.res.headers.set("X-Request-Id", id);
+    deps.log?.(
+      JSON.stringify({
+        ts: new Date(t0).toISOString(),
+        id,
+        method: c.req.method,
+        path: c.req.path,
+        status: c.res.status,
+        ms: Date.now() - t0,
+      }),
+    );
+  });
+
+  // Every response, including a fresh Response a handler returns. A route that sets its own value keeps it.
+  app.use("*", async (c, next) => {
+    await next();
+    const h = c.res.headers;
+    if (!h.has("X-Content-Type-Options")) h.set("X-Content-Type-Options", "nosniff");
+    if (!h.has("Referrer-Policy")) h.set("Referrer-Policy", "no-referrer");
+    if (deps.hsts) h.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  });
+
+  // Before auth, so a flood of bad tokens or codes is stopped without any work. OAuth clients get an OAuth error body.
+  app.use("/oauth/*", async (c, next) => {
+    const r = await limiter(`ip:oauth:${clientAddress(c, deps.clientIpHeader)}`, 60_000, OAUTH_PER_MINUTE);
+    if (r.ok) return next();
+    return c.json({ error: "rate_limited" }, 429, {
+      "Cache-Control": "no-store",
+      "Retry-After": String(r.retryAfterSec),
+    });
+  });
+  app.use("/ext/*", async (c, next) => {
+    const r = await limiter(`ip:ext:${clientAddress(c, deps.clientIpHeader)}`, 60_000, EXT_PER_MINUTE);
+    if (r.ok) return next();
+    // This runs before the /ext CORS middleware, so a listed origin gets its header here too and can read Retry-After.
+    const origin = c.req.header("origin");
+    return c.json(errorBody(429, "Too many requests. Please slow down."), 429, {
+      "Cache-Control": "no-store",
+      "Retry-After": String(r.retryAfterSec),
+      Vary: "Origin",
+      ...(origin !== undefined && allowed.has(origin) ? { "Access-Control-Allow-Origin": origin } : {}),
+    });
+  });
 
   app.route("/", deps.auth.app);
 
@@ -89,12 +151,13 @@ export function createApp(deps: AppDeps): Hono {
       repo: deps.repo,
       objectStore,
       uploader: web.uploader ?? createLocalUploader(),
-      onUploaded: web.onUploaded ?? createFixtureIngest({ repo: deps.repo, objectStore, indexStore, now, newId }),
+      ...(web.onUploaded ? { onUploaded: web.onUploaded } : {}),
       indexStore,
       indexes,
       now,
       newId,
       origins: web.origins ?? [],
+      limiter,
     }),
   );
 
@@ -105,6 +168,7 @@ export function createApp(deps: AppDeps): Hono {
       repo: deps.repo,
       onCaptured: web.onCaptured,
       allowedOrigins: allowed,
+      limiter,
       now,
     }),
   );

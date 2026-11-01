@@ -1,0 +1,170 @@
+import { TTL } from "@hippo/auth";
+import type { AuthStore, CodeRecord, Consumed, RefreshRecord, SessionRecord } from "@hippo/auth/src/store";
+import type { D1Like } from "core/src/repository/d1";
+
+// The sign in store on Cloudflare D1 (schema: migrations/0002_auth.sql). It never relies on a batch being isolated or on
+// a statement reporting how many rows it changed, neither of which D1's documentation promises (docs/VERIFIED.md 10).
+// Each guarantee is one statement, and SQLite runs one statement atomically:
+// - consume: one UPDATE can set `winner` on a row once. Each call brings its own random value and reads the row back, so
+//   exactly one caller finds its own value there.
+// - revoke versus rotation: revoking a family writes a tombstone, and consume refuses any record whose family has one,
+//   whenever that record was stored. So a token put after (or during) a revoke is dead, whichever order they landed in.
+// - rate counter: one conditional INSERT takes the slot only if the window has room.
+
+type Row = Record<string, unknown>;
+
+export interface D1AuthStoreOptions {
+  /** Milliseconds. Only used to stamp tombstones. */
+  now?: () => number;
+}
+
+export function createD1AuthStore(
+  db: D1Like,
+  opts: D1AuthStoreOptions = {},
+): AuthStore & {
+  /**
+   * Deletes records past their expiry, tombstones older than a refresh token can live (TTL.refreshMs, not a choice of the
+   * caller: a shorter one would bring revoked tokens back to life), and rate hits older than `hitTtlMs` (the longest
+   * window in use, default one hour).
+   */
+  purgeExpired(nowMs: number, hitTtlMs?: number): Promise<void>;
+} {
+  const clock = opts.now ?? Date.now;
+  const rows = async (sql: string, ...values: unknown[]): Promise<Row[]> =>
+    ((
+      await db
+        .prepare(sql)
+        .bind(...values)
+        .all()
+    ).results ?? []) as Row[];
+  const run = async (sql: string, ...values: unknown[]): Promise<void> => void (await rows(sql, ...values));
+
+  /** codes and refresh tokens are the same shape, in two tables. */
+  const oneTime = <T extends CodeRecord | RefreshRecord>(table: "auth_codes" | "auth_refresh") => ({
+    put: (key: string, rec: T) =>
+      run(
+        `INSERT OR REPLACE INTO ${table} (key, family_id, sub, expires_at, rec, winner) VALUES (?, ?, ?, ?, ?, NULL)`,
+        key,
+        rec.familyId,
+        rec.sub,
+        rec.expiresAt,
+        JSON.stringify(rec),
+      ),
+    async consume(key: string): Promise<Consumed<T>> {
+      const mine = crypto.randomUUID();
+      // One round trip. The batch is not relied on as a transaction: the UPDATE is safe by itself.
+      const [, read] = await db.batch([
+        db
+          .prepare(
+            `UPDATE ${table} SET winner = ? WHERE key = ? AND winner IS NULL
+               AND family_id NOT IN (SELECT family_id FROM auth_revoked_families)`,
+          )
+          .bind(mine, key),
+        db.prepare(`SELECT rec, winner FROM ${table} WHERE key = ?`).bind(key),
+      ]);
+      const [row] = (read?.results ?? []) as Row[];
+      if (!row) return { status: "unknown" };
+      const record = JSON.parse(row.rec as string) as T;
+      return { status: row.winner === mine ? "ok" : "used", record };
+    },
+  });
+  const codes = oneTime<CodeRecord>("auth_codes");
+  const refresh = oneTime<RefreshRecord>("auth_refresh");
+
+  const store: AuthStore = {
+    putCode: codes.put,
+    consumeCode: codes.consume,
+    putRefresh: refresh.put,
+    consumeRefresh: refresh.consume,
+
+    revokeFamily: (familyId) =>
+      run("INSERT OR IGNORE INTO auth_revoked_families (family_id, at) VALUES (?, ?)", familyId, clock()),
+
+    async revokeUser(sub) {
+      await run("DELETE FROM auth_sessions WHERE sub = ?", sub);
+      await run(
+        `INSERT OR IGNORE INTO auth_revoked_families (family_id, at)
+         SELECT family_id, ? FROM auth_refresh WHERE sub = ?
+         UNION SELECT family_id, ? FROM auth_codes WHERE sub = ?`,
+        clock(),
+        sub,
+        clock(),
+        sub,
+      );
+    },
+
+    putSession: (key, rec: SessionRecord) =>
+      run(
+        "INSERT OR REPLACE INTO auth_sessions (key, sub, expires_at, rec) VALUES (?, ?, ?, ?)",
+        key,
+        rec.sub,
+        rec.expiresAt,
+        JSON.stringify(rec),
+      ),
+    async getSession(key) {
+      const [row] = await rows("SELECT rec FROM auth_sessions WHERE key = ?", key);
+      return row ? (JSON.parse(row.rec as string) as SessionRecord) : undefined;
+    },
+    deleteSession: (key) => run("DELETE FROM auth_sessions WHERE key = ?", key),
+
+    putMagic: (key, rec) =>
+      run(
+        "INSERT OR REPLACE INTO auth_magic (key, expires_at, rec) VALUES (?, ?, ?)",
+        key,
+        rec.expiresAt,
+        JSON.stringify(rec),
+      ),
+    async getMagic(key) {
+      const [row] = await rows("SELECT rec FROM auth_magic WHERE key = ?", key);
+      return row ? JSON.parse(row.rec as string) : undefined;
+    },
+    deleteMagic: (key) => run("DELETE FROM auth_magic WHERE key = ?", key),
+
+    async tryHit(key, windowMs, max, minGapMs, nowMs) {
+      const since = nowMs - windowMs;
+      // One round trip for all four steps. Each statement is safe on its own, so the batch need not be a transaction:
+      // 1. hits that left the window are only clutter. shortcut: this assumes a key is always used with one window length
+      //    (true for every key in this repo, not enforced); two lengths on one key would delete hits the longer one needs;
+      // 2. read the window, for the wait in case of a refusal;
+      // 3. take the slot only if there is room and the last hit is old enough, in one statement, so two callers cannot
+      //    both take the last slot. With no minimum gap the gap test is skipped: callers' clocks differ a little and their
+      //    requests arrive in any order, so a hit stamped later than this call's own clock must not turn it away;
+      // 4. read that value back: if it is there, this call and not another one got the slot.
+      const mine = crypto.randomUUID();
+      const [, window, , taken] = await db.batch([
+        db.prepare("DELETE FROM auth_hits WHERE key = ? AND ts <= ?").bind(key, since),
+        db.prepare("SELECT ts FROM auth_hits WHERE key = ? AND ts > ? ORDER BY ts").bind(key, since),
+        db
+          .prepare(
+            `INSERT INTO auth_hits (key, ts, nonce)
+             SELECT ?, ?, ? WHERE (SELECT count(*) FROM auth_hits WHERE key = ? AND ts > ?) < ?
+               AND (? <= 0 OR NOT EXISTS (SELECT 1 FROM auth_hits WHERE key = ? AND ts > ?))`,
+          )
+          .bind(key, nowMs, mine, key, since, max, minGapMs, key, nowMs - minGapMs),
+        db.prepare("SELECT 1 AS got FROM auth_hits WHERE key = ? AND nonce = ?").bind(key, mine),
+      ]);
+      if ((taken?.results?.length ?? 0) > 0) return { ok: true };
+      const before = ((window?.results ?? []) as Row[]).map((r) => r.ts as number);
+      // Refused. The wait is worked out the way the memory store does it, from the hits seen before the attempt.
+      const waits: number[] = [];
+      if (before.length >= max) waits.push(before[before.length - max]! + windowMs - nowMs);
+      const last = before[before.length - 1];
+      if (minGapMs > 0 && last !== undefined && nowMs - last < minGapMs) waits.push(last + minGapMs - nowMs);
+      // Other callers filled the window between the look and the insert: ask for a short wait.
+      return { ok: false, retryAfterMs: waits.length > 0 ? Math.max(...waits) : 1000 };
+    },
+    clearCounter: (key) => run("DELETE FROM auth_hits WHERE key = ?", key),
+  };
+
+  return {
+    ...store,
+    async purgeExpired(nowMs, hitTtlMs = 3_600_000) {
+      await run("DELETE FROM auth_codes WHERE expires_at <= ?", nowMs);
+      await run("DELETE FROM auth_refresh WHERE expires_at <= ?", nowMs);
+      await run("DELETE FROM auth_sessions WHERE expires_at <= ?", nowMs);
+      await run("DELETE FROM auth_magic WHERE expires_at <= ?", nowMs);
+      await run("DELETE FROM auth_revoked_families WHERE at <= ?", nowMs - TTL.refreshMs);
+      await run("DELETE FROM auth_hits WHERE ts <= ?", nowMs - hitTtlMs);
+    },
+  };
+}

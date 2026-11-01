@@ -3,15 +3,23 @@ import { Brand, Footer } from "../components/Layout";
 
 const PRIVACY: [string, string][] = [
   [
-    "What Hippo stores",
-    "The documents you upload, the fields read from them (dates, terms, contacts), and the text of each page so you can see where a value came from. In a hosted setup the files sit in an encrypted bucket. The demo build keeps everything in memory on one computer and forgets it when stopped.",
+    "What Hippo keeps",
+    "The documents you upload, the dates and terms read from them with the exact quote and page each came from, whether you confirmed each one, the things and subscriptions built from them, your settings, and the email address you sign in with. It is kept for your household and is only shown to you. Hippo is still a prototype: the public demo keeps everything in memory and forgets it when the server restarts, so do not put real documents in it.",
+  ],
+  [
+    "The browser extension",
+    "The extension reads a page only after you click its button, and only that tab. It reads the visible text, the page title and the site name, never form values, never the full page address (only the site name) and never anything in the background. Nothing is sent until you press Save, and the popup tells you how much text will be sent. Long numbers are masked in your browser before they are sent.",
+  ],
+  [
+    "Signing in",
+    "You sign in with a code sent to your email, or with Google. Google only tells Hippo which email address you control. Hippo asks Google for nothing else.",
   ],
   [
     "What Hippo does not do",
-    "It does not read your email or your bank. It only knows what you upload, tell it, or save yourself with the browser extension.",
+    "It does not read your email or your bank. It only knows what you upload, tell it, or save yourself with the extension. It does not sell your data and does not use it for advertising.",
   ],
   ["Numbers", "Policy and account numbers are shown with only the last 4 digits."],
-  ["Logs", "Document text is never written to logs."],
+  ["Logs", "Hippo is built so the text of your documents is not written to its logs."],
   [
     "Email",
     "If you turn on the daily email, it names what is due soon and links back here. It never includes a full policy or account number.",

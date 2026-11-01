@@ -1,7 +1,15 @@
 import type { Agreement, Alert, Asset, ObligationRecord, Repository } from "core/src/contracts";
-import { computeObligations, type ObligationType } from "obligation-kit";
+import { computeObligations, type AgreementKind, type ObligationType } from "obligation-kit";
 import { agreementIdOfRef } from "core/src/repository/shared";
 import { capitalize, lowerGeneric } from "./mcp/format";
+
+export const PARTY_FIELD: Record<AgreementKind, string> = {
+  warranty: "provider",
+  insurance: "insurer",
+  lease: "landlord",
+  subscription: "vendor",
+  service_plan: "provider",
+};
 
 const PHRASE: Record<ObligationType, string> = {
   expires: "expires",

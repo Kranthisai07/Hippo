@@ -1,26 +1,20 @@
-import { CalendarClock, CreditCard, LogOut, MessageSquare, Package, Settings, Upload } from "lucide-react";
+import { CalendarClock, CreditCard, LogOut, Package, Settings, Upload } from "lucide-react";
 import { Link, NavLink, Outlet } from "react-router";
 import { useAuth } from "../lib/auth";
+import { BrandMark } from "./BrandMark";
 
 const LINKS = [
   { to: "/", label: "Coming up", icon: CalendarClock, end: true },
   { to: "/upload", label: "Upload", icon: Upload },
-  { to: "/subscriptions", label: "Subscriptions", icon: CreditCard },
+  { to: "/subscriptions", label: "Subscriptions", short: "Subs", icon: CreditCard },
   { to: "/things", label: "Things", icon: Package },
-  { to: "/ask", label: "Ask", icon: MessageSquare },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
 export function Brand() {
   return (
     <Link to="/" className="brand">
-      <span className="brand-mark" aria-hidden="true">
-        <svg width="20" height="20" viewBox="0 0 32 32" fill="none">
-          <path d="M7 22c0-6 4-10 9-10s9 4 9 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-          <circle cx="12" cy="18" r="1.8" fill="currentColor" />
-          <circle cx="20" cy="18" r="1.8" fill="currentColor" />
-        </svg>
-      </span>
+      <BrandMark />
       Hippo
     </Link>
   );
@@ -45,10 +39,19 @@ export function Layout() {
       <header className="bar">
         <Brand />
         <nav className="nav" aria-label="Main">
-          {LINKS.map(({ to, label, icon: Icon, end }) => (
+          {LINKS.map(({ to, label, short, icon: Icon, end }) => (
             <NavLink key={to} to={to} end={end} viewTransition>
               <Icon size={20} strokeWidth={1.75} aria-hidden="true" />
-              <span>{label}</span>
+              {short ? (
+                <>
+                  <span className="nav-full">{label}</span>
+                  <span className="nav-short" aria-hidden="true">
+                    {short}
+                  </span>
+                </>
+              ) : (
+                <span>{label}</span>
+              )}
             </NavLink>
           ))}
         </nav>

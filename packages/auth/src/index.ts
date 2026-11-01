@@ -1,8 +1,12 @@
 import type { Hono } from "hono";
 import { createAuth, type Auth, type AuthOptions } from "./auth";
 
-export { createAuth, unauthorized, SCOPE_SERVICE, USER_SCOPES, TTL } from "./auth";
-export type { Auth, AuthOptions, ClientConfig } from "./auth";
+export { createAuth, unauthorized, MAIL_TIMEOUT_MS, SCOPE_SERVICE, USER_SCOPES, TTL } from "./auth";
+export type { Auth, AuditEvent, AuthOptions, ClientConfig } from "./auth";
+export type { Mailer } from "./mailer";
+export type { GoogleOptions } from "./google";
+export { linksFromEnv } from "./pages";
+export type { PageLinks } from "./pages";
 export { createMemoryStore } from "./store";
 export type { AuthStore, CodeRecord, RefreshRecord, SessionRecord, MagicRecord } from "./store";
 

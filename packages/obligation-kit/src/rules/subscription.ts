@@ -36,7 +36,8 @@ const MAX_LABEL = 40;
 const MAX_PLAN = 60;
 
 const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
-const MONTH = "(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)";
+const MONTH =
+  "(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)";
 const NAMED_MDY = new RegExp(`\\b${MONTH}\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?,?\\s+(\\d{4})\\b`, "gi");
 const NAMED_DMY = new RegExp(`\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+${MONTH}\\.?,?\\s+(\\d{4})\\b`, "gi");
 const ISO_DATE = /\b(\d{4})-(\d{2})-(\d{2})\b/g;
@@ -123,10 +124,12 @@ const NOT_THE_PRICE_LEAD = /\b(?:savings|spent)\b/i;
 const FOREIGN_CURRENCY = /\b(?:CAD|AUD|NZD|EUR|GBP|INR|JPY)\b/;
 const NOT_THE_PRICE_AFTER = /^\s*(?:off|credit|discount|savings?|gift|in\b|tax|shipping|fee)/i;
 /** "/month", "per month", "a year", "every 3 months". */
-const CYCLE_AFTER = /^\s*(?:USD\s*)?(?:\/|per\s|a\s|each\s|every\s)\s*(\d{1,2}\s+)?(mo|mos|month|months|yr|yrs|year|years|annum|wk|week|weeks|quarter|quarters)\b/i;
+const CYCLE_AFTER =
+  /^\s*(?:USD\s*)?(?:\/|per\s|a\s|each\s|every\s)\s*(\d{1,2}\s+)?(mo|mos|month|months|yr|yrs|year|years|annum|wk|week|weeks|quarter|quarters)\b/i;
 /** The same, said before the price: "Billed every 3 months: $30.00". */
 const CYCLE_EVERY = /\bevery\s+(\d{1,2}\s+)?(month|months|year|years|week|weeks|quarter|quarters)\b/i;
-const CYCLE_WORD = /\b(monthly|annually|annual|yearly|quarterly|biweekly|bi-weekly|weekly|semiannually|semi-annually)\b/gi;
+const CYCLE_WORD =
+  /\b(monthly|annually|annual|yearly|quarterly|biweekly|bi-weekly|weekly|semiannually|semi-annually)\b/gi;
 const STRONG_PRICE =
   /\b(?:your\s+(?:current\s+)?(?:plan|subscription|membership)|current\s+plan|next\s+(?:charge|payment|bill)|amount|total|you(?:'|’)ll\s+be|will\s+be\s+(?:charged|billed)|billed|price\s+after\s+trial|renews?)\b/i;
 
@@ -148,7 +151,15 @@ function cycleFromUnit(rawCount: string | undefined, rawUnit: string): BillingCy
   const unit = rawUnit.toLowerCase();
   const months = /^mo/.test(unit) ? n : /^(?:yr|year|annum)/.test(unit) ? n * 12 : /^quarter/.test(unit) ? n * 3 : null;
   if (months === null) return n === 1 ? "weekly" : n === 2 ? "biweekly" : null;
-  return months === 1 ? "monthly" : months === 3 ? "quarterly" : months === 6 ? "semiannual" : months === 12 ? "annual" : null;
+  return months === 1
+    ? "monthly"
+    : months === 3
+      ? "quarterly"
+      : months === 6
+        ? "semiannual"
+        : months === 12
+          ? "annual"
+          : null;
 }
 
 /** Cycle words in a segment. Yearly plus monthly in one sentence settles nothing, so the caller gets one or none. */
@@ -210,9 +221,7 @@ function priceAndCycle(segments: string[]): Pick<SubscriptionRuleFields, "amount
     return pageCycle ? [{ c, cycle: pageCycle }] : [];
   });
   if (usable.length === 0) return none;
-  const best = only(
-    usable.map((u) => ({ key: `${u.c.amount}|${u.cycle.value}`, value: u })),
-  );
+  const best = only(usable.map((u) => ({ key: `${u.c.amount}|${u.cycle.value}`, value: u })));
   if (!best) return none;
   return { amount: leaf(best.c.amount, quoteAt(best.c.segment, best.c.index)), cycle: best.cycle };
 }
@@ -238,7 +247,8 @@ function labelledDates(segments: string[], label: RegExp) {
     const end = m.index + m[0].length;
     const date = dates.find((d) => d.index >= end) ?? (dates.length === 1 ? dates[0] : undefined);
     if (!date?.iso) return [];
-    const lead = date.index < end ? segment.slice(Math.max(0, date.index - 24), date.index) : segment.slice(end, date.index);
+    const lead =
+      date.index < end ? segment.slice(Math.max(0, date.index - 24), date.index) : segment.slice(end, date.index);
     if (PAST_DATE.test(lead)) return [];
     return [{ key: date.iso, value: leaf(date.iso, quoteAt(segment, date.index)) }];
   });
@@ -253,7 +263,16 @@ const dateField = (segments: string[], label: RegExp): RuleLeaf<string> | null =
 
 // Cancel terms
 
-const NUMBER_WORDS: Record<string, number> = { one: 1, two: 2, three: 3, five: 5, seven: 7, ten: 10, fourteen: 14, thirty: 30 };
+const NUMBER_WORDS: Record<string, number> = {
+  one: 1,
+  two: 2,
+  three: 3,
+  five: 5,
+  seven: 7,
+  ten: 10,
+  fourteen: 14,
+  thirty: 30,
+};
 const CANCEL_NOTICE =
   /\bcancel\w*\b[^.!?]*?\b(\d{1,3}|one|two|three|five|seven|ten|fourteen|thirty)\s*(?:\(\d{1,3}\)\s*)?(business\s+days?|days?|hours?)\s+(?:before|prior)\b/i;
 const CANCEL_HOW = /^(?:how\s+to\s+cancel|to\s+cancel)[^:,]{0,40}[:,]\s*(.{4,})$/i;
@@ -284,7 +303,16 @@ function cancelMethod(segments: string[]): RuleLeaf<string> | null {
 
 // Vendor, plan and account hint
 
-const PROCESSORS = new Set(["stripe", "paypal", "paddle", "chargebee", "recurly", "fastspring", "gumroad", "lemonsqueezy"]);
+const PROCESSORS = new Set([
+  "stripe",
+  "paypal",
+  "paddle",
+  "chargebee",
+  "recurly",
+  "fastspring",
+  "gumroad",
+  "lemonsqueezy",
+]);
 const GENERIC = new Set(
   "account accounts billing bill checkout complete confirmed confirmation invoice manage manager membership memberships my order orders payment payments plan plans pricing receipt receipts settings subscription subscriptions thanks thank you your".split(
     " ",
@@ -295,18 +323,31 @@ const folded = (s: string): string => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu
 
 /** The name a site goes by: `fernwood-streaming` from `account.fernwood-streaming.example`. */
 function hostLabel(host: string): string | null {
-  const parts = host.toLowerCase().replace(/^www\./, "").split(".").slice(0, -1);
+  const parts = host
+    .toLowerCase()
+    .replace(/^www\./, "")
+    .split(".")
+    .slice(0, -1);
   const last = parts.at(-1);
   const label = last && last.length <= 3 && parts.length > 1 ? parts.at(-2) : last;
   return label && !PROCESSORS.has(label) ? label : null;
 }
 
 function vendorOf(text: string, host: string | undefined): RuleLeaf<string> | null {
-  const title = text.split(/\r?\n/).map((l) => l.trim()).find(Boolean)?.slice(0, MAX_QUOTE);
+  const title = text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .find(Boolean)
+    ?.slice(0, MAX_QUOTE);
   if (!title) return null;
   const parts = title
     .split(/\s+[|:·•–—-]\s+/)
-    .map((p) => p.split(/\s+/).filter((w) => !GENERIC.has(w.toLowerCase())).join(" "))
+    .map((p) =>
+      p
+        .split(/\s+/)
+        .filter((w) => !GENERIC.has(w.toLowerCase()))
+        .join(" "),
+    )
     .filter((p) => folded(p).length > 0);
   const label = host ? hostLabel(host) : null;
   const named = parts.find((p) => {

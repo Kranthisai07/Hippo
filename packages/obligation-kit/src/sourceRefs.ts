@@ -65,7 +65,12 @@ function withinEdits(pattern: string, text: string, max: number): boolean {
     for (let i = 1; i <= m; i++) {
       const pHard = hard[i - 1] as boolean;
       const sub = pattern[i - 1] === c ? 0 : pHard || cHard ? cap : 1;
-      cur[i] = Math.min(cap, (prev[i - 1] ?? cap) + sub, (prev[i] ?? cap) + (cHard ? cap : 1), (cur[i - 1] ?? cap) + (pHard ? cap : 1));
+      cur[i] = Math.min(
+        cap,
+        (prev[i - 1] ?? cap) + sub,
+        (prev[i] ?? cap) + (cHard ? cap : 1),
+        (cur[i - 1] ?? cap) + (pHard ? cap : 1),
+      );
     }
     if ((cur[m] ?? cap) <= max) return true;
     [prev, cur] = [cur, prev];

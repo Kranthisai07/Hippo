@@ -25,9 +25,7 @@ export interface AgreementLike {
 
 /** Never guess: a match is one sure answer. Anything less sure is "ambiguous" with at most 3 things to ask about. */
 export type Resolution<T> =
-  | { status: "match"; item: T }
-  | { status: "ambiguous"; candidates: T[] }
-  | { status: "none" };
+  { status: "match"; item: T } | { status: "ambiguous"; candidates: T[] } | { status: "none" };
 
 const MAX_OPTIONS = 3;
 
@@ -54,7 +52,9 @@ function decide<T>(entries: Entry<T>[]): Resolution<T> {
   const sure = strong.length === 1 ? strong[0] : exact.length === 1 ? exact[0] : undefined;
   if (sure) return { status: "match", item: sure.item };
   const asks = strong.length ? strong : [...entries].sort(order);
-  return asks.length ? { status: "ambiguous", candidates: asks.slice(0, MAX_OPTIONS).map((e) => e.item) } : { status: "none" };
+  return asks.length
+    ? { status: "ambiguous", candidates: asks.slice(0, MAX_OPTIONS).map((e) => e.item) }
+    : { status: "none" };
 }
 
 /** The last word of a name that is not a model number: Fridge water filter is a filter, iPhone 15 is a phone. */
@@ -73,7 +73,11 @@ function assetWords(a: AssetLike): Words {
   const brand = tokens(a.brand ?? "");
   const category = tokens(a.category ?? "");
   const heads = new Set([...names.map(headOf).filter((w): w is string => !!w), ...brand, ...category]);
-  return { all: new Set([...names.flat(), ...brand, ...category, ...tokens(a.location ?? "")]), heads, names: names.map((n) => new Set(n)) };
+  return {
+    all: new Set([...names.flat(), ...brand, ...category, ...tokens(a.location ?? "")]),
+    heads,
+    names: names.map((n) => new Set(n)),
+  };
 }
 
 export function resolveAsset(query: string, assets: AssetLike[]): Resolution<AssetLike> {

@@ -61,6 +61,13 @@ export function chipParts(iso: string): { month: string; day: string } {
   return { month: MONTHS[Number(m) - 1] ?? "", day: String(Number(d)) };
 }
 
+/** "2026-11-03" as "Nov 3, 2026". Anything that is not an ISO date comes back unchanged. */
+export function readableDate(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  const month = m ? MONTHS[Number(m[2]) - 1] : undefined;
+  return m && month ? `${month} ${Number(m[3])}, ${m[1]}` : iso;
+}
+
 export const KIND_LABEL: Record<ObligationType | "recall", string> = {
   expires: "Expires",
   renews: "Renewals",
