@@ -1,6 +1,18 @@
 import { Hono, type Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
+import {
+  derivePendingKey,
+  exchangeCode,
+  googleAuthUrl,
+  googleKeys,
+  readPending,
+  safeReturnTo,
+  signPending,
+  verifyIdToken,
+  type GoogleOptions,
+  type Pending,
+} from "./google";
 import type { Mailer } from "./mailer";
 import { defaultRandom, safeEqual, sha256b64url, sixDigits, token, type RandomBytes } from "./crypto";
 import { errorPage, loginPage } from "./pages";
@@ -38,6 +50,11 @@ export interface AuthOptions {
   logMagicCodes?: boolean;
   /** One call per security event. Carries the hashed `sub` and a reason, never an email, a code or a token. */
   audit?: (e: AuditEvent) => void;
+  /**
+   * "Continue with Google". Off unless set. Google only proves which email address the person controls: the verified
+   * address then goes through the same household mapping as an emailed code.
+   */
+  google?: GoogleOptions;
   /** Emails the code. When set it replaces the log line. A failure is logged by error name only and never shown. */
   mailer?: Mailer;
   /** Service credentials for the client_credentials grant (scope mcp:service only). */
@@ -87,6 +104,8 @@ const MAX_GUESSES = 10;
 const GUESS_WINDOW_MS = 15 * 60_000;
 const SESSION_COOKIE = "hippo_session";
 const CSRF_COOKIE = "hippo_csrf";
+const PENDING_COOKIE = "hippo_gpending";
+const GOOGLE_PATH = "/oauth/google";
 const B64URL = /^[A-Za-z0-9_-]+$/;
 const VERIFIER = /^[A-Za-z0-9\-._~]{43,128}$/;
 const EMAIL = /^[^\s@<>"',;]{1,64}@[^\s@<>"',;]{1,185}\.[^\s@<>"',;]{2,}$/;
@@ -296,11 +315,15 @@ export function createAuth(opts: AuthOptions): Auth {
   const limited = (c: Context, retryAfterSec: number): Response =>
     c.json({ error: "rate_limited" }, 429, { ...noStore, "Retry-After": String(retryAfterSec) });
 
-  const startSession = async (c: Context, email: string): Promise<{ email: string; householdId: string }> => {
+  const startSession = async (
+    c: Context,
+    email: string,
+    reason = "session",
+  ): Promise<{ email: string; householdId: string }> => {
     const id = await identity(email);
     const sid = token(random);
     await store.putSession(await sha256b64url(sid), { email, ...id, expiresAt: now() + TTL.sessionMs });
-    opts.audit?.({ event: "login_ok", sub: id.sub, reason: "session" });
+    opts.audit?.({ event: "login_ok", sub: id.sub, reason });
     setCookie(c, SESSION_COOKIE, sid, cookieOpts("/", TTL.sessionMs / 1000));
     return { email, householdId: id.householdId };
   };
@@ -402,10 +425,110 @@ export function createAuth(opts: AuthOptions): Auth {
       notice: extra.notice,
       error: extra.error,
       demo: Boolean(opts.demoUser),
+      google: Boolean(opts.google),
       sessionEmail: s?.email,
     });
     return c.html(html, status);
   };
+
+  // The one place an authorization code is issued after someone has proven which address they control: the emailed code,
+  // the demo button, an existing session, and Google all end here.
+  const finishAuthorize = async (c: Context, p: AuthzParams, email: string, reason: string): Promise<Response> => {
+    // The household comes from the server side mapping, never from the request.
+    const id = await identity(email);
+    opts.audit?.({ event: "login_ok", sub: id.sub, reason });
+    const code = token(random);
+    await store.putCode(await sha256b64url(code), {
+      clientId: p.clientId,
+      redirectUri: p.redirectUri,
+      codeChallenge: p.codeChallenge,
+      resource: p.resource,
+      scope: p.scope,
+      sub: id.sub,
+      householdId: id.householdId,
+      familyId: token(random, 16),
+      expiresAt: now() + TTL.codeMs,
+    });
+    const u = new URL(p.redirectUri);
+    u.searchParams.set("code", code);
+    if (p.state !== undefined) u.searchParams.set("state", p.state);
+    deleteCookie(c, CSRF_COOKIE, { path: "/oauth" });
+    return c.redirect(u.toString(), 302);
+  };
+
+  // Continue with Google (docs/VERIFIED.md 10.9). The state of the attempt lives in one signed cookie, so no table is needed.
+
+  const google = opts.google;
+  const googleCallback = `${issuer}${GOOGLE_PATH}/callback`;
+  const pendingKey = google ? derivePendingKey(key) : undefined;
+  const idKeys = google ? googleKeys(google) : undefined;
+  const ownOrigin = new URL(issuer).origin;
+
+  const googleFailed = (c: Context, reason: string): Response => {
+    deleteCookie(c, PENDING_COOKIE, cookieOpts(GOOGLE_PATH, 0));
+    opts.audit?.({ event: "login_failed", reason });
+    pageHeaders(c);
+    return c.html(errorPage("Google sign in did not work. Try again or use an email code."), 400);
+  };
+
+  const startGoogle = async (c: Context, p: Pick<Pending, "mode" | "params" | "returnTo">): Promise<Response> => {
+    const attempt = { gstate: token(random), nonce: token(random), verifier: token(random) };
+    const jwt = await signPending(await pendingKey!, { ...p, ...attempt }, now());
+    setCookie(c, PENDING_COOKIE, jwt, cookieOpts(GOOGLE_PATH, 600));
+    return c.redirect(await googleAuthUrl(google!, { redirectUri: googleCallback, ...attempt }), 302);
+  };
+
+  // Which sign in methods this server offers, so the web app shows only buttons that work.
+  app.get("/oauth/providers", (c) => c.json({ google: Boolean(google) }, 200, noStore));
+
+  // Sign in to the web app with Google: ends with the cookie session and a redirect back to the web app.
+  app.get(`${GOOGLE_PATH}/start`, async (c) => {
+    if (!google) return c.json({ error: "not_found" }, 404, noStore);
+    const returnTo =
+      safeReturnTo(single(new URL(c.req.url).searchParams, "return"), ownOrigin, origins) ?? `${ownOrigin}/`;
+    return startGoogle(c, { mode: "session", returnTo });
+  });
+
+  app.get(`${GOOGLE_PATH}/callback`, async (c) => {
+    if (!google) return c.json({ error: "not_found" }, 404, noStore);
+    const pending = await readPending(await pendingKey!, getCookie(c, PENDING_COOKIE), now());
+    // The cookie is good for one try, whatever happens next.
+    deleteCookie(c, PENDING_COOKIE, cookieOpts(GOOGLE_PATH, 0));
+    if (!pending) return googleFailed(c, "google_state");
+    const sp = new URL(c.req.url).searchParams;
+    const gstate = single(sp, "state");
+    if (typeof gstate !== "string" || !(await safeEqual(gstate, pending.gstate)))
+      return googleFailed(c, "google_state");
+
+    const chk = pending.mode === "authorize" ? checkAuthorize(new URLSearchParams(pending.params ?? {})) : undefined;
+    if (pending.mode === "authorize" && (!chk || !chk.ok)) return googleFailed(c, "google_state");
+
+    // The person said no on Google's page: tell the client, in its own words and with its own state.
+    if (single(sp, "error") !== undefined) {
+      opts.audit?.({ event: "login_failed", reason: "google_denied" });
+      if (chk?.ok) {
+        return redirectError(c, {
+          uri: chk.p.redirectUri,
+          error: "access_denied",
+          desc: "sign in was cancelled",
+          state: chk.p.state,
+        });
+      }
+      return googleFailed(c, "google_denied");
+    }
+
+    const code = single(sp, "code");
+    if (typeof code !== "string" || code === "" || code.length > 2048) return googleFailed(c, "google_token");
+    const idToken = await exchangeCode(google, { code, redirectUri: googleCallback, verifier: pending.verifier });
+    if (!idToken) return googleFailed(c, "google_token");
+    const who = await verifyIdToken(google, idKeys!, idToken, { nonce: pending.nonce, nowMs: now() });
+    const email = who ? normalizeEmail(who.email) : null;
+    if (!email) return googleFailed(c, "google_id_token");
+
+    if (chk?.ok) return finishAuthorize(c, chk.p, email, "google");
+    await startSession(c, email, "google");
+    return c.redirect(safeReturnTo(pending.returnTo, ownOrigin, origins) ?? `${ownOrigin}/`, 302);
+  });
 
   app.get("/oauth/authorize", async (c) => {
     pageHeaders(c);
@@ -466,31 +589,15 @@ export function createAuth(opts: AuthOptions): Auth {
       }
       if (e && r === "ok") email = e;
       else return renderLogin(c, p, csrfCookie, { email: e ?? "", error: "That code did not work." }, 401);
+    } else if (action === "google") {
+      if (!opts.google) return bad();
+      return startGoogle(c, { mode: "authorize", params: hiddenFor(p) });
     } else {
       return bad();
     }
     if (!email) return bad();
 
-    // The household comes from the server side mapping, never from the request.
-    const id = await identity(email);
-    opts.audit?.({ event: "login_ok", sub: id.sub, reason: "authorize" });
-    const code = token(random);
-    await store.putCode(await sha256b64url(code), {
-      clientId: p.clientId,
-      redirectUri: p.redirectUri,
-      codeChallenge: p.codeChallenge,
-      resource: p.resource,
-      scope: p.scope,
-      sub: id.sub,
-      householdId: id.householdId,
-      familyId: token(random, 16),
-      expiresAt: now() + TTL.codeMs,
-    });
-    const u = new URL(p.redirectUri);
-    u.searchParams.set("code", code);
-    if (p.state !== undefined) u.searchParams.set("state", p.state);
-    deleteCookie(c, CSRF_COOKIE, { path: "/oauth" });
-    return c.redirect(u.toString(), 302);
+    return finishAuthorize(c, p, email, "authorize");
   });
 
   // Token
