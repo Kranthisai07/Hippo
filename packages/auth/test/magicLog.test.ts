@@ -109,29 +109,38 @@ describe("a mailer", () => {
 });
 
 describe("a mailer that does not answer", () => {
-  it("is cut off after the timeout, the answer is unchanged, and the audit says mail failed", async () => {
-    // Only the clock is faked. The request also does real asynchronous work (hashing) before it reaches the mailer, which
-    // takes longer on a slow machine, so each round lets real time pass before the fake clock moves on.
-    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
-    try {
-      const events: AuditEvent[] = [];
-      const env = makeEnv({ mailer: { send: () => new Promise(() => undefined) }, audit: (e) => events.push(e) });
-      let res: Response | undefined;
-      const pending = send(env).then((r) => (res = r));
-      for (let i = 0; i < 200 && !res; i++) {
-        await new Promise((r) => setImmediate(r));
-        await vi.advanceTimersByTimeAsync(MAIL_TIMEOUT_MS);
+  it(
+    "is cut off after the timeout, the answer is unchanged, and the audit says mail failed",
+    { timeout: 20_000 },
+    async () => {
+      // Only the clock is faked. The request also does real asynchronous work (hashing on the thread pool) before it reaches
+      // the mailer, and that takes real time, so each round sleeps a few real milliseconds before the fake clock moves on.
+      const realSetTimeout = globalThis.setTimeout;
+      const sleep = (ms: number) => new Promise<void>((r) => realSetTimeout(r, ms));
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+      try {
+        const events: AuditEvent[] = [];
+        const env = makeEnv({ mailer: { send: () => new Promise(() => undefined) }, audit: (e) => events.push(e) });
+        let res: Response | undefined;
+        const pending = send(env).then((r) => (res = r));
+        for (let i = 0; i < 2000 && !res; i++) {
+          await sleep(5);
+          await vi.advanceTimersByTimeAsync(MAIL_TIMEOUT_MS);
+        }
+        if (!res)
+          throw new Error(
+            `no answer after ${2000} rounds; events: ${events.map((e) => e.event)}; logs: ${env.logs.length}`,
+          );
+        await pending;
+        expect(res.status).toBe(200);
+        expect(await res.json()).toEqual({ ok: true });
+        expect(events.map((e) => e.event)).toEqual(["mail_failed"]);
+        expect(env.logs.join("\n")).not.toMatch(/alice@|\d{6}/);
+      } finally {
+        vi.useRealTimers();
       }
-      await pending;
-      if (!res) throw new Error("no answer");
-      expect(res.status).toBe(200);
-      expect(await res.json()).toEqual({ ok: true });
-      expect(events.map((e) => e.event)).toEqual(["mail_failed"]);
-      expect(env.logs.join("\n")).not.toMatch(/alice@|\d{6}/);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
+    },
+  );
   it("a failure is audited as mail failed, not as sent", async () => {
     const events: AuditEvent[] = [];
     const env = makeEnv({
