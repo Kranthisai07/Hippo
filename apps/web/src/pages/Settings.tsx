@@ -158,6 +158,18 @@ export function SettingsPage() {
         )}
       </section>
 
+      <section className="card stack" aria-labelledby="voice-h">
+        <h2 id="voice-h">Voice assistant</h2>
+        <p className="muted">
+          Try asking Hippo about your paperwork out loud, with a demo of the voice assistant add-on.
+        </p>
+        <div>
+          <Link className="btn" to="/ask">
+            Voice assistant demo
+          </Link>
+        </div>
+      </section>
+
       <section className="card stack danger-zone" aria-labelledby="wipe-h">
         <h2 id="wipe-h">Delete all data</h2>
         <p className="muted">

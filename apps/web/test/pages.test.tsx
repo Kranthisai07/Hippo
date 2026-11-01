@@ -7,6 +7,7 @@ import { ToastProvider } from "../src/components/ui";
 import { ApiError, api } from "../src/lib/api";
 import { ComingUp } from "../src/pages/ComingUp";
 import { Review } from "../src/pages/Review";
+import { SettingsPage } from "../src/pages/Settings";
 import { SignIn } from "../src/pages/SignIn";
 import { Things } from "../src/pages/Things";
 import type { AgreementView, Doc, ObligationItem } from "../src/lib/types";
@@ -294,5 +295,18 @@ describe("Sign in", () => {
     expect(send).toHaveBeenCalledTimes(2);
     await userEvent.click(screen.getByRole("button", { name: "Use a different email" }));
     expect(await screen.findByRole("heading", { name: "Sign in" })).toBeInTheDocument();
+  });
+});
+
+describe("Settings", () => {
+  it("links to the voice assistant demo, since Ask is not in the main nav", async () => {
+    vi.spyOn(api, "me").mockRejectedValue(new ApiError(401, "unauthenticated", "Please sign in again."));
+    vi.spyOn(api, "listDocs").mockResolvedValue({ docs: [] });
+    wrap(
+      <AuthProvider>
+        <SettingsPage />
+      </AuthProvider>,
+    );
+    expect(await screen.findByRole("link", { name: "Voice assistant demo" })).toHaveAttribute("href", "/ask");
   });
 });
