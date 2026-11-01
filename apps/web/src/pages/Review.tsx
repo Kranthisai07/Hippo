@@ -256,7 +256,7 @@ export function Review() {
             <strong>
               {waitingDates.length} {waitingDates.length === 1 ? "date" : "dates"} to confirm
             </strong>
-            <ul className="row" aria-label="Dates this will confirm">
+            <ul className="row" aria-label="Dates this will confirm" tabIndex={0}>
               {waitingDates.map((f) => (
                 <ShownDate key={f.name} name={f.name} onShown={onShown}>
                   <span className="chip chip-warn num">

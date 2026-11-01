@@ -45,7 +45,7 @@ test("phone tab bar fits at every width and the review bar is one row above it",
       expect(lb.x + lb.width, `${name} label right at ${w}`).toBeLessThanOrEqual(box.x + box.width + 0.5);
       expect(lb.height, `${name} label wraps at ${w}`).toBeLessThan(20);
     }
-    // The review bar: count and button on one row, chips hidden on a phone, clear of the tab bar.
+    // The review bar: count and button on one row, the dates under them in a row that scrolls sideways, clear of the tab bar.
     const bar = page.locator(".sticky-bar");
     const barBox = (await bar.boundingBox())!;
     const count = (await bar.locator("strong").boundingBox())!;
@@ -53,7 +53,13 @@ test("phone tab bar fits at every width and the review bar is one row above it",
     expect(Math.abs(count.y + count.height / 2 - (btn.y + btn.height / 2)), `bar row at ${w}`).toBeLessThan(12);
     expect(barBox.y + barBox.height, `bar clears tabs at ${w}`).toBeLessThanOrEqual(navBox.y);
     expect(barBox.x + barBox.width).toBeLessThanOrEqual(w);
-    await expect(bar.getByRole("list")).toBeHidden();
+    // The dates are visible inside the bar, and the row scrolls itself instead of widening the page.
+    const list = bar.getByRole("list");
+    await expect(list).toBeVisible();
+    const lb = (await list.boundingBox())!;
+    expect(lb.x, `dates left at ${w}`).toBeGreaterThanOrEqual(barBox.x - 0.5);
+    expect(lb.x + lb.width, `dates right at ${w}`).toBeLessThanOrEqual(barBox.x + barBox.width + 0.5);
+    await expect(list.getByRole("listitem").first()).toBeVisible();
     await noSidewaysScroll(page, `review ${w}`);
   }
 });

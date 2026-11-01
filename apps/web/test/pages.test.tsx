@@ -293,6 +293,7 @@ describe("Sign in", () => {
     expect(screen.queryByRole("button", { name: "Use the demo account" })).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "Send a new code" }));
     expect(send).toHaveBeenCalledTimes(2);
+    expect(await screen.findByRole("status")).toHaveTextContent("A new code was sent");
     await userEvent.click(screen.getByRole("button", { name: "Use a different email" }));
     expect(await screen.findByRole("heading", { name: "Sign in" })).toBeInTheDocument();
   });

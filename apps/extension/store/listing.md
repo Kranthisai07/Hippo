@@ -38,7 +38,7 @@ What it does not do
 
 ## Privacy practices form (answers must match the privacy policy)
 - Collects: the visible text of the page you save, the page title and site name, and your sign in email. Nothing else.
-- Does not sell or transfer data to third parties, does not use it for ads or credit decisions.
+- Does not sell or transfer data to third parties, does not use it for ads or credit decisions. Saved pages are read by Hippo's own rules on its own server; no model and no outside processor is used for them today. If that changes (docs/PRIVACY.md mentions a hosted model service for uploaded documents), this answer and the privacy policy must name it before publishing.
 - Remote code: none.
 - Privacy policy URL: the public address of the Hippo Privacy page (see blockers).
 

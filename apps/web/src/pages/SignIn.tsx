@@ -13,6 +13,9 @@ const POINTS = [
   "Delete everything with one button, any time.",
 ];
 
+/** The server log only holds the code when the server runs on this computer. */
+const LOCAL = ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname);
+
 export function SignIn() {
   const { status, refresh } = useAuth();
   const nav = useNavigate();
@@ -20,6 +23,7 @@ export function SignIn() {
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [sent, setSent] = useState(false);
+  const [resent, setResent] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [waitUntil, setWaitUntil] = useState(0);
@@ -117,7 +121,11 @@ export function SignIn() {
                 </div>
                 <p className="banner banner-ok" role="status">
                   <CheckCircle2 size={20} aria-hidden="true" />
-                  <span>Code sent. It can take a minute to arrive.</span>
+                  <span>
+                    {resent > 0
+                      ? "A new code was sent. The earlier one no longer works."
+                      : "Code sent. It can take a minute to arrive."}
+                  </span>
                 </p>
               </>
             ) : (
@@ -159,8 +167,8 @@ export function SignIn() {
                     value={code}
                     onChange={(e) => setCode(e.target.value)}
                   />
-                  {!HOSTED && (
-                    <p className="muted small signin-hint">In this demo build the code is printed in the server log.</p>
+                  {!HOSTED && LOCAL && (
+                    <p className="muted small signin-hint">On this computer the code is printed in the server log.</p>
                   )}
                 </div>
               ) : (
@@ -190,7 +198,9 @@ export function SignIn() {
                   type="button"
                   className="btn btn-quiet btn-block"
                   disabled={off}
-                  onClick={() => void run(async () => (await api.magicCode(email.trim()), setCode("")))}
+                  onClick={() =>
+                    void run(async () => (await api.magicCode(email.trim()), setCode(""), setResent((n) => n + 1)))
+                  }
                 >
                   Send a new code
                 </button>

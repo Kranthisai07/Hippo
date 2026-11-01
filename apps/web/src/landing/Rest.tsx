@@ -46,7 +46,8 @@ export function Planned() {
       <p className="lp-lead">
         Open a billing page or a receipt, click Hippo, and press Save. Nothing is read until you click and nothing is
         sent until you press Save. Hippo adds the subscription to your list, and nothing alerts you until you confirm
-        its dates. The extension is being prepared for the Chrome Web Store.
+        its dates. The extension is being prepared for the Chrome Web Store. Today it saves to a Hippo server running on
+        your own computer.
       </p>
       <div className="lp-browser" aria-hidden="true">
         <div className="lp-browser-bar">

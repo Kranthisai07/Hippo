@@ -175,3 +175,10 @@ No decisions log exists on main (MEMORY.md is only in old worktrees), so this fi
 - **Correction to the audit:** the popup is fixed at 360 px in every state. The wider look in a screenshot was screen scaling.
 - **Open, not fixable by UI:** saving a page is refused on any hosted server (`isLocalOnly`) and the manifest only allows localhost, so the extension cannot serve real users until a hosted capture path exists. Listed as blocker 1 in `apps/extension/store/listing.md`. Owner decisions: publisher name, support contact, legal review of the privacy and terms text.
 - **Checked:** web 133, extension 35 tests, rendered popup and every store image looked at. Not checked: real Chrome popup, Web Store review.
+
+## 2026-11-01: reviewer fixes for the UI pass (+claude)
+- **Blocking, fixed:** on a phone the Review bar hid the date chips by CSS while the "every date was shown" check still counted them, so one tap confirmed dates the bar did not show. The chips now stay visible as a row under the count and button that scrolls sideways (focusable, labelled "Dates this will confirm", needed for axe `scrollable-region-focusable`). `d-layout.spec.ts` now asserts they are visible and inside the bar instead of asserting they are hidden.
+- **Copy made truthful:** the sign in hint about the server log shows only on localhost; the landing page and privacy text say saving works today against a server on your own computer and that the public demo forgets everything on restart; the listing's data answer says no model or outside processor is used for saved pages today and must be revisited if that changes.
+- **Accessibility:** "Send a new code" now announces "A new code was sent" in the status region.
+- **Left open:** the demo button still shows on any build not marked hosted, because the page cannot ask the server whether the demo is on (needs `/oauth/providers` to report it, in `packages/auth`).
+- **Checked:** web 133 tests, all 8 Playwright tests including axe on every page at 1280 and 390 in light and dark.

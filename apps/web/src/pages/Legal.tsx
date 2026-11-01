@@ -4,11 +4,11 @@ import { Brand, Footer } from "../components/Layout";
 const PRIVACY: [string, string][] = [
   [
     "What Hippo keeps",
-    "The documents you upload, the dates and terms read from them with the exact quote and page each came from, whether you confirmed each one, the things and subscriptions built from them, your settings, and the email address you sign in with. It is kept for your household and is only shown to you.",
+    "The documents you upload, the dates and terms read from them with the exact quote and page each came from, whether you confirmed each one, the things and subscriptions built from them, your settings, and the email address you sign in with. It is kept for your household and is only shown to you. Hippo is still a prototype: the public demo keeps everything in memory and forgets it when the server restarts, so do not put real documents in it.",
   ],
   [
     "The browser extension",
-    "The extension reads a page only after you click its button, and only that tab. It reads the visible text, the page title and the site name, never form values, never the page address and never anything in the background. Nothing is sent until you press Save, and the popup tells you how much text will be sent. Long numbers are masked in your browser before they are sent.",
+    "The extension reads a page only after you click its button, and only that tab. It reads the visible text, the page title and the site name, never form values, never the full page address (only the site name) and never anything in the background. Nothing is sent until you press Save, and the popup tells you how much text will be sent. Long numbers are masked in your browser before they are sent.",
   ],
   [
     "Signing in",
