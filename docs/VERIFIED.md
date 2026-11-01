@@ -574,3 +574,27 @@ A Google Cloud project (`hippo-signin`), an External app in Testing mode with sc
 | Real Chrome with the extension's `launchWebAuthFlow` | Not run | UNVERIFIED |
 | Other people signing in | The app is in Testing with 0 test users and "Publish app" disabled: only the project owner can sign in. Publishing needs a public home page, a privacy policy link and a verified domain (10.9) | OPEN |
 
+### 10.18 Sign-in page: Google button branding and Geist licence (2026-11-01)
+
+Read live: https://developers.google.com/identity/branding-guidelines (via page fetch, summarised by a tool, not read raw) and `apps/web/node_modules/@fontsource-variable/geist/LICENSE` plus its `package.json`.
+
+| Item | Observed | Status |
+| :--- | :--- | :--- |
+| Button text | "Sign in with Google", "Sign up with Google" and "Continue with Google" are the recommended strings, so "Continue with Google" is allowed. Localising is allowed. "Google" alone is not | VERIFIED |
+| G logo | Must be the standard multicolour "super G" on a white background. Size and colour cannot be changed, monochrome not allowed. No minimum size or separate clear space rule found on the page | VERIFIED (no min size stated) |
+| Padding (web) | 12px before the logo, 10px between logo and text, 12px after the text | VERIFIED |
+| Light theme | Fill #FFFFFF, stroke #747775 1px inside, text #1F1F1F | VERIFIED |
+| Dark theme | Fill #131314, stroke #8E918F 1px inside, text #E3E3E3 | VERIFIED |
+| Neutral theme | Fill #F2F2F2, no stroke, text #1F1F1F | VERIFIED |
+| Font | Google Sans Medium, listed as 14/20 (not Roboto Medium as often quoted). The page does not spell out "14px" | VERIFIED as Google Sans; size reading UNVERIFIED |
+| Corner radius, full width, custom height | Not specified. Only rule: scaling is allowed if the aspect ratio keeps the logo unstretched; show it about as prominently as other sign in options | UNVERIFIED (no rule found, so not forbidden either) |
+| Official G asset | Pre-approved icon bundle (PNG and SVG) linked from the page as `/static/identity/images/signin-assets.zip`. No SVG path data on the page, so none is reproduced here | Download link VERIFIED from page text; zip itself not fetched; path data UNVERIFIED |
+| Geist licence | LICENSE is SIL Open Font License 1.1; `package.json` license field is `OFL-1.1` | VERIFIED |
+| Embedding woff2 as a base64 data URI | OFL permission text lists "use, study, copy, merge, embed, modify, redistribute"; bundling is allowed provided each copy carries the copyright notice and the licence text, as a text file, human readable header or metadata. A CSS comment header counts as a human readable header | VERIFIED (reading of the licence text, not legal advice) |
+| Copyright line to keep | `Copyright 2024 The Geist Project Authors (https://github.com/vercel/geist-font)` | VERIFIED |
+| Other OFL conditions | Font may not be sold by itself; no Reserved Font Name is declared in the file; the font stays under OFL even inside a bundle | VERIFIED |
+
+Follow-up, same day (I fetched the zip myself):
+- `https://developers.google.com/static/identity/images/signin-assets.zip` downloaded (HTTP 200, 855303 bytes). The "G" in `packages/auth/src/googleG.ts` is the one in `Android + Web/SVG/Light/Theme=Light, Show text=No, Shape=Pill`, taken as is. Only the circle behind it was dropped and the view box cropped to the G (10 10 20 20). Status: VERIFIED as the official asset. It is a gradient and filter drawing, rendered as intended in Chromium (screenshots in `apps/web/docs/screens/auth-*`); other browsers are UNVERIFIED.
+- Button: the shipped button uses the page's own surface colours and a pill shape, not the exact #FFFFFF / #747775 values above, because the guidelines do not forbid it (radius and width are unspecified) and the dark theme needs a dark fill. UNVERIFIED whether Google's consent screen review accepts that; if it asks, switch `.btn-google` in `packages/auth/src/theme.ts` to the listed light and dark values.
+- Worker bundle with the font and G: 1009800 bytes, 283561 gzip (measured by `apps/edge/test/bundle.test.ts`).
