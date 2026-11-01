@@ -253,6 +253,22 @@ describe("signing in with Google from the authorize page", () => {
     expect(((await session.json()) as { householdId: string }).householdId).toBe(viaGoogle);
   });
 
+  it("gives two different people two different households", async () => {
+    const t = setup();
+    const ids: (string | undefined)[] = [];
+    for (const email of ["alice@example.com", "bob@example.com"]) {
+      const { verifier, challenge } = await pkce();
+      const p = authzParams(challenge);
+      const page = await openAuthorize(t.env, p);
+      const r = await postAuthorize(t.env, page, p, { action: "google" });
+      const g = t.issue(r.headers.get("location")!, { email });
+      const back = await t.callback({ code: g.code, state: g.state }, cookiesOf(r).hippo_gpending);
+      const code = new URL(back.headers.get("location")!).searchParams.get("code")!;
+      const tokens = (await (await tokenReq(t.env, codeGrant(code, verifier))).json()) as { access_token: string };
+      ids.push(await householdOf(t.env, tokens.access_token));
+    }
+    expect(ids).toEqual(["hh_alice", "hh_bob"]);
+  });
   it("writes the address the way our other sign ins do, whatever case Google used", async () => {
     const t = setup();
     const { verifier, challenge } = await pkce();
@@ -329,10 +345,25 @@ describe("what is refused, and what the person sees", () => {
     expect(
       res.headers
         .getSetCookie()
-        .some((c) => c.startsWith("hippo_gpending=") && /Max-Age=0|Expires=Thu, 01 Jan 1970/i.test(c)),
+        .some(
+          (c) =>
+            c.startsWith("hippo_gpending=") &&
+            /Max-Age=0|Expires=Thu, 01 Jan 1970/i.test(c) &&
+            /Path=\/oauth\/google/i.test(c),
+        ),
     ).toBe(true);
   };
 
+  it("is never cached, whether it worked or not", async () => {
+    const t = setup();
+    const { location, pending } = await t.clickGoogle();
+    const g = t.issue(location);
+    const ok = await t.callback({ code: g.code, state: g.state }, pending);
+    expect(ok.status).toBe(302);
+    expect(ok.headers.get("cache-control")).toBe("no-store");
+    const bad = await t.callback({ code: "x", state: "y" }, "garbage");
+    expect(bad.headers.get("cache-control")).toBe("no-store");
+  });
   it("a callback with no cookie", async () => {
     const t = setup();
     await refused(await attempt(t, (g) => ({ query: { code: g.code, state: g.state }, pending: "" })));

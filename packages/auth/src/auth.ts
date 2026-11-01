@@ -491,6 +491,8 @@ export function createAuth(opts: AuthOptions): Auth {
 
   app.get(`${GOOGLE_PATH}/callback`, async (c) => {
     if (!google) return c.json({ error: "not_found" }, 404, noStore);
+    // The answer carries a one time code or a session cookie, so no response of this route may be stored or referred.
+    pageHeaders(c);
     const pending = await readPending(await pendingKey!, getCookie(c, PENDING_COOKIE), now());
     // The cookie is good for one try, whatever happens next.
     deleteCookie(c, PENDING_COOKIE, cookieOpts(GOOGLE_PATH, 0));

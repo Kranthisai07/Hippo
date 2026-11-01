@@ -558,3 +558,19 @@ A private staging Worker (`hippo-api-staging`) was deployed with a real D1 datab
 
 Not checked: the Email Sending binding (paid plan, verified sender domain), R2 write races, a second region, strict mode on the deployed Worker, read replication.
 
+### 10.17 Continue with Google on the real Google (2026-11-01, local server)
+
+A Google Cloud project (`hippo-signin`), an External app in Testing mode with scopes `openid email`, and one Web application client with the redirect address `http://localhost:8787/oauth/google/callback` were created by driving the console, and the Node server was run locally with the client id and secret from an ignored file. One person (the project owner) signed in. This settles the open items of 10.9 only as far as one real sign in can.
+
+| Item | Observed | Status |
+| :--- | :--- | :--- |
+| Google accepts our authorization request (client id, redirect address, `openid email`, state, nonce, S256 challenge) | Google showed its own account chooser for the app, then returned to our callback | CONFIRMED |
+| The token endpoint takes the client secret, the PKCE verifier and the redirect address together | The code exchange succeeded with all three sent (10.9 listed PKCE for web clients as unverified). Whether Google enforces the verifier is not shown by one success | ACCEPTED, enforcement UNVERIFIED |
+| Our ID token checks pass a real token | Real signature (RS256, Google's published keys fetched live), issuer, audience, expiry, our nonce, `email_verified` true: the session was created | CONFIRMED |
+| Web sign in (`/oauth/google/start`) | Session created for the right address, browser returned to the allowed web origin | CONFIRMED |
+| Authorize page sign in (the extension's path) | `POST /oauth/authorize` redirected to Google, the callback issued our code (audit `login_ok`, reason `google`, the same hashed user id as the web sign in). The client side exchange of that code was not run (a dummy challenge was used) | CONFIRMED up to the redirect |
+| Time of the callback | 383 ms for the first (real code exchange and key fetch), 157 ms for the second (keys cached) | OBSERVED, one run |
+| Secrets in logs | The client secret does not appear in the server log | CONFIRMED |
+| Real Chrome with the extension's `launchWebAuthFlow` | Not run | UNVERIFIED |
+| Other people signing in | The app is in Testing with 0 test users and "Publish app" disabled: only the project owner can sign in. Publishing needs a public home page, a privacy policy link and a verified domain (10.9) | OPEN |
+
