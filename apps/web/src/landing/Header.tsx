@@ -1,5 +1,5 @@
-import { CalendarCheck } from "lucide-react";
 import { Link } from "react-router";
+import { BrandMark } from "../components/BrandMark";
 import { DemoLink } from "./DemoLink";
 
 export function Header() {
@@ -12,7 +12,7 @@ export function Header() {
       <header className="lp-nav">
         <div className="lp-nav-in">
           <Link to="/welcome" className="lp-brand">
-            <CalendarCheck size={22} strokeWidth={1.75} aria-hidden="true" />
+            <BrandMark />
             Hippo
           </Link>
           <nav aria-label="Main" className="lp-nav-links">

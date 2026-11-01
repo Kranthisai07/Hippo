@@ -1,6 +1,7 @@
 import { CalendarClock, CreditCard, LogOut, MessageSquare, Package, Settings, Upload } from "lucide-react";
 import { Link, NavLink, Outlet } from "react-router";
 import { useAuth } from "../lib/auth";
+import { BrandMark } from "./BrandMark";
 
 const LINKS = [
   { to: "/", label: "Coming up", icon: CalendarClock, end: true },
@@ -14,13 +15,7 @@ const LINKS = [
 export function Brand() {
   return (
     <Link to="/" className="brand">
-      <span className="brand-mark" aria-hidden="true">
-        <svg width="20" height="20" viewBox="0 0 32 32" fill="none">
-          <path d="M7 22c0-6 4-10 9-10s9 4 9 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-          <circle cx="12" cy="18" r="1.8" fill="currentColor" />
-          <circle cx="20" cy="18" r="1.8" fill="currentColor" />
-        </svg>
-      </span>
+      <BrandMark />
       Hippo
     </Link>
   );

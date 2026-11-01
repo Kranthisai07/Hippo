@@ -134,3 +134,8 @@ No decisions log exists on main (MEMORY.md is only in old worktrees), so this fi
 - **What:** `apps/extension/src/background.ts` keeps one in-flight sign in and a second request waits for it; `auth.ts` turns Chrome's "Only one web auth flow is allowed at a time." into "A Hippo sign-in window is already open. Finish or close it, then try again."
 - **Why:** seen in the owner's own Chrome. Closing the popup does not cancel `launchWebAuthFlow`, so a click made while the window was still open (or hidden behind) got Chrome's raw error. Cause is a hypothesis from the error text and the code, not reproduced in real Chrome.
 - **Checked:** 2 new tests (one `launchWebAuthFlow` call for two clicks; the friendly message). No mutation check run.
+
+## 2026-11-01: one brand mark component (+claude)
+- **What:** `apps/web/src/components/BrandMark.tsx` holds the 32px accent tile with the arch and two eyes. Layout `Brand` (so Legal and the sign in page too) and the landing header use it; the landing header's calendar icon is gone.
+- **Why:** the mark was drawn inline in one place and the landing page used a different icon, so the product had two faces. One component keeps them equal.
+- **Checked:** typecheck passes. The landing rule `.lp-brand svg { color: accent }` would have painted the arch accent on an accent tile, so it was replaced with a hover rule for the mark.
