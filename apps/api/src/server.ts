@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomInt } from "node:crypto";
 import { pathToFileURL } from "node:url";
-import { createAuth } from "@hippo/auth";
+import { createAuth, linksFromEnv } from "@hippo/auth";
 import { serve, type ServerType } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { createMemoryRepository } from "core/src/repository";
@@ -127,7 +127,8 @@ export async function startServer(opts: ServerOptions = {}): Promise<Running> {
     issuer,
     resource: `${issuer}/mcp`,
     signingKey,
-    clients: [{ clientId, redirectUris }],
+    clients: [{ clientId, redirectUris, ...(env.HIPPO_CLIENT_NAME ? { name: env.HIPPO_CLIENT_NAME } : {}) }],
+    links: linksFromEnv(env),
     resolveHousehold: (email) =>
       email === demoEmail.toLowerCase()
         ? DEMO_HOUSEHOLD

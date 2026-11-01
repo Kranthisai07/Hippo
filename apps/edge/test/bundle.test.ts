@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 // What a Workers build of the API would carry. This bundles the app, the capture ingest and the D1 stores the way a
 // Workers bundler would (no Node platform, no Node built ins), and fails if anything Node only gets back in: a node:
 // import, a Node global, the demo fixture reader, or the PDF reader. The size ceilings are a regression guard set just
-// above the first measurement (897 KB, 228 KB gzip), not Cloudflare's limit, which is unverified (docs/VERIFIED.md 10).
+// above the first measurement (897 KB, 228 KB gzip), raised to 1.1 MB (320 KB gzip, measured 284 KB) when the sign in page gained its embedded font and Google logo (about 1010 KB), not Cloudflare's limit, which is unverified (docs/VERIFIED.md 10).
 // `new Function` and `eval(` are not asserted absent: ajv and zod contain them behind guards, and the local Workers run
 // (apps/edge/scripts/smoke.mjs) showed they do not fire.
 
@@ -50,7 +50,7 @@ describe("a Workers build of the API", () => {
     expect(text).not.toMatch(/import\.meta\.url|__dirname/);
 
     const bytes = r.outputFiles[0]!.contents;
-    expect(bytes.length).toBeLessThan(1_000_000);
-    expect(gzipSync(bytes).length).toBeLessThan(260_000);
+    expect(bytes.length).toBeLessThan(1_100_000);
+    expect(gzipSync(bytes).length).toBeLessThan(320_000);
   }, 60_000);
 });

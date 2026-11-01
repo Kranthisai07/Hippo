@@ -1,4 +1,4 @@
-import { createAuth, type Mailer } from "@hippo/auth";
+import { createAuth, linksFromEnv, type Mailer } from "@hippo/auth";
 import { createD1Repository, type D1Like } from "core/src/repository/d1";
 import type { Hono } from "hono";
 import { limiterFromStore } from "../../api/src/api/limiter";
@@ -33,6 +33,11 @@ export interface Env {
   /** "Continue with Google". Both or neither. The secret is a `wrangler secret`. */
   HIPPO_GOOGLE_CLIENT_ID?: string;
   HIPPO_GOOGLE_CLIENT_SECRET?: string;
+  /** The sign in window: what it says it continues to, and the public pages it links to. All optional. */
+  HIPPO_CLIENT_NAME?: string;
+  HIPPO_PRIVACY_URL?: string;
+  HIPPO_TERMS_URL?: string;
+  HIPPO_HOME_URL?: string;
 }
 
 const list = (v: string | undefined): string[] =>
@@ -115,7 +120,8 @@ export function buildApp(env: Env, opts: BuildOptions = {}): Hono {
     issuer,
     resource: `${issuer}/mcp`,
     signingKey,
-    clients: [{ clientId, redirectUris }],
+    clients: [{ clientId, redirectUris, ...(env.HIPPO_CLIENT_NAME ? { name: env.HIPPO_CLIENT_NAME } : {}) }],
+    links: linksFromEnv(env),
     resolveHousehold: householdOf,
     log,
     ...(mailer ? { mailer } : {}),
