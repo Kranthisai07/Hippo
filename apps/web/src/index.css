@@ -1196,18 +1196,14 @@ mark {
   color: var(--ink-2);
 }
 .signin-points li {
-  padding-left: var(--s5);
-  position: relative;
+  display: flex;
+  gap: var(--s3);
+  align-items: flex-start;
 }
-.signin-points li::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0.55em;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--accent);
+.signin-points svg {
+  flex: none;
+  margin-top: 4px;
+  color: var(--accent);
 }
 .signin-about {
   display: inline-flex;
@@ -1215,13 +1211,77 @@ mark {
   min-height: 44px;
   font-weight: 600;
 }
-.signin-form.card {
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
-  background: transparent;
-  padding: var(--s6);
+.signin-col {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
   justify-content: center;
+  padding: var(--s6) var(--s6) var(--s4);
+}
+.signin-form {
+  gap: var(--s4);
+}
+.signin-sub {
+  margin-top: var(--s1);
+}
+.signin-sub strong {
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.btn-block {
+  width: 100%;
+  min-height: 48px;
+}
+.signin-or {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  color: var(--ink-2);
+  font-size: 0.875rem;
+}
+.signin-or::before,
+.signin-or::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+.signin-code {
+  min-height: 56px;
+  font-size: 1.6rem;
+  font-weight: 600;
+  letter-spacing: 0.4em;
+  text-align: center;
+  padding-left: calc(var(--s3) + 0.4em);
+}
+.signin-hint {
+  margin-top: var(--s2);
+}
+.signin-quiet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+}
+.signin-demo {
+  display: flex;
+  justify-content: center;
+  padding-top: var(--s2);
+  border-top: 1px dashed var(--line);
+}
+.tag {
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 1px var(--s2);
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  color: var(--ink-2);
+  border: 1px solid var(--line);
+}
+.signin-col .footer {
+  justify-content: center;
+  padding: var(--s3) 0 0;
 }
 @media (max-width: 720px) {
   .signin {
@@ -1240,8 +1300,12 @@ mark {
   .signin-points {
     display: none;
   }
-  .signin-form.card {
-    padding: var(--s5);
+  .signin-col {
+    padding: var(--s5) var(--s4) var(--s3);
+  }
+  .signin-code {
+    letter-spacing: 0.3em;
+    padding-left: calc(var(--s3) + 0.3em);
   }
 }
 

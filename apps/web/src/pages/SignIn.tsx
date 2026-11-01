@@ -1,8 +1,17 @@
+import { Check, CheckCircle2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router";
+import googleG from "../assets/google-g.svg";
 import { Brand, Footer } from "../components/Layout";
 import { ApiError, api } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { HOSTED } from "../lib/hosted";
+
+const POINTS = [
+  "Every date shows the exact words it came from.",
+  "Nothing alerts you until you confirm it.",
+  "Delete everything with one button, any time.",
+];
 
 export function SignIn() {
   const { status, refresh } = useAuth();
@@ -17,6 +26,7 @@ export function SignIn() {
   const [, setNow] = useState(0);
   const [google, setGoogle] = useState(false);
   const timer = useRef<number | undefined>(undefined);
+  const codeInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => () => window.clearTimeout(timer.current), []);
   // A failure here only means no Google button, never a broken page.
@@ -26,9 +36,14 @@ export function SignIn() {
       () => undefined,
     );
   }, []);
+  // On the code step the cursor goes straight to the code field.
+  useEffect(() => {
+    if (sent) codeInput.current?.focus();
+  }, [sent]);
   if (status === "in") return <Navigate to={from} replace />;
 
   const waiting = Date.now() < waitUntil;
+  const off = busy || waiting;
 
   // A 429 is shown once. The buttons stay off until the wait is over; nothing retries on its own.
   function fail(e: unknown, demo = false) {
@@ -59,6 +74,19 @@ export function SignIn() {
     nav(from, { replace: true });
   };
 
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    void run(async () => {
+      if (!sent) {
+        await api.magicCode(email.trim());
+        setSent(true);
+      } else {
+        await api.session(email.trim(), code.trim());
+        await finish();
+      }
+    });
+  };
+
   return (
     <div className="page">
       <div className="signin">
@@ -66,94 +94,143 @@ export function SignIn() {
           <Brand />
           <p className="signin-lede">Your paperwork, turned into dates you can trust.</p>
           <ul className="signin-points">
-            <li>Every date shows the exact words it came from.</li>
-            <li>Nothing alerts you until you confirm it.</li>
-            <li>Delete everything with one button, any time.</li>
+            {POINTS.map((t) => (
+              <li key={t}>
+                <Check size={18} strokeWidth={2.25} aria-hidden="true" />
+                <span>{t}</span>
+              </li>
+            ))}
           </ul>
           <Link to="/welcome" className="signin-about">
             What is Hippo?
           </Link>
         </aside>
-        <div className="card stack signin-form">
-          <h1>Sign in</h1>
-          <p className="muted">Pick up where your documents left off.</p>
-
-          <button
-            type="button"
-            className="btn btn-primary"
-            disabled={busy || waiting}
-            onClick={() => void run(async () => (await api.demoSession(), await finish()), true)}
-          >
-            Use the demo account
-          </button>
-
-          {google && (
-            <a className="btn" href={`/oauth/google/start?return=${encodeURIComponent(window.location.origin + from)}`}>
-              Continue with Google
-            </a>
-          )}
-
-          <p className="muted small">Or sign in with your email.</p>
-          <form
-            className="stack"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void run(async () => {
-                if (!sent) {
-                  await api.magicCode(email.trim());
-                  setSent(true);
-                } else {
-                  await api.session(email.trim(), code.trim());
-                  await finish();
-                }
-              });
-            }}
-          >
-            <div>
-              <label className="field-label" htmlFor="email">
-                Email
-              </label>
-              <input
-                id="email"
-                className="input"
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => (setEmail(e.target.value), setSent(false))}
-              />
-            </div>
-            {sent && (
+        <div className="signin-col">
+          <div className="signin-form stack">
+            {sent ? (
+              <>
+                <div>
+                  <h1>Enter your code</h1>
+                  <p className="muted signin-sub">
+                    We sent a code to <strong>{email.trim()}</strong>.
+                  </p>
+                </div>
+                <p className="banner banner-ok" role="status">
+                  <CheckCircle2 size={20} aria-hidden="true" />
+                  <span>Code sent. It can take a minute to arrive.</span>
+                </p>
+              </>
+            ) : (
               <div>
-                <label className="field-label" htmlFor="code">
-                  Code from your email
-                </label>
-                <input
-                  id="code"
-                  className="input num"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  required
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                />
-                <p className="muted small">In this demo build the code is printed in the server log.</p>
+                <h1>Sign in</h1>
+                <p className="muted signin-sub">Pick up where your documents left off.</p>
               </div>
             )}
-            <button type="submit" className="btn" disabled={busy || waiting}>
-              {sent ? "Sign in" : "Send me a code"}
-            </button>
-          </form>
-          <div aria-live="assertive">
-            {error && (
-              <p role="alert" className="banner banner-error">
-                {error}
-              </p>
+
+            {!sent && google && (
+              <>
+                <a
+                  className="btn btn-block"
+                  href={`/oauth/google/start?return=${encodeURIComponent(window.location.origin + from)}`}
+                >
+                  <img src={googleG} alt="" width="20" height="20" />
+                  Continue with Google
+                </a>
+                <p className="signin-or" aria-hidden="true">
+                  or
+                </p>
+              </>
+            )}
+
+            <form className="stack" onSubmit={submit}>
+              {sent ? (
+                <div>
+                  <label className="field-label" htmlFor="code">
+                    Code from your email
+                  </label>
+                  <input
+                    id="code"
+                    ref={codeInput}
+                    className="input num signin-code"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={12}
+                    required
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                  />
+                  {!HOSTED && (
+                    <p className="muted small signin-hint">In this demo build the code is printed in the server log.</p>
+                  )}
+                </div>
+              ) : (
+                <div>
+                  <label className="field-label" htmlFor="email">
+                    Email
+                  </label>
+                  <input
+                    id="email"
+                    className="input"
+                    type="email"
+                    autoComplete="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </div>
+              )}
+              <button type="submit" className="btn btn-primary btn-block" disabled={off}>
+                {sent ? "Sign in" : "Send me a code"}
+              </button>
+            </form>
+
+            {sent && (
+              <div className="signin-quiet">
+                <button
+                  type="button"
+                  className="btn btn-quiet btn-block"
+                  disabled={off}
+                  onClick={() => void run(async () => (await api.magicCode(email.trim()), setCode("")))}
+                >
+                  Send a new code
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-quiet btn-block"
+                  onClick={() => (setSent(false), setCode(""), setError(null))}
+                >
+                  Use a different email
+                </button>
+              </div>
+            )}
+
+            <div aria-live="assertive">
+              {error && (
+                <p role="alert" className="banner banner-error">
+                  {error}
+                </p>
+              )}
+            </div>
+
+            {!sent && !HOSTED && (
+              <div className="signin-demo">
+                <button
+                  type="button"
+                  className="btn btn-quiet"
+                  disabled={off}
+                  onClick={() => void run(async () => (await api.demoSession(), await finish()), true)}
+                >
+                  Use the demo account
+                  <span className="tag" aria-hidden="true">
+                    Demo
+                  </span>
+                </button>
+              </div>
             )}
           </div>
+          <Footer />
         </div>
       </div>
-      <Footer />
     </div>
   );
 }

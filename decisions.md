@@ -145,3 +145,10 @@ No decisions log exists on main (MEMORY.md is only in old worktrees), so this fi
 - **Why:** six tabs wrapped and spilled out of the active pill. Measured, not guessed: with the full word the "Subscriptions" text overran its tab at 390 and at 360 (the test failed on it), so the short label is needed up to 440 px.
 - **Cost:** the chips are only hidden by CSS, so they stay mounted and the "every date was shown" check still counts them, but on a phone the person confirms against the dates in the field cards above, not against the chips.
 - **Checked:** the layout spec passes (tab text inside its own tab, one line, review bar centred on one row and clear of the tab bar, no sideways scroll on 8 pages at 5 widths); web unit tests 128 pass.
+
+## 2026-11-01: the web sign in has two steps like the server page (+claude)
+- **What:** `apps/web/src/pages/SignIn.tsx`: step 1 (Google button with the official G, "or", email, filled "Send me a code"), step 2 (code field with one-time-code and numeric keyboard, "Sign in", "Send a new code", "Use a different email"). Panel points use check icons. The demo account is a quiet action with a "Demo" tag. The Privacy and Terms links sit in the card column. `apps/web/scripts/make-google-g.mjs` writes `src/assets/google-g.svg` from `packages/auth/src/googleG.ts` so there is one copy of the official asset.
+- **Why:** the two sign in pages should look like one product, and the demo button was the loudest thing on a real sign in page.
+- **Demo visibility:** `/oauth/providers` only says whether Google is on, so the page cannot ask the server whether the demo is on. It shows the demo action when the build is not `VITE_HOSTED`. Hosted builds hide it. On a real server with the demo off, the existing 401 message still explains it. Not solved at the root (that would need the server to report `demo`, in packages/auth, which I did not touch).
+- **Kept:** the 429 wait (buttons off until Retry-After, no retry), the alert banner, the Google link with `?return=`.
+- **Checked:** web unit tests 129 (one new for the code step and going back); a-smoke 3 pass; both steps read as screenshots at 320, 390, 1280 in light and dark.

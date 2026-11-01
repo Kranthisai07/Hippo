@@ -267,4 +267,32 @@ describe("Sign in", () => {
     await new Promise((r) => setTimeout(r, 100));
     expect(send).toHaveBeenCalledTimes(1);
   });
+
+  it("moves to a code step after the email, and a different email goes back", async () => {
+    vi.spyOn(api, "me").mockRejectedValue(new ApiError(401, "unauthenticated", "Please sign in again."));
+    vi.spyOn(api, "providers").mockResolvedValue({ google: true });
+    const send = vi.spyOn(api, "magicCode").mockResolvedValue(undefined as never);
+    wrap(
+      <AuthProvider>
+        <SignIn />
+      </AuthProvider>,
+      "/signin",
+      "/signin",
+    );
+    expect(await screen.findByRole("heading", { name: "Sign in" })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "Continue with Google" })).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("Email"), "a@b.co");
+    await userEvent.click(screen.getByRole("button", { name: "Send me a code" }));
+    expect(await screen.findByRole("heading", { name: "Enter your code" })).toBeInTheDocument();
+    expect(screen.getByText("a@b.co")).toBeInTheDocument();
+    const code = screen.getByLabelText("Code from your email");
+    expect(code).toHaveAttribute("autocomplete", "one-time-code");
+    expect(code).toHaveAttribute("inputmode", "numeric");
+    expect(screen.queryByRole("link", { name: "Continue with Google" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Use the demo account" })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Send a new code" }));
+    expect(send).toHaveBeenCalledTimes(2);
+    await userEvent.click(screen.getByRole("button", { name: "Use a different email" }));
+    expect(await screen.findByRole("heading", { name: "Sign in" })).toBeInTheDocument();
+  });
 });
