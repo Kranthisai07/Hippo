@@ -104,6 +104,22 @@ ul {
 .top h1 {
   flex: 1;
 }
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 600;
+}
+.open {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 4px var(--s3);
+  font-size: 13px;
+}
 .logo {
   width: 28px;
   height: 28px;
@@ -246,8 +262,12 @@ button.ghost:hover:not(:disabled) {
   gap: var(--s2);
 }
 .row button {
+  min-height: 28px;
   padding: 4px var(--s3);
   font-size: 13px;
+}
+.card > button:not(.ghost):not(.quiet) {
+  min-height: 44px;
 }
 .muted {
   color: var(--ink-2);
