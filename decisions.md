@@ -93,3 +93,11 @@ No decisions log exists on main (MEMORY.md is only in old worktrees), so this fi
 - **Setting a build script policy:** pnpm asked whether `workerd`'s install script may run. It is set to `false` in `pnpm-workspace.yaml` (like `esbuild`) and `wrangler dev` works without it.
 - **Not done:** uploads and PDF reading on Workers, the daily job, Google sign in, Resend, the staging deploy (slice 6), and the real email binding (beta, paid, verified sender domain).
 
+## 2026-11-01: fixes from the reviewer round on slice 5 (+claude)
+
+- **The default is now strict.** The Worker took the production checks only when `HIPPO_ENV` was exactly `production`, and `wrangler.toml` never set it, so a plain deploy would have run with a made up signing key per isolate, a localhost issuer, the dev extension id and sign in codes in the log. Now only `HIPPO_ENV=development` or `local` relaxes it. Unset, misspelled and `Production` all take the checks. Local runs get `HIPPO_ENV=development` from `apps/edge/.dev.vars` (git ignored, never deployed). Checked three ways: the unit tests, the old default put back (8 tests fail), and `wrangler dev --local` with `HIPPO_ENV` unset, which answered a bare 500 and logged only the names of the missing settings. With `HIPPO_ENV=development` all 24 smoke steps pass.
+- **A failed start logs only safe text:** the names of the settings (`StartupError`), or the kind of any other error. A bad issuer value no longer reaches the log. Each distinct failure is logged once.
+- **`householdOf` is pinned** to the Node server's `createHash` result in a test, so the two cannot drift and orphan data.
+- **Two smoke steps could pass on a substring.** They now parse the MCP answer: the valid call must return a `coming_up` structure for a 30 day window, and the invalid call must return `isError` with the `bad_input` code.
+- **Written down, not built:** two saves for one household from different isolates at the same moment can lose one chunk of the R2 clause index (read, change, write back); the upgrade is `onlyIf` etag writes. The bundle test does not assert `new Function` or `eval(` absent, because `ajv` and `zod` hold them behind guards that did not fire locally. The effect of `workerd: false` on CI is unknown.
+

@@ -235,18 +235,28 @@ const callTool = (name, args) =>
     body: JSON.stringify({ jsonrpc: "2.0", id: 3, method: "tools/call", params: { name, arguments: args } }),
   });
 const good = await callTool("whats_coming_up", { window_days: 30 });
-const goodText = await good.text();
+const goodBody = await good.json().catch(() => ({}));
+const g = goodBody.result;
 step(
-  "a tool call with valid arguments is answered",
-  good.status === 200 && !goodText.includes("EvalError") && goodText.includes("result"),
-  `status ${good.status} ${goodText.slice(0, 120)}`,
+  "a tool call with valid arguments returns the tool's structured answer",
+  good.status === 200 &&
+    !g?.isError &&
+    g?.content?.[0]?.type === "text" &&
+    g?.structuredContent?.kind === "coming_up" &&
+    g?.structuredContent?.windowDays === 30 &&
+    Array.isArray(g?.structuredContent?.items),
+  `status ${good.status}`,
 );
 const bad = await callTool("whats_coming_up", { window_days: 9999, extra: 1 });
-const badText = await bad.text();
+const badBody = await bad.json().catch(() => ({}));
+const b = badBody.result;
 step(
-  "a tool call with invalid arguments is refused by validation, not by a crash",
-  bad.status === 200 && /error|invalid|Invalid/.test(badText) && !badText.includes("EvalError"),
-  `status ${bad.status} ${badText.slice(0, 120)}`,
+  "a tool call with invalid arguments is refused by validation (bad_input), not by a crash",
+  bad.status === 200 &&
+    b?.isError === true &&
+    b?.structuredContent?.kind === "error" &&
+    b?.structuredContent?.code === "bad_input",
+  `status ${bad.status}`,
 );
 
 // 8. A web session, the same person's tokens through it, and delete all data. (One emailed code per address a minute.)

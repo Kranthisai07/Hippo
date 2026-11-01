@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   authzParams,
   codeGrant,
@@ -12,7 +12,8 @@ import {
   type Env as AuthTestEnv,
 } from "../../../packages/auth/test/helpers";
 import { createSqliteD1 } from "../../../packages/core/test/d1.sqlite";
-import worker, { buildApp, householdOf, type Env } from "../src/index";
+import { createHash } from "node:crypto";
+import worker, { buildApp, householdOf, StartupError, type Env } from "../src/index";
 import { fakeBucket } from "./fakes";
 
 // The whole Workers app, in process: the entry wired to the D1 stores (on node:sqlite), an R2 fake and a fake email
@@ -31,11 +32,10 @@ const page = (name: string): string => {
     .replaceAll("&gt;", ">");
 };
 
-function setup(over: Partial<Env> = {}) {
+function makeEnv(over: Partial<Env> = {}) {
   const db = createSqliteD1();
   const { bucket, objects } = fakeBucket();
   const mails: { to: string; text: string }[] = [];
-  const logs: string[] = [];
   const env: Env = {
     DB: db,
     BUCKET: bucket,
@@ -45,6 +45,8 @@ function setup(over: Partial<Env> = {}) {
         return { messageId: "m" };
       },
     },
+    // Strict is the default, so the tests that are not about the settings say they are a local run.
+    HIPPO_ENV: "development",
     HIPPO_ISSUER: ISSUER,
     HIPPO_CLIENT_ID: "alexa",
     HIPPO_REDIRECT_URIS: REDIRECT,
@@ -53,6 +55,12 @@ function setup(over: Partial<Env> = {}) {
     HIPPO_MAIL_FROM: "Hippo <login@hippo.test>",
     ...over,
   };
+  return { env, db, objects, mails };
+}
+
+function setup(over: Partial<Env> = {}) {
+  const { env, db, objects, mails } = makeEnv(over);
+  const logs: string[] = [];
   const app = buildApp(env, { now: () => T0, log: (l) => logs.push(l) });
   const req = (path: string, init?: RequestInit) => Promise.resolve(app.request(ISSUER + path, init));
   // What the auth package's own test helpers need: a way to send a request.
@@ -226,4 +234,78 @@ describe("production settings", () => {
     expect(res.status).toBe(500);
     expect(await res.text()).toBe("Service unavailable");
   });
+});
+
+describe("the default is strict", () => {
+  const ALL: Partial<Env> = {
+    HIPPO_DEMO: "0",
+    HIPPO_SIGNING_KEY: "k".repeat(40),
+    HIPPO_ISSUER: ISSUER,
+    HIPPO_ALLOWED_ORIGINS: "https://app.hippo.test",
+    HIPPO_CLIENT_IP_HEADER: "cf-connecting-ip",
+  };
+  const NONE: Partial<Env> = {
+    HIPPO_SIGNING_KEY: undefined,
+    HIPPO_ISSUER: undefined,
+    HIPPO_EXTENSION_ID: undefined,
+  };
+
+  it.each([undefined, "", "Production", "prod", "staging", "Development"])(
+    "HIPPO_ENV %j without the production settings refuses to start, naming them",
+    (value) => {
+      expect(() => setup({ ...NONE, HIPPO_ENV: value })).toThrow(StartupError);
+      expect(() => setup({ ...NONE, HIPPO_ENV: value })).toThrow(/HIPPO_SIGNING_KEY/);
+    },
+  );
+
+  it("an unset HIPPO_ENV with every setting and an email binding starts", () => {
+    expect(() => setup({ ...ALL, HIPPO_ENV: undefined })).not.toThrow();
+  });
+
+  it("an unset HIPPO_ENV with every setting but no email binding refuses, and no code can reach a log", () => {
+    const logs: string[] = [];
+    const { env } = makeEnv({ ...ALL, HIPPO_ENV: undefined, EMAIL: undefined });
+    expect(() => buildApp(env, { log: (l) => logs.push(l) })).toThrow(/mailer/i);
+    expect(logs).toEqual([]);
+  });
+
+  it.each(["development", "local"])(
+    "HIPPO_ENV %s is the only way to the relaxed mode: the code goes to the log",
+    async (value) => {
+      const logs: string[] = [];
+      const { env } = makeEnv({ HIPPO_ENV: value, EMAIL: undefined, HIPPO_SIGNING_KEY: undefined });
+      const app = buildApp(env, { now: () => T0, log: (l) => logs.push(l) });
+      const r = await app.request(`${ISSUER}/oauth/magic-code`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: "frank@example.com" }),
+      });
+      expect(r.status).toBe(200);
+      expect(logs.some((l) => /sign in code for frank@example\.com: \d{6}/.test(l))).toBe(true);
+    },
+  );
+
+  it("a build that fails for another reason logs only the kind of error, never a value", async () => {
+    const { env } = makeEnv({ HIPPO_ISSUER: "not a url SECRET-ISSUER-VALUE" });
+    const spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      const res = await worker.fetch(new Request(`${ISSUER}/healthz`), env);
+      expect(res.status).toBe(500);
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(String(spy.mock.calls[0]![0])).toContain("TypeError");
+      expect(JSON.stringify(spy.mock.calls)).not.toContain("SECRET-ISSUER-VALUE");
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
+
+describe("householdOf", () => {
+  it.each(["alice@example.com", "Alice@Example.COM", "alice+news@example.com", "jürgen@example.de", "а@example.com"])(
+    "is hh_ and the first 16 characters of the base64url SHA-256 of %j, as the Node server computes it",
+    async (email) => {
+      const node = `hh_${createHash("sha256").update(email).digest("base64url").slice(0, 16)}`;
+      expect(await householdOf(email)).toBe(node);
+    },
+  );
 });

@@ -50,6 +50,14 @@ export async function householdOf(email: string): Promise<string> {
   return `hh_${b64url(new Uint8Array(digest)).slice(0, 16)}`;
 }
 
+/** Thrown when the settings are not safe to start with. The message holds only names of settings, never values. */
+export class StartupError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "StartupError";
+  }
+}
+
 export interface BuildOptions {
   now?: () => number;
   log?: (line: string) => void;
@@ -59,7 +67,10 @@ export interface BuildOptions {
 export function buildApp(env: Env, opts: BuildOptions = {}): Hono {
   const now = opts.now ?? (() => Date.now());
   const log = opts.log ?? ((line: string) => console.log(line));
-  const production = env.HIPPO_ENV === "production";
+  // Strict unless a local run says so. An unset or misspelled HIPPO_ENV is strict too, so a deploy that forgets it fails
+  // closed instead of starting with a made up signing key, a localhost issuer and sign in codes in the log.
+  const lax = env.HIPPO_ENV === "development" || env.HIPPO_ENV === "local";
+  const production = !lax;
 
   const mailer: Mailer | undefined = env.EMAIL
     ? createCloudflareMailer(env.EMAIL, env.HIPPO_MAIL_FROM ?? "Hippo <login@localhost>")
@@ -79,10 +90,10 @@ export function buildApp(env: Env, opts: BuildOptions = {}): Hono {
       HIPPO_ALLOWED_ORIGINS: env.HIPPO_ALLOWED_ORIGINS,
     };
     const problems = productionProblems(settings, { durable: true, mailer: mailer !== undefined });
-    if (problems.length > 0) throw new Error(`Refusing to start in production: ${problems.join(" | ")}`);
+    if (problems.length > 0) throw new StartupError(`Refusing to start: ${problems.join(" | ")}`);
   }
 
-  // Outside production a missing key is made up for this isolate, so tokens end when it restarts.
+  // Only in development a missing key is made up for this isolate, so tokens end when it restarts.
   const signingKey = env.HIPPO_SIGNING_KEY ?? b64url(crypto.getRandomValues(new Uint8Array(32)));
   const issuer = env.HIPPO_ISSUER ?? "http://localhost:8787";
   const extensionId = env.HIPPO_EXTENSION_ID ?? (production ? undefined : DEV_EXTENSION_ID);
@@ -134,16 +145,19 @@ export function buildApp(env: Env, opts: BuildOptions = {}): Hono {
 }
 
 let app: Hono | undefined;
-let failed = false;
+let lastFailure = "";
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
       app ??= buildApp(env);
     } catch (e) {
-      // The names of the problems go to the log. The caller gets nothing it could use.
-      if (!failed) console.error(e instanceof Error ? e.message : "the app could not be built");
-      failed = true;
+      // Only text that is safe to print: the names of the settings, or the kind of error. A message of any other error
+      // could hold a value (for example the bad address that made a URL fail to parse).
+      const text =
+        e instanceof StartupError ? e.message : `the app could not be built (${e instanceof Error ? e.name : "error"})`;
+      if (text !== lastFailure) console.error(text);
+      lastFailure = text;
       return new Response("Service unavailable", { status: 500, headers: { "Cache-Control": "no-store" } });
     }
     return app.fetch(request, env);

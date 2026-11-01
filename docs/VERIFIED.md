@@ -504,7 +504,7 @@ Written by the slice 3 work. Each item is something the code assumes about Cloud
 | A SELECT after an UPDATE in the same request reads the primary, not a stale replica | The "read your own winner" step of `consume` and `tryHit` | Leave read replication off, and repeat the parallel run; if it is on, use the session bookmark API |
 | `db.batch` accepts the chunk size used (25 statements) | `write` in d1.ts | Write 25 and 100 item batches, note any limit error |
 | Latency of 3 to 4 statements per `tryHit` is acceptable on every /oauth and /ext call | slice 4 | Time 100 sequential calls from a Worker in the same region as the database |
-| `crypto.randomUUID()` and `Buffer`/`node:crypto` `createHash` work in Workers with nodejs_compat | d1 stores, apps/api | Smoke test with `wrangler dev` |
+| `crypto.randomUUID()` and Web Crypto `crypto.subtle.digest` work in Workers without `nodejs_compat` (confirmed in 10.15). `Buffer` and `node:crypto` are no longer used by the Workers build (apps/edge/test/bundle.test.ts fails if they return) | d1 stores, apps/api | Run under `wrangler dev --local` (done, apps/edge/scripts/smoke.mjs) and again on staging |
 
 
 ### 10.15 Slice 5b: bindings, wrangler config and runtime (checked 2026-10-31)

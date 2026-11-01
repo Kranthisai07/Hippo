@@ -6,13 +6,13 @@ The same API as the Node server (`apps/api`), on D1 (data, sign in state, rate c
 
 ```bash
 cd apps/edge
-printf 'HIPPO_SIGNING_KEY=<at least 32 random characters>\n' > .dev.vars     # git ignored
+printf 'HIPPO_ENV=development\nHIPPO_SIGNING_KEY=<at least 32 random characters>\n' > .dev.vars   # git ignored, never deployed
 npx wrangler d1 migrations apply hippo --local
 npx wrangler dev --local --port 8799 --var HIPPO_ISSUER:http://localhost:8799 > ../../wrangler.log 2>&1
 node scripts/smoke.mjs http://localhost:8799 ../../wrangler.log              # in another terminal
 ```
 
-Without the email binding a non production run writes the sign in code to the log, and the smoke script reads it from there. Stop `wrangler dev` afterwards (it starts a `node` and a `workerd` process). On Windows, if `workerd` crashes at start, install the latest x64 Visual C++ Redistributable (reported by others, not an official requirement: docs/VERIFIED.md 10.15).
+The Worker is strict by default: only `HIPPO_ENV=development` or `local` relaxes it (a made up signing key, a localhost issuer, and the sign in code written to the log when there is no email binding, which is how the smoke script reads it). An unset or misspelled `HIPPO_ENV` takes the production checks, and the Worker answers a bare 500 until every required setting and the email binding are present, so a deploy that forgets it fails closed. `wrangler.toml` therefore never sets `HIPPO_ENV`. Stop `wrangler dev` afterwards (it starts a `node` and a `workerd` process). On Windows, if `workerd` crashes at start, install the latest x64 Visual C++ Redistributable (reported by others, not an official requirement: docs/VERIFIED.md 10.15).
 
 ## What is and is not connected
 

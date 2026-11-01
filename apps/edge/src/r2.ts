@@ -39,6 +39,8 @@ const indexKey = (householdId: string): string => {
 /**
  * The serialized clause index of a household, one object each. shortcut: a whole object is written per change, and R2
  * allows one write a second to the same key (docs/VERIFIED.md 10), which the 30 saves an hour limit keeps far below.
+ * `updateIndex` reads, changes and writes the object back, so two saves for one household from different isolates at
+ * the same moment can lose one chunk. Upgrade: `onlyIf` etag writes with a retry.
  */
 export function createR2IndexStore(bucket: R2BucketLike): IndexStore {
   return {

@@ -11,7 +11,7 @@ Run it locally: `pnpm --filter @hippo/api dev` (port 8787). Everything is in mem
 - Writes (`POST`, `PUT`, `PATCH`, `DELETE`) need an `Origin` header that is the request's own origin, the issuer origin, or one of `HIPPO_ALLOWED_ORIGINS`. A missing or other Origin is 403 `forbidden_origin`. Reads need no Origin.
 - A write that has a JSON body needs `Content-Type: application/json` (415 otherwise). `DELETE /api/docs/<id>` has no body, so it needs no content type. The only non JSON write is the raw upload `PUT`.
 - JSON bodies are at most 64 KiB (413). Every body is validated strictly: an unknown key, a wrong type or a missing key is 400.
-- Errors are `{ "error": { "code": string, "message": string } }`: 400 `invalid_request`, 401 `unauthenticated`, 403 `forbidden_origin`, 404 `not_found`, 409 `conflict`, 413 `too_large`, 415 `unsupported_type`, 429 `rate_limited`, 500 `internal`. The message is plain English for a person. It never contains document text or a value you sent, and there is never a stack trace.
+- Errors are `{ "error": { "code": string, "message": string } }`: 400 `invalid_request`, 401 `unauthenticated`, 403 `forbidden_origin`, 404 `not_found`, 409 `conflict`, 413 `too_large`, 415 `unsupported_type`, 422 `limit_reached`, 429 `rate_limited`, 500 `internal`, 503 `unavailable`. The message is plain English for a person. It never contains document text or a value you sent, and there is never a stack trace.
 - Another household's id and an id that does not exist give the same 404 with the same body.
 - Every answer has `Cache-Control: no-store`.
 - Document text is untrusted. Every string that came from a document (`value`, `quote`, page text, labels, file names) is returned as a plain JSON string and the web app must render it as text, never as HTML.
@@ -30,7 +30,7 @@ Run it locally: `pnpm --filter @hippo/api dev` (port 8787). Everything is in mem
 
 ## Upload and documents
 
-Allowed types: `application/pdf`, `image/jpeg`, `image/png` (exact match, no parameters). HEIC (`image/heic`, `image/heif`, or a `.heic` name) is 415 and the message tells the person to convert it to JPEG first (Textract does not accept HEIC). Size 1 byte to 15 MB (15,728,640 bytes): 0 or less is 400, more is 413. At most 30 announced uploads per household per hour (429 with `Retry-After`).
+Allowed types: `application/pdf`, `image/jpeg`, `image/png` (exact match, no parameters). HEIC (`image/heic`, `image/heif`, or a `.heic` name) is 415 and the message tells the person to convert it to JPEG first (Textract does not accept HEIC). Size 1 byte to 15 MB (15,728,640 bytes): 0 or less is 400, more is 413. At most 30 announced uploads per household per hour (429 with `Retry-After`). 503 `unavailable` ("Uploads are not available yet.") when no ingest is connected to the server, which is the case on the Cloudflare Worker today.
 
 | Route | Request | Response |
 | :--- | :--- | :--- |
