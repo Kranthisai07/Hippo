@@ -1,4 +1,4 @@
-import { ArrowRight, FileCheck2, FilePlus2, Hash, KeyRound, Mail, Puzzle, Trash2 } from "lucide-react";
+import { ArrowRight, FileCheck2, FilePlus2, Hash, KeyRound, Puzzle, Trash2 } from "lucide-react";
 import { Link } from "react-router";
 import { DemoLink, HOSTED, REPO_URL } from "./DemoLink";
 
@@ -41,11 +41,12 @@ export function Trust() {
 export function Planned() {
   return (
     <section id="planned" className="lp-wrap lp-planned" aria-labelledby="planned-h">
-      <p className="lp-eyebrow">Planned, not built yet</p>
-      <h2 id="planned-h">Planned: a Chrome extension</h2>
+      <p className="lp-eyebrow">Hippo for Chrome</p>
+      <h2 id="planned-h">Save a billing page in one click</h2>
       <p className="lp-lead">
-        Save a file from any page and get a reminder by email when it matters. This is on the roadmap. Today, Hippo
-        works through the web app and an Alexa+ style voice demo.
+        Open a billing page or a receipt, click Hippo, and press Save. Nothing is read until you click and nothing is
+        sent until you press Save. Hippo adds the subscription to your list, and nothing alerts you until you confirm
+        its dates. The extension is being prepared for the Chrome Web Store.
       </p>
       <div className="lp-browser" aria-hidden="true">
         <div className="lp-browser-bar">
@@ -60,8 +61,8 @@ export function Planned() {
             Save to Hippo
           </span>
           <span>
-            <Mail size={18} strokeWidth={1.75} />
-            Reminder by email
+            <FileCheck2 size={18} strokeWidth={1.75} />
+            Review before any reminder
           </span>
         </div>
       </div>

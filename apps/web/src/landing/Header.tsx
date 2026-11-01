@@ -17,7 +17,7 @@ export function Header() {
           </Link>
           <nav aria-label="Main" className="lp-nav-links">
             <a href="#story">How it works</a>
-            <a href="#planned">Roadmap</a>
+            <a href="#planned">Chrome extension</a>
             <DemoLink className="lp-btn" label="Try the demo" />
           </nav>
         </div>
