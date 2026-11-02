@@ -200,7 +200,10 @@ describe("the scheduled run", () => {
     };
     const err = vi.spyOn(console, "error").mockImplementation(quiet);
     vi.spyOn(console, "log").mockImplementation(quiet);
-    await expect(runScheduled({ ...w.env, DB: failing } as unknown as Env, () => NOW)).rejects.toThrow();
+    // 03:05 UTC on the day of NOW: the run that also does the cleanup.
+    await expect(
+      runScheduled({ ...w.env, DB: failing } as unknown as Env, () => Date.UTC(2026, 9, 21, 3, 5)),
+    ).rejects.toThrow();
     expect((await w.repo.listAlerts("hh_a")).length).toBeGreaterThan(0);
     expect(JSON.stringify(err.mock.calls)).not.toContain("secret detail");
     vi.restoreAllMocks();
@@ -209,7 +212,7 @@ describe("the scheduled run", () => {
 
   it("builds the deps without any network or app", () => {
     const w = world();
-    const d = dailyDeps(w.env, () => NOW);
+    const d = dailyDeps(w.env, () => NOW, []);
     expect(d.sender).toBeDefined();
     expect(d.unsubscribeUrl).toBeDefined();
     expect(d.appUrl).toBe(ISSUER);

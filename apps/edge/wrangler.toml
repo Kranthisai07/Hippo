@@ -35,7 +35,7 @@ bucket_name = "hippo-docs"
 
 # Daily cleanup of expired sign in records (the Worker's scheduled handler). Cron triggers on the free plan: unverified.
 [triggers]
-crons = ["17 3 * * *"]
+crons = ["*/15 * * * *"]
 
 # The Email Sending binding (beta, paid plan, a verified sender domain) is added at staging:
 # [[send_email]]

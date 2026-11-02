@@ -32,6 +32,7 @@ export interface Env {
   HIPPO_CLIENT_ID?: string;
   HIPPO_CLIENT_IP_HEADER?: string;
   HIPPO_MAIL_FROM?: string;
+  HIPPO_DAILY_BATCH?: string;
   HIPPO_DEMO?: string;
   /** "Continue with Google". Both or neither. The secret is a `wrangler secret`. */
   HIPPO_GOOGLE_CLIENT_ID?: string;
@@ -177,10 +178,20 @@ export async function purgeAuthStore(env: Env, now: () => number = () => Date.no
   }
 }
 
-/** The daily work, one job after the other: the cleanup of expired sign in records, then the daily job. */
+/** True in the first 15 minute run after 03:00 UTC, the one run a day that also does the cleanup. */
+export const isCleanupRun = (nowMs: number): boolean => {
+  const d = new Date(nowMs);
+  return d.getUTCHours() === 3 && d.getUTCMinutes() < 15;
+};
+
+/**
+ * One run of the cron, every 15 minutes: the daily job for the next few households, and once a day (the first run after
+ * 03:00 UTC) the cleanup of expired sign in records. Each job gets its turn even when the other fails.
+ */
 export async function runScheduled(env: Env, now: () => number = () => Date.now()): Promise<void> {
   const failures: unknown[] = [];
-  for (const job of [() => purgeAuthStore(env, now), () => runDailyJob(env, now)]) {
+  const jobs = [...(isCleanupRun(now()) ? [() => purgeAuthStore(env, now)] : []), () => runDailyJob(env, now)];
+  for (const job of jobs) {
     try {
       await job();
     } catch (e) {

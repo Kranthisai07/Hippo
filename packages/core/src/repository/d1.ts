@@ -1,6 +1,6 @@
 import type { Repository } from "../contracts";
 import { createItemRepository, type Item, type ItemClient, type WriteRequest } from "./items";
-import { dec, HOUSEHOLD_SK } from "./keys";
+import { dec, HOUSEHOLD_SK, pk as householdPk } from "./keys";
 
 // The repository on Cloudflare D1 (schema: apps/edge/migrations/0001_items.sql). It implements ItemClient, so the
 // repository logic is the one in items.ts and the shared repository suite proves it. This file imports no AWS SDK.
@@ -106,6 +106,38 @@ export async function listD1HouseholdIds(db: D1Like): Promise<string[]> {
     .map((r) => r.pk)
     .filter((p) => p.startsWith("HH#"))
     .map((p) => dec(p.slice(3)));
+}
+
+/**
+ * The households the daily job has not finished for `day` (a YYYY-MM-DD date), in key order, at most `limit`. A household
+ * with a record and no row in `daily_runs` for that day is still to do. Uses the table made by migration 0003.
+ */
+export async function nextD1HouseholdIds(db: D1Like, day: string, limit: number): Promise<string[]> {
+  const res = await db
+    .prepare(
+      "SELECT i.pk AS pk FROM items i LEFT JOIN daily_runs d ON d.pk = i.pk AND d.day = ? WHERE i.sk = ? AND d.pk IS NULL ORDER BY i.pk LIMIT ?",
+    )
+    .bind(day, HOUSEHOLD_SK, limit)
+    .all();
+  return ((res.results ?? []) as { pk: string }[])
+    .map((r) => r.pk)
+    .filter((p) => p.startsWith("HH#"))
+    .map((p) => dec(p.slice(3)));
+}
+
+/** Records that the daily job finished these households for `day`. Safe to repeat. */
+export async function markD1HouseholdsDone(db: D1Like, ids: string[], day: string): Promise<void> {
+  for (let i = 0; i < ids.length; i += D1_BATCH) {
+    await db.batch(
+      ids
+        .slice(i, i + D1_BATCH)
+        .map((id) =>
+          db
+            .prepare("INSERT INTO daily_runs (pk, day) VALUES (?, ?) ON CONFLICT(pk) DO UPDATE SET day = excluded.day")
+            .bind(householdPk(id), day),
+        ),
+    );
+  }
 }
 
 export const createD1Repository = (db: D1Like): Repository => createItemRepository(createD1ItemClient(db));

@@ -34,7 +34,7 @@ The Worker is strict by default: only `HIPPO_ENV=development` or `local` relaxes
 npx wrangler d1 migrations apply <database> --remote --config wrangler.staging.toml
 npx wrangler secret put HIPPO_SIGNING_KEY --config wrangler.staging.toml   # pipe a random value in, never type it
 npx wrangler deploy --config wrangler.staging.toml
-# the [triggers] cron in wrangler.toml is copied with the rest and runs the daily cleanup of expired sign in records
+# the [triggers] cron in wrangler.toml is copied with the rest: every 15 minutes, a few households' daily work (below)
 npx wrangler tail --config wrangler.staging.toml --format pretty > tail.log &
 node scripts/smoke.mjs https://<worker address> tail.log
 ```
@@ -54,7 +54,5 @@ Nothing here has been run on a real account for this tier yet (`docs/VERIFIED.md
 6. `wrangler deploy`. The Worker refuses to start, answering a bare 500 and logging only the names of the settings that are wrong, until the list above is complete and there is a way to sign in (the email binding or Google).
 7. Check by hand: `/healthz`, `/` (the app), `/oauth/providers` (answers `google: true`, `email: false`), then sign in with Google, save a page with the extension, review and confirm it in the app. `scripts/smoke.mjs` cannot sign in on a real Worker (it reads the sign in code from a log, which production never writes).
 
-The daily cron runs the cleanup and the reminder job. With no email binding the reminder job still makes the alerts (Coming up is right) and counts the digest as a dry run. To turn email on later: add `[[send_email]]` with `name = "EMAIL"`, set `HIPPO_MAIL_FROM` to an address on a verified domain, and redeploy. People then get sign in codes by email, and the daily digest with its turn off link, with no code change.
+The cron runs every 15 minutes. Each run does the daily job for the next few households (`HIPPO_DAILY_BATCH`, default 5, at most 50) that have not had it today, so every household is done once a day and one run stays small. About 3 ms of work per household was measured on Node (`docs/VERIFIED.md` 10.23); on the Workers free plan, which allows 10 ms of CPU per run, set `HIPPO_DAILY_BATCH` to 1. The first run after 03:00 UTC also deletes expired sign in records. With no email binding the reminder job still makes the alerts (Coming up is right) and counts the digest as a dry run. To turn email on later: add `[[send_email]]` with `name = "EMAIL"`, set `HIPPO_MAIL_FROM` to an address on a verified domain, and redeploy. People then get sign in codes by email, and the daily digest with its turn off link, with no code change.
 
-**Before turning email on** (found in review, not yet fixed in code):
-- The cron does its database queries and recall requests for every household in one run. Cloudflare limits the requests one run may make (the free plan figure, 50, is unverified here: `docs/VERIFIED.md` 10.20 did not cover it), so add a per run household cap or batching before there are many people.
