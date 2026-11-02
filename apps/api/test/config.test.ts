@@ -41,8 +41,32 @@ describe("production config", () => {
     const both = { HIPPO_GOOGLE_CLIENT_ID: "id.apps.googleusercontent.com", HIPPO_GOOGLE_CLIENT_SECRET: "secret" };
     expect(productionProblems({ ...GOOD, ...both }, { durable: true, mailer: true })).toEqual([]);
   });
-  it("refuses no mailer", () => {
-    expect(productionProblems(GOOD, { durable: true, mailer: false })).toHaveLength(1);
+  describe("a way to sign in", () => {
+    const google = { HIPPO_GOOGLE_CLIENT_ID: "id.apps.googleusercontent.com", HIPPO_GOOGLE_CLIENT_SECRET: "secret" };
+    it.each([
+      ["a mailer alone", {}, true, 0],
+      ["Google alone", google, false, 0],
+      ["both", google, true, 0],
+      ["neither", {}, false, 1],
+    ])("%s", (_name, extra, mailer, problems) => {
+      expect(productionProblems({ ...GOOD, ...extra }, { durable: true, mailer })).toHaveLength(problems);
+    });
+    it("names the settings that fix it, and never a value", () => {
+      const [msg] = productionProblems(
+        { ...GOOD, HIPPO_SIGNING_KEY: GOOD.HIPPO_SIGNING_KEY },
+        { durable: true, mailer: false },
+      );
+      expect(msg).toContain("HIPPO_GOOGLE_CLIENT_ID");
+      expect(msg).toContain("mailer");
+      expect(msg).not.toContain(GOOD.HIPPO_SIGNING_KEY!);
+    });
+    it("half a Google setting is still its own problem, and does not count as a way in", () => {
+      const problems = productionProblems(
+        { ...GOOD, HIPPO_GOOGLE_CLIENT_ID: "id.apps.googleusercontent.com" },
+        { durable: true, mailer: false },
+      );
+      expect(problems).toHaveLength(2);
+    });
   });
   it("refuses memory storage", () => {
     expect(productionProblems(GOOD, { durable: false, mailer: true })).toHaveLength(1);

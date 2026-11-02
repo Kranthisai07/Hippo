@@ -24,7 +24,13 @@ export function productionProblems(
   }
   if (env.HIPPO_LIVE_AI === "1" && !env.HIPPO_SERVICE_CLIENT_SECRET)
     out.push("HIPPO_SERVICE_CLIENT_SECRET is required with HIPPO_LIVE_AI.");
-  if (!opts.mailer) out.push("No mailer is set, so nobody can sign in by email. A demo login must not be the way in.");
+  // Some way in that is not the demo: an emailed code (a mailer), or Google. Either alone is enough, so a first release can
+  // run on Google sign in with no email service at all.
+  if (!opts.mailer && !(env.HIPPO_GOOGLE_CLIENT_ID && env.HIPPO_GOOGLE_CLIENT_SECRET)) {
+    out.push(
+      "No way to sign in: set a mailer (the email binding) or both HIPPO_GOOGLE_CLIENT_ID and HIPPO_GOOGLE_CLIENT_SECRET. A demo login must not be the way in.",
+    );
+  }
   if (!opts.durable) out.push("The repository and auth store are in memory. Production needs durable ones.");
   return out;
 }

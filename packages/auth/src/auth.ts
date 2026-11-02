@@ -438,7 +438,7 @@ export function createAuth(opts: AuthOptions): Auth {
     p: AuthzParams,
     csrf: string,
     extra: { email?: string; notice?: string; error?: string; step?: "email" | "code" } = {},
-    status: 200 | 401 | 429 = 200,
+    status: 200 | 400 | 401 | 429 = 200,
   ): Promise<Response> => {
     const s = await sessionFromId(getCookie(c, SESSION_COOKIE));
     const html = loginPage({
@@ -450,6 +450,7 @@ export function createAuth(opts: AuthOptions): Auth {
       demo: Boolean(opts.demoUser),
       google: Boolean(opts.google),
       sessionEmail: s?.email,
+      emailCodes,
       step: extra.step ?? "email",
       links: opts.links,
       ...(clientName(p.clientId) ? { clientName: clientName(p.clientId) } : {}),
@@ -486,6 +487,9 @@ export function createAuth(opts: AuthOptions): Auth {
   // Continue with Google (docs/VERIFIED.md 10.9). The state of the attempt lives in one signed cookie, so no table is needed.
 
   const google = opts.google;
+  // An emailed code can reach someone only through a mailer, or (the demo and local runs) the log. With neither, asking for
+  // a code would look like it worked and send nothing, so every route that takes an email says it is not available.
+  const emailCodes = Boolean(opts.mailer) || opts.logMagicCodes !== false;
   const googleCallback = `${issuer}${GOOGLE_PATH}/callback`;
   const pendingKey = google ? derivePendingKey(key) : undefined;
   const idKeys = google ? googleKeys(google) : undefined;
@@ -506,7 +510,9 @@ export function createAuth(opts: AuthOptions): Auth {
   };
 
   // Which sign in methods this server offers (Google, and the demo login), so the web app shows only buttons that work.
-  app.get("/oauth/providers", (c) => c.json({ google: Boolean(google), demo: Boolean(opts.demoUser) }, 200, noStore));
+  app.get("/oauth/providers", (c) =>
+    c.json({ google: Boolean(google), demo: Boolean(opts.demoUser), email: emailCodes }, 200, noStore),
+  );
 
   // Sign in to the web app with Google: ends with the cookie session and a redirect back to the web app.
   app.get(`${GOOGLE_PATH}/start`, async (c) => {
@@ -593,6 +599,9 @@ export function createAuth(opts: AuthOptions): Auth {
       if (!opts.demoUser) return renderLogin(c, p, csrfCookie, { error: "Demo login is off." }, 401);
       email = normalizeEmail(opts.demoUser.email);
     } else if (action === "send") {
+      if (!emailCodes) {
+        return renderLogin(c, p, csrfCookie, { error: "Email codes are not available here. Use Google instead." }, 400);
+      }
       const e = normalizeEmail(single(sp, "email"));
       const wait = e ? await issueMagic(e) : null;
       if (wait !== null) {
@@ -847,6 +856,7 @@ export function createAuth(opts: AuthOptions): Auth {
     const g = jsonGuard(c);
     if (g) return g;
     const email = normalizeEmail((await readJson(c))?.email);
+    if (!emailCodes) return c.json({ error: "not_available" }, 404, noStore);
     if (!email) return c.json({ error: "invalid_request" }, 400, noStore);
     const wait = await issueMagic(email);
     if (wait !== null) return limited(c, wait);

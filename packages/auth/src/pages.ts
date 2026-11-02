@@ -20,6 +20,8 @@ export interface LoginView {
   demo: boolean;
   google: boolean;
   sessionEmail?: string;
+  /** Whether an emailed code can reach the person here. Default true. */
+  emailCodes?: boolean;
   /** `code`: a code was sent to `email`, ask for it. Default `email`. */
   step?: "email" | "code";
   /** What the person is signing in to, for example "Hippo for Chrome". */
@@ -101,19 +103,24 @@ export function loginPage(v: LoginView): string {
       ) + `<p class="or">or use another account</p>`
     : "";
 
+  // False when this server has no way to send a code (no mailer, and codes are not logged): the form would only pretend.
+  const mail = v.emailCodes !== false;
+
   const google = v.google
     ? form(
         `<button class="btn btn-google" type="submit" name="action" value="google" formnovalidate>${GOOGLE_G}<span>Continue with Google</span></button>`,
-      ) + `<p class="or">or</p>`
+      ) + (mail ? `<p class="or">or</p>` : "")
     : "";
 
-  const mailForm = codeStep
-    ? form(
-        `<input type="hidden" name="email" value="${esc(v.email)}"><div class="field"><label for="code">Code from your email</label><input id="code" class="code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="12" required spellcheck="false"${v.error ? ' aria-invalid="true"' : ""} autofocus></div><button class="btn btn-primary" type="submit" name="action" value="login">Sign in</button><div class="row"><button class="btn btn-quiet" type="submit" name="action" value="send" formnovalidate>Send a new code</button><button class="btn btn-quiet" type="submit" name="action" value="change" formnovalidate>Use a different email</button></div>`,
-      )
-    : form(
-        `<div class="field"><label for="email">Email</label><input id="email" name="email" type="email" maxlength="254" autocomplete="email" placeholder="you@example.com" value="${esc(v.email)}" required spellcheck="false"${v.sessionEmail ? "" : " autofocus"}></div><button class="btn ${v.sessionEmail ? "btn-secondary" : "btn-primary"}" type="submit" name="action" value="send">Send me a code</button>`,
-      );
+  const mailForm = !mail
+    ? ""
+    : codeStep
+      ? form(
+          `<input type="hidden" name="email" value="${esc(v.email)}"><div class="field"><label for="code">Code from your email</label><input id="code" class="code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="12" required spellcheck="false"${v.error ? ' aria-invalid="true"' : ""} autofocus></div><button class="btn btn-primary" type="submit" name="action" value="login">Sign in</button><div class="row"><button class="btn btn-quiet" type="submit" name="action" value="send" formnovalidate>Send a new code</button><button class="btn btn-quiet" type="submit" name="action" value="change" formnovalidate>Use a different email</button></div>`,
+        )
+      : form(
+          `<div class="field"><label for="email">Email</label><input id="email" name="email" type="email" maxlength="254" autocomplete="email" placeholder="you@example.com" value="${esc(v.email)}" required spellcheck="false"${v.sessionEmail ? "" : " autofocus"}></div><button class="btn ${v.sessionEmail ? "btn-secondary" : "btn-primary"}" type="submit" name="action" value="send">Send me a code</button>`,
+        );
 
   const demo = v.demo
     ? `<div class="demo"><span class="tag">Demo</span>${form(`<button class="btn btn-quiet" type="submit" name="action" value="demo" formnovalidate>Use the demo household</button>`)}</div>`

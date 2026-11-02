@@ -41,3 +41,17 @@ node scripts/smoke.mjs https://<worker address> tail.log
 
 The script ends with three concurrency checks that need about 70 seconds. Results of the last run are in docs/VERIFIED.md 10.16. To remove staging: `npx wrangler delete --config wrangler.staging.toml`.
 
+
+## First release: the free beta (Google sign in, no email)
+
+Nothing here has been run on a real account for this tier yet (`docs/VERIFIED.md` 10.20 holds what is and is not checked for the Worker and its assets). Do these in order, in your own `wrangler.release.toml` (a copy of `wrangler.toml`, not committed, like the staging file):
+
+1. `pnpm build:hosted` from the repository root, so `../web/dist` holds the web app the Worker serves.
+2. Create the D1 database and the R2 bucket, put their ids in the file, and run the migrations with `--remote`.
+3. Settings in `[vars]` (none of these is a secret): `HIPPO_ISSUER` (the Worker's own https address, for example the `workers.dev` one), `HIPPO_ALLOWED_ORIGINS` (the same address, since the app is served from it), `HIPPO_DEMO = "0"`, `HIPPO_CLIENT_IP_HEADER = "cf-connecting-ip"`, `HIPPO_EXTENSION_ID` (the Chrome Web Store id, see `apps/extension/README.md`), `HIPPO_GOOGLE_CLIENT_ID`, `HIPPO_CLIENT_NAME = "Hippo for Chrome"`, and the public pages `HIPPO_PRIVACY_URL`, `HIPPO_TERMS_URL`, `HIPPO_HOME_URL`. Leave `HIPPO_ENV` unset: unset means strict.
+4. Secrets, piped in and never typed or printed: `wrangler secret put HIPPO_SIGNING_KEY` and `wrangler secret put HIPPO_GOOGLE_CLIENT_SECRET`.
+5. In the Google Cloud console add `<issuer>/oauth/google/callback` as an authorised redirect address. While the Google app is in Testing, only the test users you add there can sign in (a limit of 100).
+6. `wrangler deploy`. The Worker refuses to start, answering a bare 500 and logging only the names of the settings that are wrong, until the list above is complete and there is a way to sign in (the email binding or Google).
+7. Check by hand: `/healthz`, `/` (the app), `/oauth/providers` (answers `google: true`, `email: false`), then sign in with Google, save a page with the extension, review and confirm it in the app. `scripts/smoke.mjs` cannot sign in on a real Worker (it reads the sign in code from a log, which production never writes).
+
+The daily cron runs the cleanup and the reminder job. With no email binding the reminder job still makes the alerts (Coming up is right) and counts the digest as a dry run. To turn email on later: add `[[send_email]]` with `name = "EMAIL"`, set `HIPPO_MAIL_FROM` to an address on a verified domain, and redeploy. People then get sign in codes by email, and the daily digest with its turn off link, with no code change.

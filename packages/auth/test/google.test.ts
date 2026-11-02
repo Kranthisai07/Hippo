@@ -162,8 +162,8 @@ describe("the button", () => {
     expect(
       await (await off.env.req("/oauth/authorize?" + new URLSearchParams(p as Record<string, string>))).text(),
     ).not.toContain("Google");
-    expect(await (await on.env.req("/oauth/providers")).json()).toEqual({ google: true, demo: true });
-    expect(await (await off.env.req("/oauth/providers")).json()).toEqual({ google: false, demo: true });
+    expect(await (await on.env.req("/oauth/providers")).json()).toEqual({ google: true, demo: true, email: false });
+    expect(await (await off.env.req("/oauth/providers")).json()).toEqual({ google: false, demo: true, email: false });
   });
   it("does not run the email check first: the button works with an empty email box", async () => {
     const t = setup();

@@ -138,7 +138,40 @@ describe("what the server says it offers", () => {
   it("/oauth/providers reports the demo login only when it is on", async () => {
     const on = makeEnv();
     const off = makeEnv({ demoUser: undefined });
-    expect(await (await on.req("/oauth/providers")).json()).toEqual({ google: false, demo: true });
-    expect(await (await off.req("/oauth/providers")).json()).toEqual({ google: false, demo: false });
+    expect(await (await on.req("/oauth/providers")).json()).toEqual({ google: false, demo: true, email: true });
+    expect(await (await off.req("/oauth/providers")).json()).toEqual({ google: false, demo: false, email: true });
+  });
+});
+
+describe("a server with no way to send a code", () => {
+  const google = { clientId: "id", clientSecret: "secret" };
+  const noMail = () => makeEnv({ logMagicCodes: false, demoUser: undefined, google });
+
+  it("says so in /oauth/providers", async () => {
+    expect(await (await noMail().req("/oauth/providers")).json()).toEqual({ google: true, demo: false, email: false });
+  });
+
+  it("the sign in page offers Google and no email form", async () => {
+    const { challenge } = await pkce();
+    const html = await (await noMail().req(`/oauth/authorize?${qs(authzParams(challenge))}`)).text();
+    expect(html).toContain("Continue with Google");
+    expect(html).not.toContain('name="email"');
+    expect(html).not.toContain("Send me a code");
+  });
+
+  it("an emailed code is refused outright, from the page and from the web route, and nothing is stored", async () => {
+    const e = noMail();
+    const { challenge } = await pkce();
+    const p = authzParams(challenge);
+    const page = await openAuthorize(e, p);
+    const res = await postAuthorize(e, page, p, { action: "send", email: "sam@example.com" });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toContain("Email codes are not available here");
+    const web = await e.req("/oauth/magic-code", {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: "https://api.hippo.test" },
+      body: JSON.stringify({ email: "sam@example.com" }),
+    });
+    expect(web.status).toBe(404);
   });
 });

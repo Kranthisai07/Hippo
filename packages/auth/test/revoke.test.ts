@@ -74,7 +74,12 @@ describe("revokeUser", () => {
 describe("audit events", () => {
   it("record what happened by hashed id, and never an email, a code or a token", async () => {
     const events: AuditEvent[] = [];
-    const env = makeEnv({ audit: (e) => events.push(e), logMagicCodes: false });
+    // A mailer that drops the code: it is not logged, and the route stays available.
+    const env = makeEnv({
+      audit: (e) => events.push(e),
+      logMagicCodes: false,
+      mailer: { send: async () => undefined },
+    });
     const send = () =>
       env.req("/oauth/magic-code", {
         method: "POST",

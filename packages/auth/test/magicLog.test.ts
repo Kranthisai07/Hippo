@@ -17,10 +17,11 @@ describe("logging the magic code", () => {
     expect(env.logs.some((l) => /magic code for alice@example\.com: \d{6}/.test(l))).toBe(true);
   });
 
-  it("with logMagicCodes false the code and the email never reach the log", async () => {
+  it("with logMagicCodes false and no mailer there is no way to send a code: the route says so and nothing reaches the log", async () => {
     const env = makeEnv({ logMagicCodes: false });
     const res = await send(env);
-    expect(res.status).toBeLessThan(300);
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "not_available" });
     expect(env.logs.join("\n")).not.toMatch(/\d{6}/);
     expect(env.logs.join("\n")).not.toContain("alice@example.com");
   });
