@@ -26,6 +26,8 @@ export interface Target {
   apiOrigin?: string;
   /** Store builds: where the web app is. The extension only opens pages there, so it gets no host permission. */
   webOrigin?: string;
+  /** Store builds: the OAuth client id the server knows the extension by. No fallback, so a store package never signs in as the demo client. */
+  clientId?: string;
   /**
    * Store builds, optional: the public key the Chrome Web Store dashboard gives, which keeps the extension id the same
    * across uploads. Left out, the id is the one the store assigns.
@@ -68,6 +70,11 @@ export function buildManifest(template: Record<string, unknown>, t: Target): Man
   const problems = [originProblem("VITE_HIPPO_API", t.apiOrigin), originProblem("VITE_HIPPO_WEB", t.webOrigin)].filter(
     (p): p is string => p !== null,
   );
+  if (!t.clientId || !/^[A-Za-z0-9._-]{1,100}$/.test(t.clientId)) {
+    problems.push(
+      "VITE_HIPPO_CLIENT_ID must be set to the server's client id for the extension (letters, digits, dots, dashes).",
+    );
+  }
   if (t.publicKey !== undefined && !/^[A-Za-z0-9+/]{100,}={0,2}$/.test(t.publicKey)) {
     problems.push("VITE_HIPPO_PUBLIC_KEY is not a base64 public key.");
   }

@@ -18,6 +18,7 @@ const store = {
   version: "0.1.0",
   apiOrigin: "https://api.hippo-app.workers.dev",
   webOrigin: "https://api.hippo-app.workers.dev",
+  clientId: "hippo-store",
 };
 
 describe("the dev manifest", () => {
@@ -73,6 +74,11 @@ describe("the store manifest", () => {
       expect((e as Error).message).toContain("VITE_HIPPO_API");
       expect((e as Error).message).toContain("VITE_HIPPO_WEB");
     }
+  });
+
+  it("refuses a store build with no client id, so it never signs in as the demo client", () => {
+    expect(() => buildManifest(template, { ...store, clientId: undefined })).toThrow(/VITE_HIPPO_CLIENT_ID/);
+    expect(() => buildManifest(template, { ...store, clientId: "has space" })).toThrow(/VITE_HIPPO_CLIENT_ID/);
   });
 
   it("refuses a public key that is not base64", () => {

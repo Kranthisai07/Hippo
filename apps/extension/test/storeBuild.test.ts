@@ -96,6 +96,12 @@ describe("a store build", () => {
     setEnv(ENV);
   }, 120_000);
 
+  it("refuses to build with no client id", async () => {
+    setEnv({ VITE_HIPPO_CLIENT_ID: undefined });
+    await expect(run()).rejects.toThrow(/VITE_HIPPO_CLIENT_ID/);
+    setEnv(ENV);
+  }, 120_000);
+
   it("refuses to build when an address is missing", async () => {
     setEnv({ VITE_HIPPO_WEB: undefined });
     await expect(run()).rejects.toThrow(/VITE_HIPPO_WEB/);

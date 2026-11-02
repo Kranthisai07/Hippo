@@ -35,6 +35,7 @@ export function extensionPackage(root: string): Plugin {
       version,
       ...(env.VITE_HIPPO_API ? { apiOrigin: env.VITE_HIPPO_API } : {}),
       ...(env.VITE_HIPPO_WEB ? { webOrigin: env.VITE_HIPPO_WEB } : {}),
+      ...(env.VITE_HIPPO_CLIENT_ID ? { clientId: env.VITE_HIPPO_CLIENT_ID } : {}),
       ...(env.VITE_HIPPO_PUBLIC_KEY ? { publicKey: env.VITE_HIPPO_PUBLIC_KEY } : {}),
     });
 

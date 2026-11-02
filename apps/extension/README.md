@@ -37,10 +37,10 @@ The public key in `manifest.template.json` fixes the id `gcanedelajoahpaoeeonbdl
 The local build (`pnpm --filter @hippo/extension build`, folder `dist/`) keeps the local host and the development key. The store build is separate and cannot carry either:
 
 ```bash
-VITE_HIPPO_API=https://<your worker address> VITE_HIPPO_WEB=https://<your worker address>   pnpm --filter @hippo/extension build:store
+VITE_HIPPO_API=https://<your worker address> VITE_HIPPO_WEB=https://<your worker address> VITE_HIPPO_CLIENT_ID=<client id> pnpm --filter @hippo/extension build:store
 ```
 
-It writes `dist-store/` and `release/hippo-<version>.zip` (both git ignored). The version comes from `package.json` only. The build stops before building anything if an address is not a plain https origin (no localhost, IP address, wildcard, path or user name), and stops after building if any text file in the package still contains a development address. Set `VITE_HIPPO_CLIENT_ID` if the server's client id is not `hippo-demo`. The tests (`test/storeManifest.test.ts`, `test/storeBuild.test.ts`) run a real store build and check the manifest, the files and the zip.
+It writes `dist-store/` and `release/hippo-<version>.zip` (both git ignored). The version comes from `package.json` only. The build stops before building anything if an address is not a plain https origin (no localhost, IP address, wildcard, path or user name), and stops after building if any text file in the package still contains a development address. `VITE_HIPPO_CLIENT_ID` is required (the server's client id for the extension, the same as `HIPPO_CLIENT_ID` on the Worker), so a store package never signs in as the demo client. The tests (`test/storeManifest.test.ts`, `test/storeBuild.test.ts`) run a real store build and check the manifest, the files and the zip.
 
 Steps for the first release, in order:
 
