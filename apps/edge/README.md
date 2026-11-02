@@ -5,10 +5,11 @@ The same API as the Node server (`apps/api`), on D1 (data, sign in state, rate c
 ## Run it locally (free, no account)
 
 ```bash
+pnpm build:hosted   # from the repository root: builds the web app that the Worker serves (apps/web/dist)
 cd apps/edge
 printf 'HIPPO_ENV=development\nHIPPO_SIGNING_KEY=<at least 32 random characters>\n' > .dev.vars   # git ignored, never deployed
 npx wrangler d1 migrations apply hippo --local
-npx wrangler dev --local --port 8799 --var HIPPO_ISSUER:http://localhost:8799 > ../../wrangler.log 2>&1
+npx wrangler dev --local --port 8799 --test-scheduled --var HIPPO_ISSUER:http://localhost:8799 > ../../wrangler.log 2>&1
 node scripts/smoke.mjs http://localhost:8799 ../../wrangler.log              # in another terminal
 ```
 

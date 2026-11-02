@@ -12,6 +12,16 @@ HIPPO_REDIRECT_URIS = "http://localhost:5173/callback"
 HIPPO_ALLOWED_ORIGINS = "http://localhost:5173"
 HIPPO_MAIL_FROM = "Hippo <login@localhost>"
 
+# The web app, built by `pnpm build:hosted`, is served by the platform from the same address as the API, so the cookie
+# session needs no CORS and no cross site cookie. The paths below go to the Worker first; every other path is a file of the
+# app, or index.html for an address the app handles itself (a single page app fallback). `_headers` in the app build
+# carries the headers for the files (docs/VERIFIED.md 10.20).
+[assets]
+directory = "../web/dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*", "/oauth/*", "/ext/*", "/mcp", "/mcp/*", "/.well-known/*", "/unsubscribe", "/healthz"]
+
 # The database id is a placeholder until a real database exists (slice 6). A local run does not use it.
 [[d1_databases]]
 binding = "DB"

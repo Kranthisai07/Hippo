@@ -119,6 +119,50 @@ step(
   health.headers.get("x-content-type-options") === "nosniff" &&
     /^[0-9a-f-]{36}$/.test(health.headers.get("x-request-id") ?? ""),
 );
+// The web app, served by the platform from the same address (needs `pnpm build:hosted` first).
+const indexRes = await fetch(`${base}/`);
+const indexHtml = await indexRes.text();
+step(
+  "the web app is served at / with its own security policy",
+  indexRes.status === 200 &&
+    (indexRes.headers.get("content-type") ?? "").includes("text/html") &&
+    indexHtml.includes('id="root"') &&
+    indexHtml.includes("Content-Security-Policy"),
+  `status ${indexRes.status}`,
+);
+const deep = await fetch(`${base}/review/some-document`);
+const deepHtml = await deep.text();
+step("a deep link such as /review/x gets the app, not a 404", deep.status === 200 && deepHtml.includes('id="root"'));
+const scriptSrc = /<script[^>]+src="([^"]+)"/.exec(indexHtml)?.[1];
+const script = scriptSrc ? await fetch(new URL(scriptSrc, base)) : undefined;
+step(
+  "a built file is served as script, cached for good, and not as the app",
+  script?.status === 200 &&
+    (script.headers.get("content-type") ?? "").includes("javascript") &&
+    /immutable/.test(script.headers.get("cache-control") ?? ""),
+  scriptSrc ?? "no script tag",
+);
+step(
+  "the app files carry nosniff and frame-ancestors none",
+  indexRes.headers.get("x-content-type-options") === "nosniff" &&
+    /frame-ancestors 'none'/.test(indexRes.headers.get("content-security-policy") ?? ""),
+);
+const noSession = await fetch(`${base}/api/me`);
+step(
+  "/api/me reaches the Worker: a JSON 401, not the app",
+  noSession.status === 401 && (noSession.headers.get("content-type") ?? "").includes("json"),
+  `status ${noSession.status}`,
+);
+const providers = await (await fetch(`${base}/oauth/providers`)).json();
+step("/oauth/providers says no demo on this Worker", providers.demo === false && typeof providers.google === "boolean");
+const unsub = await fetch(`${base}/unsubscribe?t=nope`);
+step(
+  "/unsubscribe reaches the Worker and refuses a bad link",
+  unsub.status === 400 && /default-src 'none'/.test(unsub.headers.get("content-security-policy") ?? ""),
+  `status ${unsub.status}`,
+);
+const unknownApi = await fetch(`${base}/api/not-a-route`);
+step("an unknown /api path is not answered with the app", !(await unknownApi.text()).includes('id="root"'));
 const meta = await (await fetch(`${base}/.well-known/oauth-authorization-server`)).json();
 step(
   "OAuth metadata names this issuer and a revocation endpoint",
@@ -298,6 +342,46 @@ const carolSaved = await call(carol.access_token, "/ext/captures", {
   text: fixturePage("fernwood_billing"),
 });
 step("carol saves a page", carolSaved.status === 201, `status ${carolSaved.status}`);
+{
+  // Review and confirm in the web app, then the daily cron, which needs the household record made at sign in.
+  const savedBody = await carolSaved.json();
+  const doc = await (await fetch(`${base}/api/docs/${savedBody.docId}`, { headers: { cookie } })).json();
+  // The review view lists fields as { name, value, ... }. Confirm the ones that hold a date.
+  const dateFields = (doc.agreement?.fields ?? [])
+    .filter((f) => /^\d{4}-\d{2}-\d{2}$/.test(String(f.value)))
+    .map((f) => f.name);
+  step(
+    "the saved page opens for review with dates to confirm",
+    !!doc.agreement?.id && dateFields.length > 0,
+    dateFields.join(","),
+  );
+  const confirm = await fetch(`${base}/api/agreements/${doc.agreement.id}/confirm`, {
+    method: "POST",
+    headers: { "content-type": "application/json", origin, cookie },
+    body: JSON.stringify({ fields: dateFields }),
+  });
+  step("confirming the dates is 200", confirm.status === 200, `status ${confirm.status}`);
+  const since = readFileSync(logFile, "utf8").length;
+  const cron = await fetch(`${base}/cdn-cgi/local/scheduled`);
+  step("the local cron trigger answers", cron.status === 200, `status ${cron.status}`);
+  let line = "";
+  for (let i = 0; i < 80 && !line; i++) {
+    line =
+      readFileSync(logFile, "utf8")
+        .slice(since)
+        .split("\n")
+        .find((l) => l.includes('"job":"daily"')) ?? "";
+    if (!line) await sleep(250);
+  }
+  const summary = line ? JSON.parse(line.slice(line.indexOf("{"))) : {};
+  step(
+    "the daily job ran and found the households that have signed in, and mailed nobody (no email binding)",
+    summary.job === "daily" && summary.households >= 1 && summary.emailsSent === 0,
+    line.slice(line.indexOf("{")),
+  );
+  const alerts = await fetch(`${base}/api/alerts?open=true`, { headers: { cookie } });
+  step("her alerts answer", alerts.status === 200);
+}
 const exported = await fetch(`${base}/api/export`, { headers: { cookie } });
 const exportBody = await exported.json();
 step(
