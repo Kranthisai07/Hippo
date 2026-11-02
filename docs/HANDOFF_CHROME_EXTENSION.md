@@ -53,7 +53,7 @@ From Kundana to Kranthi, 2026-10-30. Branch `k/chrome-extension`. Built with Cla
 | Rules first, no model | Bedrock never worked on our account, and this costs nothing |
 | Demo first, unpacked | Real users need durable storage and real sign-in first |
 | Never use `add_record` for a capture | It marks fields confirmed, which would break "no alert from an unconfirmed date" |
-| Saving works only on a server bound to its own machine (`isLocalOnly` in `server.ts`) | The public demo shares one household, so a real page there could be read by the next visitor |
+| The Node demo server saves only when bound to its own machine (`isLocalOnly` in `server.ts`); the Cloudflare backend always saves, per person | The demo shares one household, so a real page there could be read by the next visitor |
 | A page with no subscription is not kept | It has nothing to confirm, so it could never become an answer |
 
 ## Run it
@@ -83,7 +83,7 @@ Follow [apps/extension/README.md](../apps/extension/README.md). In short: run `p
 - **Other voice paths can still use unreviewed data.** `check_coverage`, `get_history`, `ui_show_clause`, `ui_show_claim_steps` and the option labels in `resolve.ts`. This is existing behaviour and is not reachable as a spoken answer from a capture, but fix it before real users.
 - **Masking:** `maskNumbers` misses digits written one at a time ("4 1 1 1 ..."), and `docs/PRIVACY.md` overclaims here. Fix the helper or the wording.
 - **Personal details:** a saved page can hold a name or an address. Hippo does not remove them.
-- **Tunnels:** a tunnel to a local server passes `isLocalOnly`. `docs/PRIVACY.md` warns about it.
+- **Tunnels:** a tunnel to a local Node server passes `isLocalOnly`. `docs/PRIVACY.md` warns about it.
 - **Sign-in:** a 200 from the token route with no token signs the person out. Signing in again fixes it.
 - **Failed saves:** if the cleanup also fails, a retry can answer "already saved". Deleting it in Settings clears that.
 - **Search:** with very few short documents, one word questions can find nothing. This is the documented score cutoff.
@@ -97,7 +97,7 @@ I have not priced any of this, and nothing here has been verified with a provide
 | :--- | :--- | :--- |
 | Durable storage | Data and auth are in memory. `infra/` is written and never deployed | Hosting and AWS |
 | Real email sign-in | No mailer. On a public host nobody can log in by email | Email sending |
-| Accept saves on a hosted server | Off by design. Needs per user households first, then a change to `isLocalOnly` | None by itself |
+| Accept saves on a hosted server | Done on the Cloudflare backend (a household per person, created at first sign in). The Node demo server stays local only on purpose | None by itself |
 | Encryption at rest | Designed in the CDK stack, not live | Part of AWS |
 | A reader for more pages | Rules only. Bedrock quota is zero on our account, and the support case had no answer | Per model call |
 | Fix the gaps above | Open | Time |

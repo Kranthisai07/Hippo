@@ -141,7 +141,7 @@ For the browser extension, under `/ext`, not `/api`. Auth is `Authorization: Bea
 | `POST /ext/captures` | `{ title, host, text }`, strict. `host` is a site name, not an address. `text` is 1 to 60,000 characters. | `201 { saved: true, docId, reviewUrl }`, or `200 { saved: false }` when the page has no subscription and nothing was stored. |
 | `GET /ext/subscriptions` | none | Same as `GET /api/subscriptions`. |
 
-- 403: saving is off (no `onCaptured` hook). `apps/api/src/server.ts` loads the hook only when the server is bound to a loopback host, has a loopback issuer and no public domain (`isLocalOnly`). Anything else refuses.
+- 403: saving is off (no `onCaptured` hook). The Node server (`apps/api/src/server.ts`) loads the hook only when it is bound to a loopback host, has a loopback issuer and no public domain (`isLocalOnly`), because its demo household is shared. The Cloudflare backend (`apps/edge`) always has the hook, and every person has their own household.
 - 409: the same text was saved already, or the household already tracks that vendor. `X-Hippo-Doc` holds the existing document id, when there is one.
 - 422 `limit_reached`: the household already holds 200 saved pages. The message says to delete some in Hippo.
 - 429: more than 30 saves per household per hour, or 60 list reads per household per minute, with `Retry-After`.

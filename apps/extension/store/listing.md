@@ -37,7 +37,8 @@ What it does not do
 - Host permission: the Hippo server address the extension talks to. The build for the store must list the production address only (see blockers).
 
 ## Privacy practices form (answers must match the privacy policy)
-- Collects: the visible text of the page you save, the page title and site name, and your sign in email. Nothing else.
+- Collects: the visible text of the page you save, the page title and site name, and your sign in email (it comes from Google or from the code you enter). The email is also used to send the daily reminder email, which is on by default and has a one click turn off link in every message.
+- Where it lives: page text in object storage and the extracted dates in a database, both on Cloudflare (a processor), in the person's own household.
 - Does not sell or transfer data to third parties, does not use it for ads or credit decisions. Saved pages are read by Hippo's own rules on its own server; no model and no outside processor is used for them today. If that changes (docs/PRIVACY.md mentions a hosted model service for uploaded documents), this answer and the privacy policy must name it before publishing.
 - Remote code: none.
 - Privacy policy URL: the public address of the Hippo Privacy page (see blockers).
@@ -50,7 +51,8 @@ What it does not do
 5. Subscriptions page in the web app.
 
 ## Blockers before this can be published
-1. **Saving is refused on a hosted server today** (`isLocalOnly` in `apps/api/src/server.ts`, because the demo household is shared). A store build needs a hosted server that keeps each person's captures in their own household. Until then the listing would promise something the product refuses to do.
-2. **Manifest**: `host_permissions` is `http://localhost:8787/*` and a development `key` is set. The store build needs the production origin only and the store's own key handling (unverified, see 10.19).
-3. **Public privacy policy** at a real address, the same text as the dashboard form.
+1. **Nothing is deployed.** The Cloudflare backend saves per person and the store build exists (`pnpm --filter @hippo/extension build:store`), but until the Worker is deployed to a real address the listing would describe a product nobody can use. Deploy steps: `apps/edge/README.md`. Needs the owner's yes (account, R2, Google test users).
+2. **The extension id.** It is known only after a draft upload. Then set `HIPPO_EXTENSION_ID` on the Worker and redeploy (`apps/extension/README.md`). Whether the store wants the manifest `key` is unverified (10.19).
+3. **Public privacy policy** at the real address of the app (`/privacy`), the same text as the dashboard form. The text in the app must be re-read against this file when the address is known.
 4. **Owner decisions**: publisher name, support contact, and whether the privacy and terms text is reviewed by a lawyer.
+5. **Landing copy**: the landing page says the extension saves to a server on your own computer. Change it when the beta is deployed.

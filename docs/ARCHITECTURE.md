@@ -95,7 +95,7 @@ The server reads the text with `extractSubscriptionRules` (`packages/obligation-
 
 Limits: the rules read US dollars and English only, and a date with no year is left out. On a household with very few short documents, one word questions can fall under the search cutoff (see Retrieval).
 
-Sign-in and saving were run in real Chrome 156 against the local server, using a throwaway test copy of the build that opens the popup as a tab, with its message guard and tab lookup changed to allow that. So the click that grants `activeTab` was not automated. Saving needs a server bound to a loopback host with a loopback issuer (`isLocalOnly` in `apps/api/src/server.ts`), so no reachable server accepts saves.
+Sign-in and saving were run in real Chrome 156 against the local server, using a throwaway test copy of the build that opens the popup as a tab, with its message guard and tab lookup changed to allow that. So the click that grants `activeTab` was not automated. The Node demo server saves only when bound to a loopback host with a loopback issuer (`isLocalOnly` in `apps/api/src/server.ts`), because its one demo household is shared. The Cloudflare backend (`apps/edge`) always saves, into the signed in person's own household, which is created at first sign in. That path was run in process (`apps/edge/test/entry.test.ts`) and on the local Workers runtime with the web app, review, confirm and the daily cron (`apps/edge/scripts/smoke.mjs`), not yet on a deployed Worker or with the store build in a real browser.
 
 ## Why the voice path has no LLM and no outbound HTTP
 

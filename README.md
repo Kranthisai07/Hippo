@@ -73,7 +73,7 @@ Most subscription paperwork is a web page, not a PDF. The extension saves one: o
 
 It reads only the page you choose, only after your click: the visible text, with long numbers masked, and the site name, never the full address. There is no background reading and no email or bank access. Reading uses fixed rules with no model, so it costs nothing and handles common layouts only. A page with no subscription is not kept. Details are in [apps/extension/README.md](apps/extension/README.md).
 
-Status: run it locally as an unpacked extension. It is not in the Chrome Web Store, and saving is off on the public demo server, because everyone there shares one household.
+Status: run it locally as an unpacked extension. It is not in the Chrome Web Store yet. Saving is off on the public Node demo server, because everyone there shares one household. The Cloudflare backend (`apps/edge`) saves per person and is built and tested but not deployed.
 
 ## Four rules everything follows
 
