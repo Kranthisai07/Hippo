@@ -6,10 +6,12 @@ import { AuthProvider } from "../src/lib/auth";
 import { ToastProvider } from "../src/components/ui";
 import { ApiError, api } from "../src/lib/api";
 import { ComingUp } from "../src/pages/ComingUp";
+import { Layout } from "../src/components/Layout";
 import { Review } from "../src/pages/Review";
 import { SettingsPage } from "../src/pages/Settings";
 import { SignIn } from "../src/pages/SignIn";
 import { Things } from "../src/pages/Things";
+import { UploadPage } from "../src/pages/Upload";
 import type { AgreementView, Doc, ObligationItem } from "../src/lib/types";
 
 afterEach(() => vi.restoreAllMocks());
@@ -222,7 +224,7 @@ describe("Sign in with Google", () => {
 
   it("shows a Continue with Google link only when the server offers it, and sends the person back to where they were", async () => {
     vi.spyOn(api, "me").mockRejectedValue(new ApiError(401, "unauthenticated", "Please sign in again."));
-    vi.spyOn(api, "providers").mockResolvedValue({ google: true });
+    vi.spyOn(api, "providers").mockResolvedValue({ google: true, demo: true });
     open();
     const link = await screen.findByRole("link", { name: "Continue with Google" });
     const href = new URL(link.getAttribute("href")!, window.location.origin);
@@ -232,7 +234,7 @@ describe("Sign in with Google", () => {
 
   it("shows no Google link when the server does not offer it, or does not answer", async () => {
     vi.spyOn(api, "me").mockRejectedValue(new ApiError(401, "unauthenticated", "Please sign in again."));
-    const providers = vi.spyOn(api, "providers").mockResolvedValue({ google: false });
+    const providers = vi.spyOn(api, "providers").mockResolvedValue({ google: false, demo: false });
     open();
     await screen.findByLabelText("Email");
     await waitFor(() => expect(providers).toHaveBeenCalled());
@@ -253,6 +255,7 @@ describe("Sign in", () => {
         new ApiError(429, "rate_limited", "Too many tries. Please wait 30 seconds and try again.", 30),
       );
     vi.spyOn(api, "me").mockRejectedValue(new ApiError(401, "unauthenticated", "Please sign in again."));
+    vi.spyOn(api, "providers").mockResolvedValue({ google: false, demo: true });
     wrap(
       <AuthProvider>
         <SignIn />
@@ -264,14 +267,14 @@ describe("Sign in", () => {
     await userEvent.click(screen.getByRole("button", { name: "Send me a code" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("wait 30 seconds");
     expect(screen.getByRole("button", { name: "Send me a code" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Use the demo account" })).toBeDisabled();
+    expect(await screen.findByRole("button", { name: "Use the demo account" })).toBeDisabled();
     await new Promise((r) => setTimeout(r, 100));
     expect(send).toHaveBeenCalledTimes(1);
   });
 
   it("moves to a code step after the email, and a different email goes back", async () => {
     vi.spyOn(api, "me").mockRejectedValue(new ApiError(401, "unauthenticated", "Please sign in again."));
-    vi.spyOn(api, "providers").mockResolvedValue({ google: true });
+    vi.spyOn(api, "providers").mockResolvedValue({ google: true, demo: true });
     const send = vi.spyOn(api, "magicCode").mockResolvedValue(undefined as never);
     wrap(
       <AuthProvider>
@@ -309,5 +312,57 @@ describe("Settings", () => {
       </AuthProvider>,
     );
     expect(await screen.findByRole("link", { name: "Voice assistant demo" })).toHaveAttribute("href", "/ask");
+  });
+});
+
+describe("what the server can do", () => {
+  it("offers the demo account only when the server says the demo is on", async () => {
+    vi.spyOn(api, "me").mockRejectedValue(new ApiError(401, "unauthenticated", "Please sign in again."));
+    const providers = vi.spyOn(api, "providers").mockResolvedValue({ google: false, demo: false });
+    wrap(
+      <AuthProvider>
+        <SignIn />
+      </AuthProvider>,
+      "/signin",
+      "/signin",
+    );
+    await screen.findByLabelText("Email");
+    await waitFor(() => expect(providers).toHaveBeenCalled());
+    expect(screen.queryByRole("button", { name: "Use the demo account" })).toBeNull();
+  });
+
+  it("leaves Upload out of the nav and explains it on the page when the server cannot read uploads", async () => {
+    vi.spyOn(api, "me").mockResolvedValue({ email: "a@b.co", digestOn: true, uploads: false });
+    wrap(
+      <AuthProvider>
+        <Routes>
+          <Route element={<Layout />}>
+            <Route path="/upload" element={<UploadPage />} />
+          </Route>
+        </Routes>
+      </AuthProvider>,
+      "/upload",
+      "/*",
+    );
+    expect(await screen.findByRole("heading", { name: "Uploads are not available yet" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Upload" })).toBeNull();
+    expect(screen.queryByText("Choose files")).toBeNull();
+  });
+
+  it("keeps Upload when the server reads uploads", async () => {
+    vi.spyOn(api, "me").mockResolvedValue({ email: "a@b.co", digestOn: true, uploads: true });
+    wrap(
+      <AuthProvider>
+        <Routes>
+          <Route element={<Layout />}>
+            <Route path="/upload" element={<UploadPage />} />
+          </Route>
+        </Routes>
+      </AuthProvider>,
+      "/upload",
+      "/*",
+    );
+    expect(await screen.findByRole("link", { name: "Upload" })).toBeInTheDocument();
+    expect(screen.getByText("Choose files")).toBeInTheDocument();
   });
 });

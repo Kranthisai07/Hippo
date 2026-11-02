@@ -488,8 +488,8 @@ export function createAuth(opts: AuthOptions): Auth {
     return c.redirect(await googleAuthUrl(google!, { redirectUri: googleCallback, ...attempt }), 302);
   };
 
-  // Which sign in methods this server offers, so the web app shows only buttons that work.
-  app.get("/oauth/providers", (c) => c.json({ google: Boolean(google) }, 200, noStore));
+  // Which sign in methods this server offers (Google, and the demo login), so the web app shows only buttons that work.
+  app.get("/oauth/providers", (c) => c.json({ google: Boolean(google), demo: Boolean(opts.demoUser) }, 200, noStore));
 
   // Sign in to the web app with Google: ends with the cookie session and a redirect back to the web app.
   app.get(`${GOOGLE_PATH}/start`, async (c) => {

@@ -133,3 +133,12 @@ describe("the sign in page as served", () => {
     expect(html).toContain("That code did not work.");
   });
 });
+
+describe("what the server says it offers", () => {
+  it("/oauth/providers reports the demo login only when it is on", async () => {
+    const on = makeEnv();
+    const off = makeEnv({ demoUser: undefined });
+    expect(await (await on.req("/oauth/providers")).json()).toEqual({ google: false, demo: true });
+    expect(await (await off.req("/oauth/providers")).json()).toEqual({ google: false, demo: false });
+  });
+});

@@ -117,6 +117,8 @@ export interface UploadTicket {
 export interface Me {
   email: string;
   digestOn: boolean;
+  /** Whether this server reads uploaded files. False means the Upload page and its nav link are left out. */
+  uploads?: boolean;
   /** Not sent by the API today. Used when it is (docs/WEB_API.md has no server date). */
   today?: string;
 }

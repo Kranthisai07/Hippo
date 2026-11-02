@@ -113,7 +113,12 @@ export function createWebApi(deps: WebApiDeps): Hono<{ Variables: { hh: string; 
 
   api.get("/me", async (c) => {
     const household = await repo.getHousehold(c.var.hh);
-    return c.json({ email: household?.email ?? c.var.email, digestOn: household?.digestOn ?? true });
+    // `uploads` tells the web app whether this server reads uploaded files, so it does not offer a page that answers 503.
+    return c.json({
+      email: household?.email ?? c.var.email,
+      digestOn: household?.digestOn ?? true,
+      uploads: Boolean(deps.onUploaded),
+    });
   });
 
   api.get("/subscriptions", async (c) => c.json(await listSubscriptions(repo, c.var.hh, today())));

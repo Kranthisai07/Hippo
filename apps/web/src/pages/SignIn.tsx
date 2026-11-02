@@ -5,7 +5,6 @@ import googleG from "../assets/google-g.svg";
 import { Brand, Footer } from "../components/Layout";
 import { ApiError, api } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import { HOSTED } from "../lib/hosted";
 
 const POINTS = [
   "Every date shows the exact words it came from.",
@@ -29,6 +28,7 @@ export function SignIn() {
   const [waitUntil, setWaitUntil] = useState(0);
   const [, setNow] = useState(0);
   const [google, setGoogle] = useState(false);
+  const [demo, setDemo] = useState(false);
   const timer = useRef<number | undefined>(undefined);
   const codeInput = useRef<HTMLInputElement>(null);
 
@@ -36,7 +36,7 @@ export function SignIn() {
   // A failure here only means no Google button, never a broken page.
   useEffect(() => {
     api.providers().then(
-      (p) => setGoogle(p.google),
+      (p) => (setGoogle(p.google), setDemo(p.demo)),
       () => undefined,
     );
   }, []);
@@ -167,7 +167,7 @@ export function SignIn() {
                     value={code}
                     onChange={(e) => setCode(e.target.value)}
                   />
-                  {!HOSTED && LOCAL && (
+                  {demo && LOCAL && (
                     <p className="muted small signin-hint">On this computer the code is printed in the server log.</p>
                   )}
                 </div>
@@ -222,7 +222,7 @@ export function SignIn() {
               )}
             </div>
 
-            {!sent && !HOSTED && (
+            {!sent && demo && (
               <div className="signin-demo">
                 <button
                   type="button"

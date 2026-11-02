@@ -1,6 +1,8 @@
 import { AlertCircle, Check, CircleDashed, FileUp, Loader } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
+import { useAuth } from "../lib/auth";
+import { EmptyState } from "../components/ui";
 import { realUploadDeps, uploadOne, type UploadState } from "../lib/upload";
 
 interface Row {
@@ -83,7 +85,19 @@ export function UploadPage() {
     }
   }
 
+  const { me } = useAuth();
   const working = rows.some((r) => r.state.phase === "uploading" || r.state.phase === "reading");
+  if (me?.uploads === false) {
+    return (
+      <>
+        <h1>Upload</h1>
+        <EmptyState icon={FileUp} title="Uploads are not available yet">
+          This Hippo cannot read uploaded files yet. Save a billing page with the Hippo Chrome extension instead, and it
+          shows up in Subscriptions to review.
+        </EmptyState>
+      </>
+    );
+  }
   return (
     <>
       <h1>Upload</h1>

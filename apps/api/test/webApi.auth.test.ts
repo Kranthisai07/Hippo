@@ -32,7 +32,7 @@ describe("session", () => {
   it("the cookie from POST /oauth/session authenticates /api/me", async () => {
     const r = await w.a.get("/api/me");
     expect(r.status).toBe(200);
-    expect(await json(r)).toEqual({ email: "demo@hippo.test", digestOn: true });
+    expect(await json(r)).toEqual({ email: "demo@hippo.test", digestOn: true, uploads: true });
   });
 
   it("the cookie from the magic code login authenticates too, for its own household", async () => {
@@ -60,8 +60,24 @@ describe("session", () => {
 
   it("GET /api/me returns the digest address once it is set", async () => {
     await w.a.send("PUT", "/api/settings", { digestOn: false, email: "Home@Example.com" });
-    expect(await json(await w.a.get("/api/me"))).toEqual({ email: "home@example.com", digestOn: false });
+    expect(await json(await w.a.get("/api/me"))).toEqual({
+      email: "home@example.com",
+      digestOn: false,
+      uploads: true,
+    });
     await w.a.send("PUT", "/api/settings", { digestOn: true });
+  });
+
+  it("GET /api/me says uploads are off when no ingest is connected, so the web app does not offer them", async () => {
+    const noUploads = await makeWeb({ web: { onUploaded: undefined } });
+    const r = await noUploads.app.request(`${BASE}/oauth/session`, {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: BASE },
+      body: JSON.stringify({ demo: true }),
+    });
+    const cookie = /hippo_session=[^;]+/.exec(r.headers.get("set-cookie") ?? "")![0];
+    const me = await json(await noUploads.clientFor(cookie).get("/api/me"));
+    expect(me).toMatchObject({ uploads: false });
   });
 });
 
