@@ -7,3 +7,4 @@ packages:
 # pnpm install does not rewrite this file asking.
 allowBuilds:
   esbuild: false
+  workerd: false

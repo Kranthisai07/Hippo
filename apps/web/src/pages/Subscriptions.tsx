@@ -2,7 +2,7 @@ import { CreditCard, Upload } from "lucide-react";
 import { Link } from "react-router";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui";
 import { api } from "../lib/api";
-import { humanize } from "../lib/format";
+import { humanize, readableDate } from "../lib/format";
 import { useLoad } from "../lib/useLoad";
 import type { Subscription } from "../lib/types";
 
@@ -26,10 +26,14 @@ export function Subscriptions() {
   return (
     <>
       <h1>Subscriptions</h1>
-      <p className="muted">
-        <span className="num">${data.monthlyTotal.toFixed(2)}</span> a month from what you have confirmed.
-        {waiting > 0 && ` ${waiting} more to review, not counted yet.`}
-      </p>
+      <section className="card stat" aria-label="Monthly total">
+        <p className="stat-label">Confirmed total</p>
+        <p className="stat-value num">${data.monthlyTotal.toFixed(2)}</p>
+        <p className="muted small">
+          a month from what you have confirmed.
+          {waiting > 0 && ` ${waiting} more to review, not counted yet.`}
+        </p>
+      </section>
       {data.subscriptions.length === 0 ? (
         <EmptyState
           icon={CreditCard}
@@ -40,7 +44,7 @@ export function Subscriptions() {
             </Link>
           }
         >
-          Upload a subscription confirmation, or tell Alexa about one, and it shows up here.
+          Upload a subscription confirmation and it shows up here, with its next charge.
         </EmptyState>
       ) : (
         <ul className="list">
@@ -50,7 +54,7 @@ export function Subscriptions() {
                 <div className="grow">
                   <h2>{s.vendor}</h2>
                   <p className="muted small">
-                    {[s.plan, price(s), s.nextChargeDate && `next charge ${s.nextChargeDate}`]
+                    {[s.plan, price(s), s.nextChargeDate && `next charge ${readableDate(s.nextChargeDate)}`]
                       .filter(Boolean)
                       .join(", ")}
                   </p>

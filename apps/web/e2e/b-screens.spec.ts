@@ -4,14 +4,15 @@ import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { demoSignIn, removeSeedLease, uploadLease } from "./helpers";
 
-// Walks every page, runs axe on it in light and dark, and saves screenshots at 1280x720 (light and dark) and 390x844.
+// Walks every page, runs axe on it in light and dark at desktop and phone width, and saves screenshots at 1280x720 and 390x844.
 const OUT = fileURLToPath(new URL("../docs/screens/", import.meta.url));
 mkdirSync(OUT, { recursive: true });
 
 const VARIANTS = [
   { tag: "desktop-light", w: 1280, h: 720, scheme: "light" as const, axe: true },
   { tag: "desktop-dark", w: 1280, h: 720, scheme: "dark" as const, axe: true },
-  { tag: "phone-light", w: 390, h: 844, scheme: "light" as const, axe: false },
+  { tag: "phone-light", w: 390, h: 844, scheme: "light" as const, axe: true },
+  { tag: "phone-dark", w: 390, h: 844, scheme: "dark" as const, axe: true },
 ];
 
 async function snap(page: Page, name: string) {
@@ -77,6 +78,11 @@ test("every page: accessibility check and screenshots", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByTestId("confirmed-item").filter({ hasText: "Give notice by" })).toBeVisible();
   await snap(page, "coming-up-confirmed");
+
+  await page.goto("/subscriptions");
+  await expect(page.getByRole("heading", { name: "Subscriptions" })).toBeVisible();
+  await expect(page.locator(".stat-value")).toBeVisible();
+  await snap(page, "subscriptions");
 
   await page.goto("/things");
   await expect(page.getByRole("heading", { name: "Things" })).toBeVisible();

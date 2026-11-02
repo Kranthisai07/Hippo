@@ -3,7 +3,7 @@ import type { Agreement, Alert, Asset, Doc, Repository } from "core/src/contract
 import { chunkPages, buildIndex, serializeIndex, type Chunk } from "core/src/retrieval";
 import { pageTextKey } from "core/src/repository/shared";
 import { ExtractionSchemas, leavesToAgreementFields, type AgreementKind } from "obligation-kit";
-import { syncObligations } from "./obligations";
+import { PARTY_FIELD, syncObligations } from "./obligations";
 
 // Seeds one demo household from the fixtures (fixtures/README.md). The seed stands in for "the person already confirmed
 // every extracted date in the web app", so every field is `confirmed`. It never calls anything but the repository.
@@ -35,14 +35,6 @@ const DOCS = [
   "subscription_fernwood",
   "subscription_kestrel",
 ] as const;
-
-export const PARTY_FIELD: Record<AgreementKind, string> = {
-  warranty: "provider",
-  insurance: "insurer",
-  lease: "landlord",
-  subscription: "vendor",
-  service_plan: "provider",
-};
 
 export interface SeedOptions {
   /** ISO date the deadlines are computed against. */

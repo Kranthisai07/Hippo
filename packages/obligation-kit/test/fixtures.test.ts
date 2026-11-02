@@ -29,15 +29,27 @@ const tagged = (list: string[], from: string, type: string) => list.some((s) => 
 
 describe("fixtures reproduce the expected obligations at the anchor date", () => {
   it.each(spec.obligations.map((o) => [`${o.from} ${o.type}`, o] as const))("%s", (_name, exp) => {
-    const got = computeObligations(toInput(exp.from), spec.anchorDate).find((o) => o.type === exp.type && o.dueDate === exp.dueDate);
+    const got = computeObligations(toInput(exp.from), spec.anchorDate).find(
+      (o) => o.type === exp.type && o.dueDate === exp.dueDate,
+    );
     expect(got, `engine produced no ${exp.type} on ${exp.dueDate}`).toBeDefined();
     expect(got!.daysUntil).toBe(exp.daysFromAnchor);
-    const want = tagged(spec.severity.high, exp.from, exp.type) ? "high" : tagged(spec.severity.possible, exp.from, exp.type) ? "possible" : null;
+    const want = tagged(spec.severity.high, exp.from, exp.type)
+      ? "high"
+      : tagged(spec.severity.possible, exp.from, exp.type)
+        ? "possible"
+        : null;
     expect(got!.severity).toBe(want);
   });
 
   it("never alerts when the same documents are unconfirmed", () => {
-    for (const stem of ["warranty_dishwasher", "insurance_auto", "lease", "subscription_fernwood", "subscription_kestrel"]) {
+    for (const stem of [
+      "warranty_dishwasher",
+      "insurance_auto",
+      "lease",
+      "subscription_fernwood",
+      "subscription_kestrel",
+    ]) {
       const obs = computeObligations(toInput(stem, false), spec.anchorDate);
       expect(obs.length).toBeGreaterThan(0);
       for (const o of obs) expect(o.severity, `${stem} ${o.type}`).toBeNull();

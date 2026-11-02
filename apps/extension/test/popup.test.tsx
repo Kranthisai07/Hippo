@@ -134,6 +134,36 @@ describe("Popup", () => {
     expect(screen.getByText("From fernwood.example Billing, page 1")).toBeInTheDocument();
   });
 
+  it("badges the toolbar with what waits for review, and links each row to its review page", async () => {
+    replies(true);
+    render(<Popup />);
+    await userEvent.click(await screen.findByRole("button", { name: "Review Fernwood" }));
+    expect(fake.chrome.tabs.create).toHaveBeenCalledWith({ url: "http://localhost:5173/review/d1" });
+    expect(fake.chrome.action.setBadgeText).toHaveBeenCalledWith({ text: "1" });
+  });
+
+  it("says so when nothing is tracked yet, and clears the badge", async () => {
+    replies(true);
+    fetchMock.mockImplementation(async () => json({ monthlyTotal: 0, subscriptions: [] }));
+    render(<Popup />);
+    expect(await screen.findByText(/Nothing tracked yet/)).toBeInTheDocument();
+    expect(fake.chrome.action.setBadgeText).toHaveBeenCalledWith({ text: "" });
+  });
+
+  it("marks a confirmed subscription and shows its next charge", async () => {
+    replies(true);
+    fetchMock.mockImplementation(async () =>
+      json({
+        monthlyTotal: 15.99,
+        subscriptions: [{ ...LIST.subscriptions[0], confirmed: true, nextChargeDate: "2026-11-03" }],
+      }),
+    );
+    render(<Popup />);
+    expect(await screen.findByText("confirmed")).toBeInTheDocument();
+    expect(screen.getByText(/next Nov 3, 2026/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Review Fernwood" })).toBeNull();
+  });
+
   it("shows page text as text, never as HTML", async () => {
     replies(true);
     fake.chrome.scripting.executeScript.mockResolvedValue([
@@ -141,7 +171,7 @@ describe("Popup", () => {
     ]);
     render(<Popup />);
     expect(await screen.findByText("<img src=x onerror=alert(1)>")).toBeInTheDocument();
-    expect(document.querySelector("img")).toBeNull();
+    expect(document.querySelector("img[src=x]")).toBeNull();
   });
 });
 
@@ -163,6 +193,12 @@ describe("the manifest", () => {
     expect([...manifest.permissions].sort()).toEqual(["activeTab", "identity", "scripting", "storage"]);
     expect(JSON.stringify(manifest)).not.toMatch(/all_urls|\*:\/\/\*/);
     expect(manifest.host_permissions).toEqual(["http://localhost:8787/*"]);
+  });
+  it("has the Hippo icon at every size", () => {
+    for (const size of ["16", "32", "48", "128"]) {
+      expect(manifest.icons[size]).toBe(`icons/icon-${size}.png`);
+      expect(manifest.action.default_icon[size]).toBe(`icons/icon-${size}.png`);
+    }
   });
   it("has no always on content script", () => {
     expect(manifest.content_scripts).toBeUndefined();

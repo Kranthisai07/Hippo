@@ -4,18 +4,40 @@ import { describe, expect, it } from "vitest";
 import { resolveAgreement, resolveAsset, tokens, type AgreementLike, type AssetLike } from "../src";
 
 const home: AssetLike[] = [
-  { id: "dw", name: "Dishwasher", aliases: ["dish washer"], category: "appliance", brand: "Northwind", location: "kitchen" },
+  {
+    id: "dw",
+    name: "Dishwasher",
+    aliases: ["dish washer"],
+    category: "appliance",
+    brand: "Northwind",
+    location: "kitchen",
+  },
   { id: "fr", name: "Refrigerator", aliases: ["fridge"], category: "appliance", brand: "Coolmax", location: "kitchen" },
   { id: "wf1", name: "Kitchen water filter", category: "appliance", location: "kitchen" },
   { id: "wf2", name: "Fridge water filter", category: "appliance", location: "kitchen" },
-  { id: "tv", name: "Living room TV", aliases: ["television"], category: "electronics", brand: "Vista", location: "living room" },
-  { id: "car", name: "Car", aliases: ["Honda", "CR-V", "my car"], category: "vehicle", brand: "Honda", location: "garage" },
+  {
+    id: "tv",
+    name: "Living room TV",
+    aliases: ["television"],
+    category: "electronics",
+    brand: "Vista",
+    location: "living room",
+  },
+  {
+    id: "car",
+    name: "Car",
+    aliases: ["Honda", "CR-V", "my car"],
+    category: "vehicle",
+    brand: "Honda",
+    location: "garage",
+  },
   { id: "wh", name: "Water heater", category: "appliance", location: "basement" },
   { id: "bb", name: "Boon NURSH baby bottles", aliases: ["baby bottles"], category: "child_safety", brand: "Boon" },
 ];
 
 const id = (r: ReturnType<typeof resolveAsset>) => (r.status === "match" ? r.item.id : r.status);
-const ids = (r: ReturnType<typeof resolveAsset>) => (r.status === "ambiguous" ? r.candidates.map((c) => c.id).sort() : []);
+const ids = (r: ReturnType<typeof resolveAsset>) =>
+  r.status === "ambiguous" ? r.candidates.map((c) => c.id).sort() : [];
 
 describe("tokens", () => {
   it("lowercases and strips punctuation", () => {
@@ -215,8 +237,14 @@ describe("resolveAsset: a name that merely contains the words is a question, not
   });
   it("matches by category or brand when the name is a model number", () => {
     expect(id(resolveAsset("dishwasher", [{ id: "dw", name: "Bosch SHX878", category: "dishwasher" }]))).toBe("dw");
-    expect(id(resolveAsset("samsung fridge", [{ id: "f", name: "RF28", brand: "Samsung", category: "fridge" }]))).toBe("f");
-    expect(id(resolveAsset("kitchen dishwasher", [{ id: "dw", name: "SHX878", category: "dishwasher", location: "kitchen" }]))).toBe("dw");
+    expect(id(resolveAsset("samsung fridge", [{ id: "f", name: "RF28", brand: "Samsung", category: "fridge" }]))).toBe(
+      "f",
+    );
+    expect(
+      id(
+        resolveAsset("kitchen dishwasher", [{ id: "dw", name: "SHX878", category: "dishwasher", location: "kitchen" }]),
+      ),
+    ).toBe("dw");
   });
   it("is ruled out by one different word", () => {
     expect(resolveAsset("upstairs bathroom fan", as("Downstairs bathroom fan")).status).toBe("none");

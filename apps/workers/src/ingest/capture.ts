@@ -5,7 +5,7 @@ import { s3KeysForDoc } from "core/src/repository/shared";
 import { extractSubscriptionRules, looksLikeSubscription } from "obligation-kit";
 import type { CaptureResult, OnCaptured } from "../../../api/src/api/extension";
 import { updateIndex } from "../../../api/src/api/fixtureIngest";
-import { createPagesIngest, type PagesDeps } from "./ingest";
+import { createPagesIngest, type PagesDeps } from "./pagesIngest";
 import { reasonFor } from "./reasons";
 import { createRuleExtractor } from "./ruleExtractor";
 

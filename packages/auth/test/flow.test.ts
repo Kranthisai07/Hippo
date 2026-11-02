@@ -173,7 +173,8 @@ describe("full flow", () => {
       headers: { cookie: cookieHeader(sess) },
     });
     const html = await res.text();
-    expect(html).toContain("Signed in as demo@hippo.test");
+    expect(html).toContain("demo@hippo.test");
+    expect(html).toContain("Signed in on this browser");
     const csrf = /name="csrf" value="([^"]*)"/.exec(html)![1]!;
     const page = { csrf, cookies: { ...sess, ...cookiesOf(res) }, html, res };
     const go = await postAuthorize(env, page, p, { action: "continue" });

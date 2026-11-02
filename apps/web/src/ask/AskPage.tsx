@@ -1,6 +1,7 @@
 // The Hippo demo MCP client page. Mounted at /ask and /callback by the main app. No router: it reads window.location.
 import { useCallback, useEffect, useRef, useState } from "react";
 import "./ask.css";
+import { BrandMark } from "../components/BrandMark";
 import { completeExchange, signInDemo, signOut } from "./auth";
 import { Boundary } from "./cards";
 import { Console } from "./Console";
@@ -72,12 +73,10 @@ export default function AskPage() {
       </a>
       <header className="ha-top">
         <div className="ha-brand">
-          <span className="ha-logo" aria-hidden="true">
-            H
-          </span>
+          <BrandMark />
           <div>
             <h1>Hippo</h1>
-            <p className="ha-muted">Demo client for the voice assistant add-on</p>
+            <p className="ha-muted">Voice assistant demo</p>
           </div>
         </div>
         {session ? (
@@ -100,8 +99,8 @@ export default function AskPage() {
           <section className="ha-hero" aria-live="polite" aria-busy={phase === "working"}>
             <h2>Ask Hippo about your paperwork</h2>
             <p>
-              This page is a real MCP client. It signs in with OAuth (PKCE), then calls the Hippo server over Streamable
-              HTTP, the same way a voice assistant would.
+              Sign in with the demo account, then ask a question the way you would out loud. Every answer names the
+              document and the page it came from.
             </p>
             {message ? (
               <p className="ha-error" role="alert">
@@ -114,7 +113,7 @@ export default function AskPage() {
           </section>
         ) : (
           <Boundary text="Something went wrong drawing this page. Reload it and sign in again.">
-            <div className="ha-layout">
+            <div className="ha-solo">
               <Console
                 call={session.call}
                 tools={session.tools}
@@ -125,17 +124,21 @@ export default function AskPage() {
                   setMessage("Your sign-in ended. Sign in again to keep going.");
                 }}
               />
-              <aside className="ha-side" aria-label="Protocol log">
-                <ProtocolLog entries={log} />
-              </aside>
             </div>
           </Boundary>
         )}
+        <details className="ha-how">
+          <summary>How this works</summary>
+          <div className="ha-how__body">
+            <p>
+              This page is a real MCP client. It signs in with OAuth (PKCE), then calls the Hippo server over Streamable
+              HTTP, the same way a voice assistant would.
+            </p>
+            {session ? <ProtocolLog entries={log} /> : null}
+            <p>Cards are plain React drawn from the tool's structured result. They are not the MCP Apps host bridge.</p>
+          </div>
+        </details>
       </main>
-
-      <footer className="ha-foot">
-        Cards are plain React drawn from the tool's structured result. They are not the MCP Apps host bridge.
-      </footer>
     </div>
   );
 }

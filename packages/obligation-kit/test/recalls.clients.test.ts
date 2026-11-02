@@ -47,32 +47,64 @@ describe("fetchCpscRecalls", () => {
     expect(await fetchCpscRecalls({ ProductName: "zzz" }, { fetch: async () => ok([]) })).toEqual([]);
   });
   it("the HTTP 200 error record throws, not an empty list", async () => {
-    const bad = [{ RecallID: 0, RecallNumber: null, Title: "Error retrieving Recalls: The underlying provider failed on Open.", Products: [] }];
-    await expect(fetchCpscRecalls({ ProductName: "x" }, { fetch: async () => ok(bad) })).rejects.toBeInstanceOf(CpscApiError);
+    const bad = [
+      {
+        RecallID: 0,
+        RecallNumber: null,
+        Title: "Error retrieving Recalls: The underlying provider failed on Open.",
+        Products: [],
+      },
+    ];
+    await expect(fetchCpscRecalls({ ProductName: "x" }, { fetch: async () => ok(bad) })).rejects.toBeInstanceOf(
+      CpscApiError,
+    );
   });
   it("unknown param throws before any fetch", async () => {
     let called = false;
-    await expect(fetchCpscRecalls({ UPC: "1" }, { fetch: async () => ((called = true), ok([])) })).rejects.toBeInstanceOf(CpscApiError);
+    await expect(
+      fetchCpscRecalls({ UPC: "1" }, { fetch: async () => ((called = true), ok([])) }),
+    ).rejects.toBeInstanceOf(CpscApiError);
     expect(called).toBe(false);
   });
   it("non-ok status throws without echoing the url", async () => {
-    await expect(fetchCpscRecalls({ ProductName: "secret" }, { fetch: async () => status(503) })).rejects.toThrow(/^(?!.*secret).*503/);
+    await expect(fetchCpscRecalls({ ProductName: "secret" }, { fetch: async () => status(503) })).rejects.toThrow(
+      /^(?!.*secret).*503/,
+    );
   });
   it("network error throws a typed error without the original message", async () => {
     await expect(
-      fetchCpscRecalls({ ProductName: "x" }, { fetch: async () => { throw new Error("https://leak.example/?q=1"); } }),
+      fetchCpscRecalls(
+        { ProductName: "x" },
+        {
+          fetch: async () => {
+            throw new Error("https://leak.example/?q=1");
+          },
+        },
+      ),
     ).rejects.toThrow(/^(?!.*leak).*network/);
   });
   it("invalid JSON throws", async () => {
-    const res: HttpResponse = { ok: true, status: 200, json: async () => { throw new SyntaxError("x"); } };
-    await expect(fetchCpscRecalls({ ProductName: "x" }, { fetch: async () => res })).rejects.toBeInstanceOf(CpscApiError);
+    const res: HttpResponse = {
+      ok: true,
+      status: 200,
+      json: async () => {
+        throw new SyntaxError("x");
+      },
+    };
+    await expect(fetchCpscRecalls({ ProductName: "x" }, { fetch: async () => res })).rejects.toBeInstanceOf(
+      CpscApiError,
+    );
   });
   it("applies the ceiling", async () => {
-    await expect(fetchCpscRecalls({ ProductName: "x" }, { fetch: async () => ok([...boon, ...boon]), maxRecords: 1 })).rejects.toThrow(/ceiling/);
+    await expect(
+      fetchCpscRecalls({ ProductName: "x" }, { fetch: async () => ok([...boon, ...boon]), maxRecords: 1 }),
+    ).rejects.toThrow(/ceiling/);
   });
   it("is not retried", async () => {
     let n = 0;
-    await expect(fetchCpscRecalls({ ProductName: "x" }, { fetch: async () => (n++, status(500)) })).rejects.toBeInstanceOf(CpscApiError);
+    await expect(
+      fetchCpscRecalls({ ProductName: "x" }, { fetch: async () => (n++, status(500)) }),
+    ).rejects.toBeInstanceOf(CpscApiError);
     expect(n).toBe(1);
   });
 });
@@ -130,7 +162,13 @@ describe("fetchNhtsaRecalls", () => {
     await expect(fetchNhtsaRecalls(V, h.deps)).rejects.toThrow(/^(?!.*leak)/);
   });
   it("error after non-JSON body", async () => {
-    const res: HttpResponse = { ok: true, status: 200, json: async () => { throw new SyntaxError("x"); } };
+    const res: HttpResponse = {
+      ok: true,
+      status: 200,
+      json: async () => {
+        throw new SyntaxError("x");
+      },
+    };
     await expect(fetchNhtsaRecalls(V, harness([res]).deps)).rejects.toBeInstanceOf(NhtsaApiError);
   });
   it("a malformed body throws and is not retried", async () => {

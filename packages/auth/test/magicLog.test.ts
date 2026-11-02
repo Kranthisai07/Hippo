@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { MAIL_TIMEOUT_MS, type AuditEvent } from "../src";
 import { makeEnv } from "./helpers";
 
 // Round 2 review: the magic code is a login credential and was written to the log in every environment.
@@ -33,5 +34,124 @@ describe("logging the magic code", () => {
       body: JSON.stringify({ email: "alice@example.com", code: "000000" }),
     });
     expect(res.status).toBe(401);
+  });
+});
+
+describe("a mailer", () => {
+  it("receives the code, and nothing is logged", async () => {
+    const sent: [string, string][] = [];
+    const env = makeEnv({ mailer: { send: async (e, c) => void sent.push([e, c]) } });
+    expect((await send(env)).status).toBeLessThan(300);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]![0]).toBe("alice@example.com");
+    expect(sent[0]![1]).toMatch(/^\d{6}$/);
+    expect(env.logs.join("\n")).not.toContain(sent[0]![1]);
+    const login = await env.req("/oauth/session", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: "alice@example.com", code: sent[0]![1] }),
+    });
+    expect(login.status).toBe(200);
+  });
+
+  it("a provider failure gives the same answer, and the log holds the error name only", async () => {
+    const ok = makeEnv({ mailer: { send: async () => undefined } });
+    const bad = makeEnv({
+      mailer: {
+        send: async () => {
+          throw new TypeError("smtp said alice@example.com 123456");
+        },
+      },
+    });
+    const a = await send(ok);
+    const b = await send(bad);
+    expect(b.status).toBe(a.status);
+    expect(await b.json()).toEqual(await a.json());
+    expect(bad.logs.join("\n")).toContain("mail failed: TypeError");
+    expect(bad.logs.join("\n")).not.toMatch(/alice@|\d{6}/);
+  });
+
+  it("the sign in form answers the same for an address that is malformed and one that is not", async () => {
+    const env = makeEnv({ mailer: { send: async () => undefined } });
+    const msg = async (email: string) => {
+      const page = await env.req(
+        "/oauth/authorize?" +
+          new URLSearchParams({
+            client_id: "alexa",
+            redirect_uri: "https://alexa.example/auth/callback",
+            response_type: "code",
+            code_challenge: "A".repeat(43),
+            code_challenge_method: "S256",
+            resource: "https://api.hippo.test/mcp",
+          }),
+      );
+      const csrf = /name="csrf" value="([^"]+)"/.exec(await page.text())![1]!;
+      const res = await env.req("/oauth/authorize", {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded", cookie: `hippo_csrf=${csrf}` },
+        body: new URLSearchParams({
+          action: "send",
+          email,
+          csrf,
+          client_id: "alexa",
+          redirect_uri: "https://alexa.example/auth/callback",
+          response_type: "code",
+          code_challenge: "A".repeat(43),
+          code_challenge_method: "S256",
+          resource: "https://api.hippo.test/mcp",
+        }).toString(),
+      });
+      return /If that address can sign in[^<]*/.exec(await res.text())?.[0];
+    };
+    expect(await msg("real@example.com")).toBe("If that address can sign in, a code was sent. Enter it below.");
+    expect(await msg("not an email")).toBe("If that address can sign in, a code was sent. Enter it below.");
+  });
+});
+
+describe("a mailer that does not answer", () => {
+  it(
+    "is cut off after the timeout, the answer is unchanged, and the audit says mail failed",
+    { timeout: 20_000 },
+    async () => {
+      // Only the clock is faked. The request also does real asynchronous work (hashing on the thread pool) before it reaches
+      // the mailer, and that takes real time, so each round sleeps a few real milliseconds before the fake clock moves on.
+      const realSetTimeout = globalThis.setTimeout;
+      const sleep = (ms: number) => new Promise<void>((r) => realSetTimeout(r, ms));
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+      try {
+        const events: AuditEvent[] = [];
+        const env = makeEnv({ mailer: { send: () => new Promise(() => undefined) }, audit: (e) => events.push(e) });
+        let res: Response | undefined;
+        const pending = send(env).then((r) => (res = r));
+        for (let i = 0; i < 2000 && !res; i++) {
+          await sleep(5);
+          await vi.advanceTimersByTimeAsync(MAIL_TIMEOUT_MS);
+        }
+        if (!res)
+          throw new Error(
+            `no answer after ${2000} rounds; events: ${events.map((e) => e.event)}; logs: ${env.logs.length}`,
+          );
+        await pending;
+        expect(res.status).toBe(200);
+        expect(await res.json()).toEqual({ ok: true });
+        expect(events.map((e) => e.event)).toEqual(["mail_failed"]);
+        expect(env.logs.join("\n")).not.toMatch(/alice@|\d{6}/);
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+  it("a failure is audited as mail failed, not as sent", async () => {
+    const events: AuditEvent[] = [];
+    const env = makeEnv({
+      mailer: {
+        send: async () => {
+          throw new Error("down");
+        },
+      },
+      audit: (e) => events.push(e),
+    });
+    await send(env);
+    expect(events.map((e) => e.event)).toEqual(["mail_failed"]);
   });
 });

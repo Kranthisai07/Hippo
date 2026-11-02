@@ -17,7 +17,10 @@ const BASE = "https://www.saferproducts.gov/RestWebServices/Recall";
 // End date on its own returned 10,047 records, so each End needs its Start.
 const DATE_PARAMS = new Set(["RecallDateStart", "RecallDateEnd", "LastPublishDateStart", "LastPublishDateEnd"]);
 const ALLOWED = new Set(["RecallNumber", "ProductName", ...DATE_PARAMS]);
-const END_NEEDS: Record<string, string> = { RecallDateEnd: "RecallDateStart", LastPublishDateEnd: "LastPublishDateStart" };
+const END_NEEDS: Record<string, string> = {
+  RecallDateEnd: "RecallDateStart",
+  LastPublishDateEnd: "LastPublishDateStart",
+};
 
 function isIsoDate(v: string): boolean {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
@@ -33,7 +36,8 @@ export function buildCpscUrl(params: Record<string, string>): string {
   for (const [k, v] of Object.entries(params)) {
     if (!ALLOWED.has(k)) throw new CpscApiError(`unknown CPSC parameter: ${k}`);
     if (typeof v !== "string" || v.trim() === "") throw new CpscApiError(`empty value for CPSC parameter: ${k}`);
-    if (DATE_PARAMS.has(k) && !isIsoDate(v.trim())) throw new CpscApiError(`CPSC parameter ${k} must be a YYYY-MM-DD date`);
+    if (DATE_PARAMS.has(k) && !isIsoDate(v.trim()))
+      throw new CpscApiError(`CPSC parameter ${k} must be a YYYY-MM-DD date`);
     q.set(k, v.trim());
   }
   if (q.size === 0) throw new CpscApiError("refusing an unfiltered CPSC request: it returns the whole database");
@@ -97,18 +101,25 @@ export function normalizeUpc(v: string | null | undefined): string | null {
 const arr = (v: unknown): Record<string, unknown>[] =>
   Array.isArray(v) ? v.filter((x): x is Record<string, unknown> => !!x && typeof x === "object") : [];
 const str = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
-const names = (v: unknown, key = "Name"): string[] => arr(v).map((x) => str(x[key])).filter(Boolean);
+const names = (v: unknown, key = "Name"): string[] =>
+  arr(v)
+    .map((x) => str(x[key]))
+    .filter(Boolean);
 
 /** A list field must be absent, null or an array of objects. Anything else would silently drop evidence, so it throws. */
 function list(v: unknown, field: string): Record<string, unknown>[] {
   if (v === undefined || v === null) return [];
   if (!Array.isArray(v)) throw new CpscApiError(`CPSC ${field} is not a list`);
   return v.map((x) => {
-    if (!x || typeof x !== "object" || Array.isArray(x)) throw new CpscApiError(`CPSC ${field} holds something that is not a record`);
+    if (!x || typeof x !== "object" || Array.isArray(x))
+      throw new CpscApiError(`CPSC ${field} holds something that is not a record`);
     return x as Record<string, unknown>;
   });
 }
-const namesOf = (v: unknown, field: string, key = "Name"): string[] => list(v, field).map((x) => str(x[key])).filter(Boolean);
+const namesOf = (v: unknown, field: string, key = "Name"): string[] =>
+  list(v, field)
+    .map((x) => str(x[key]))
+    .filter(Boolean);
 
 /** One UPC field can hold a list ("a, b; c"), and one code can be written with spaces or hyphens ("0 12345 67890 5"). */
 function upcCandidates(v: unknown): string[] {
@@ -177,10 +188,35 @@ const modelKey = (s: string): string =>
     .replace(/[\s\-_/.]+/g, "-")
     .replace(/^-|-$/g, "")
     .replace(/(?<=\p{L})-(?=\p{N})|(?<=\p{N})-(?=\p{L})/gu, "");
-const usableModel = (key: string): boolean => /\p{L}/u.test(key) && /\p{N}/u.test(key) || key.replace(/[^\p{L}\p{N}]/gu, "").length >= 4;
-const words = (s: string): string[] => s.normalize("NFKC").toLowerCase().replace(/['’]/g, "").split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+const usableModel = (key: string): boolean =>
+  (/\p{L}/u.test(key) && /\p{N}/u.test(key)) || key.replace(/[^\p{L}\p{N}]/gu, "").length >= 4;
+const words = (s: string): string[] =>
+  s
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/['’]/g, "")
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(Boolean);
 const BRAND_STOP = new Set(["a", "an", "the", "and", "of", "co", "inc", "llc", "ltd"]);
-const STOP = new Set(["the", "a", "an", "and", "or", "of", "for", "with", "by", "in", "to", "set", "pack", "new", "oz", "kit", "pcs"]);
+const STOP = new Set([
+  "the",
+  "a",
+  "an",
+  "and",
+  "or",
+  "of",
+  "for",
+  "with",
+  "by",
+  "in",
+  "to",
+  "set",
+  "pack",
+  "new",
+  "oz",
+  "kit",
+  "pcs",
+]);
 
 /** Whole-word, in sequence, inside a single text. Boon is not found in Boone. */
 function hasBrand(brandWords: string[], texts: string[]): boolean {
@@ -212,7 +248,10 @@ export function matchCpscRecall(asset: RecallAsset, recall: CpscRecall): CpscMat
   }
 
   const skip = new Set(brandWords);
-  const content = (s: string) => words(s).filter((w) => !STOP.has(w) && !skip.has(w)).map(stem);
+  const content = (s: string) =>
+    words(s)
+      .filter((w) => !STOP.has(w) && !skip.has(w))
+      .map(stem);
   const theirs = new Set(recall.productNames.flatMap(content));
   if (content(asset.name).some((w) => theirs.has(w))) return { confidence: "possible", evidence: "brand_name" };
   return null;

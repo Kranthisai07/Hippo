@@ -233,7 +233,15 @@ describe("masking", () => {
     expect(out("n 1,2345,678")).toContain("n ****5678");
   });
   it("does not mask ordinary short numbers", () => {
-    for (const t of ["3 things", "Nov 1", "within 30 days", "Due in 14 days, 2 left", "Room 12, floor 3", "v1.2.3", "1 2 3 4"])
+    for (const t of [
+      "3 things",
+      "Nov 1",
+      "within 30 days",
+      "Due in 14 days, 2 left",
+      "Room 12, floor 3",
+      "v1.2.3",
+      "1 2 3 4",
+    ])
       expect(out(t)).toContain(t);
   });
   it("accepts false positives on 5+ scattered digits (fail safe)", () => {
@@ -459,7 +467,10 @@ describe("second review: hostile length, wider separators, caps, urls, types", (
     const many = Array.from({ length: 200 }, () => mk());
     const d = must(many, { maxItems: 1e6 });
     expect(d.alertIds).toHaveLength(50);
-    const few = must(Array.from({ length: 30 }, () => mk()), { maxItems: 1e9 });
+    const few = must(
+      Array.from({ length: 30 }, () => mk()),
+      { maxItems: 1e9 },
+    );
     expect(few.alertIds).toHaveLength(30);
     expect(few.subject).toBe("Hippo: 30 things need you");
     expect(few.subject).not.toMatch(/\d{3}/);
@@ -492,9 +503,13 @@ describe("second review: hostile length, wider separators, caps, urls, types", (
 
 describe("recalls rank below deadlines and never crowd them out (Q-012)", () => {
   const recalls = (k: number) =>
-    Array.from({ length: k }, (_, i) => mk({ source: "recall", severity: "high", label: `Honda CR-V recall ${i + 1}`, dueDate: null }));
+    Array.from({ length: k }, (_, i) =>
+      mk({ source: "recall", severity: "high", label: `Honda CR-V recall ${i + 1}`, dueDate: null }),
+    );
   const possibles = (k: number) =>
-    Array.from({ length: k }, (_, i) => mk({ severity: "possible", label: `Deadline ${i + 1}`, dueDate: `2026-11-0${i + 1}` }));
+    Array.from({ length: k }, (_, i) =>
+      mk({ severity: "possible", label: `Deadline ${i + 1}`, dueDate: `2026-11-0${i + 1}` }),
+    );
   it("a high recall does not outrank a possible deadline", () => {
     const d = must([...recalls(1), ...possibles(2)]);
     expect(d.text.indexOf("Deadline 1")).toBeGreaterThan(-1);

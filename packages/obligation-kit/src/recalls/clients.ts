@@ -6,7 +6,14 @@
 // own and tests run on a fake clock. URLs and bodies are never logged or put in error messages.
 
 import { CpscApiError, buildCpscUrl, normalizeCpscRecall, parseCpscResponse, type CpscRecall } from "./cpsc";
-import { NhtsaApiError, canonicalizeVehicle, modelsUrl, parseNhtsaResponse, recallsByVehicleUrl, type NhtsaRecall } from "./nhtsa";
+import {
+  NhtsaApiError,
+  canonicalizeVehicle,
+  modelsUrl,
+  parseNhtsaResponse,
+  recallsByVehicleUrl,
+  type NhtsaRecall,
+} from "./nhtsa";
 
 export interface HttpResponse {
   ok: boolean;
@@ -93,5 +100,7 @@ export function createNhtsaClient(deps: NhtsaDeps) {
   };
 }
 
-export const fetchNhtsaRecalls = (v: { make: string; model: string; year: number }, deps: NhtsaDeps): Promise<NhtsaRecall[]> =>
-  createNhtsaClient(deps).recalls(v);
+export const fetchNhtsaRecalls = (
+  v: { make: string; model: string; year: number },
+  deps: NhtsaDeps,
+): Promise<NhtsaRecall[]> => createNhtsaClient(deps).recalls(v);

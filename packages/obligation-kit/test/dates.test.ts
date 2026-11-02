@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { addDays, addMonths, daysBetween, isBusinessDay, isFederalHoliday, parseIso, subtractBusinessDays } from "../src";
+import {
+  addDays,
+  addMonths,
+  daysBetween,
+  isBusinessDay,
+  isFederalHoliday,
+  parseIso,
+  subtractBusinessDays,
+} from "../src";
 
 describe("parseIso", () => {
   it.each(["2026-10-21", "2028-02-29", "1999-12-31"])("accepts %s", (s) => {

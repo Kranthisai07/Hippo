@@ -57,7 +57,8 @@ function dayNumber(iso: string): number | null {
 }
 
 function validateAppUrl(raw: string): string {
-  const bad = () => new Error(`appUrl must be an https:// URL (or http://localhost for dev), got: ${JSON.stringify(raw)}`);
+  const bad = () =>
+    new Error(`appUrl must be an https:// URL (or http://localhost for dev), got: ${JSON.stringify(raw)}`);
   const s = typeof raw === "string" ? raw.trim() : "";
   // Printable ASCII only: no controls, zero width, spaces, dash look-alikes. Also no quotes, angle brackets, backslash, backtick.
   // shortcut: internationalized hosts must be given as punycode, upgrade if a household ever needs a non-ASCII domain.
@@ -91,8 +92,7 @@ function capTail(text: string, max: number): string {
  * and become "****" plus the last 4. Fail safe on purpose: "1 2 3 4 5" and "Dec 5, 2026" are masked too, and so are ISO dates.
  */
 function clean(raw: unknown): string {
-  let s = capTail(typeof raw === "string" ? raw : "", MAX_RAW)
-    .normalize("NFKC"); // superscripts and full width digits become plain digits, look-alike dashes and dots become ASCII
+  let s = capTail(typeof raw === "string" ? raw : "", MAX_RAW).normalize("NFKC"); // superscripts and full width digits become plain digits, look-alike dashes and dots become ASCII
   s = capTail(s, MAX_NORMALIZED)
     .replace(/\p{M}/gu, "")
     .replace(/[\p{Z}\p{Cc}\p{Cf}]/gu, " ")
@@ -102,11 +102,19 @@ function clean(raw: unknown): string {
     .replace(/(?<![^\s(\[])\/\/\S*/g, "[link removed]")
     // A bare domain with a letters-only TLD of 2+ characters, and anything after it. "Dec. 5" and "e.g. this" survive.
     .replace(/\b[a-z0-9][a-z0-9-]*(?:\.[a-z0-9-]+)*\.\p{L}{2,}\b(?:[/?#]\S*)?/giu, "[link removed]")
-    .replace(new RegExp(NUMBER_RUN.source, "gu"), (run) => `****${[...run.replace(/[^\p{Nd}]/gu, "")].slice(-4).join("")}`)
+    .replace(
+      new RegExp(NUMBER_RUN.source, "gu"),
+      (run) => `****${[...run.replace(/[^\p{Nd}]/gu, "")].slice(-4).join("")}`,
+    )
     .replace(/\s+/g, " ")
     .trim();
   const chars = [...s];
-  if (chars.length > MAX_TEXT) s = chars.slice(0, MAX_TEXT - 3).join("").trimEnd() + "...";
+  if (chars.length > MAX_TEXT)
+    s =
+      chars
+        .slice(0, MAX_TEXT - 3)
+        .join("")
+        .trimEnd() + "...";
   return s;
 }
 
@@ -164,7 +172,8 @@ export function buildDigest(input: DigestInput): Digest | null {
     );
   if (picked.length === 0) return null;
 
-  const asked = Number.isFinite(input.maxItems) && (input.maxItems as number) >= 1 ? Math.floor(input.maxItems as number) : 10;
+  const asked =
+    Number.isFinite(input.maxItems) && (input.maxItems as number) >= 1 ? Math.floor(input.maxItems as number) : 10;
   const cap = Math.min(asked, MAX_ITEMS);
   // At most MAX_RECALLS recall lines per digest; the rest stay unsent and come in a later digest.
   const shown: DigestAlert[] = [];
@@ -188,7 +197,8 @@ export function buildDigest(input: DigestInput): Digest | null {
 
   const n = shown.length;
   // Counts in the subject and the "more" line are capped so a huge alert pile never prints a long number.
-  const subject = more > 0 ? "Hippo: Several things need you" : `Hippo: ${n} ${n === 1 ? "thing needs" : "things need"} you`;
+  const subject =
+    more > 0 ? "Hippo: Several things need you" : `Hippo: ${n} ${n === 1 ? "thing needs" : "things need"} you`;
   const moreLine = more > 0 ? `and ${more > 99 ? "many" : more} more in the app` : null;
 
   const text = [

@@ -1,10 +1,12 @@
 import { createHash, randomBytes, randomInt } from "node:crypto";
 import { pathToFileURL } from "node:url";
-import { createAuth } from "@hippo/auth";
+import { createAuth, linksFromEnv } from "@hippo/auth";
 import { serve, type ServerType } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { createMemoryRepository } from "core/src/repository";
 import { createApp } from "./app";
+import { createFixtureIngest } from "./api/demoIngest";
+import { DEV_EXTENSION_ID, productionProblems } from "./config";
 import { createLocalUploader, createMemoryObjectStore } from "./api/storage";
 import { createMemoryIndexSource } from "./mcp/indexCache";
 import { DEMO_HOUSEHOLD, seedHousehold } from "./seed";
@@ -24,8 +26,7 @@ export const isLocalOnly = (host: string, issuer: string, env: Record<string, st
 
 /** The date every deadline in the fixtures is computed against (fixtures/README.md). */
 export const DEMO_TODAY = "2026-10-21";
-/** The id Chrome gives apps/extension, fixed by the public key in its manifest. Local servers trust it by default. */
-export const DEV_EXTENSION_ID = "gcanedelajoahpaoeeonbdlieoepcobc";
+export { DEV_EXTENSION_ID };
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
 
 /**
@@ -64,6 +65,11 @@ const list = (v: string | undefined, fallback: string[]): string[] =>
 
 export async function startServer(opts: ServerOptions = {}): Promise<Running> {
   const env = opts.env ?? process.env;
+  // This entry keeps everything in memory, so production is refused here until a durable host entry replaces it.
+  if (env.HIPPO_ENV === "production") {
+    const problems = productionProblems(env, { durable: false, mailer: false }).map((x) => `- ${x}`);
+    throw new Error(["Refusing to start in production:", ...problems].join("\n"));
+  }
   const log = opts.log ?? ((line: string) => console.log(line));
   const port = opts.port ?? Number(env.PORT ?? 8787);
   const host = opts.host ?? env.HOST ?? "127.0.0.1";
@@ -121,15 +127,20 @@ export async function startServer(opts: ServerOptions = {}): Promise<Running> {
     issuer,
     resource: `${issuer}/mcp`,
     signingKey,
-    clients: [{ clientId, redirectUris }],
+    clients: [{ clientId, redirectUris, ...(env.HIPPO_CLIENT_NAME ? { name: env.HIPPO_CLIENT_NAME } : {}) }],
+    links: linksFromEnv(env),
     resolveHousehold: (email) =>
       email === demoEmail.toLowerCase()
         ? DEMO_HOUSEHOLD
         : `hh_${createHash("sha256").update(email).digest("base64url").slice(0, 16)}`,
     log,
+    audit: (e) => log(JSON.stringify({ ts: new Date().toISOString(), audit: e.event, sub: e.sub, reason: e.reason })),
     ...(demoOn ? { demoUser: { email: demoEmail, code: demoCode } } : {}),
     // Without the demo there is no mailer, so a printed code would only leak into a shared log.
     logMagicCodes: demoOn,
+    ...(env.HIPPO_GOOGLE_CLIENT_ID && env.HIPPO_GOOGLE_CLIENT_SECRET
+      ? { google: { clientId: env.HIPPO_GOOGLE_CLIENT_ID, clientSecret: env.HIPPO_GOOGLE_CLIENT_SECRET } }
+      : {}),
     ...(serviceId && serviceSecret ? { serviceClient: { clientId: serviceId, clientSecret: serviceSecret } } : {}),
     now: clock,
   });
@@ -139,25 +150,33 @@ export async function startServer(opts: ServerOptions = {}): Promise<Running> {
     repo,
     indexSource,
     now: clock,
+    // Set only behind a proxy that writes this header itself (cf-connecting-ip on Cloudflare).
+    hsts: issuer.startsWith("https://"),
+    ...(env.HIPPO_CLIENT_IP_HEADER ? { clientIpHeader: env.HIPPO_CLIENT_IP_HEADER } : {}),
     // The server's own origin too: when it serves the web build itself, the /ask page calls /mcp from this origin.
     allowedOrigins: [
       new URL(issuer).origin,
       ...allowedOrigins,
       ...(extensionId ? [`chrome-extension://${extensionId}`] : []),
     ],
-    // Web API: files in memory, the PUT route of this server, and the fixture ingest (createApp's default hook) that
+    // Web API: files in memory, the PUT route of this server, and the demo fixture ingest, which
     // only reads the demo documents. The web dev server may send the cookie from its own origin.
     web: {
       objectStore,
       // HIPPO_INGEST=pipeline swaps the demo-only fixture ingest for the real pipeline (apps/workers, fixture mode unless HIPPO_LIVE_AI=1).
-      ...(env.HIPPO_INGEST === "pipeline"
-        ? {
-            onUploaded: (await import("../../workers/src/ingest")).createPipelineIngest(
+      onUploaded:
+        env.HIPPO_INGEST === "pipeline"
+          ? (await import("../../workers/src/ingest")).createPipelineIngest(
               { repo, objectStore, indexStore: indexSource, now: clock, log },
               env,
-            ),
-          }
-        : {}),
+            )
+          : createFixtureIngest({
+              repo,
+              objectStore,
+              indexStore: indexSource,
+              now: clock,
+              newId: () => crypto.randomUUID(),
+            }),
       // The browser extension saves pages only on a local server. The hook is not even loaded anywhere else.
       ...(localOnly
         ? {

@@ -44,7 +44,8 @@ const TYPE_LABEL: Record<ObligationType, string> = {
   claim_by: "file claim by",
 };
 
-const date = (f: Record<string, unknown>, k: string): string | null => (parseIso(f[k]) === null ? null : (f[k] as string));
+const date = (f: Record<string, unknown>, k: string): string | null =>
+  parseIso(f[k]) === null ? null : (f[k] as string);
 const count = (f: Record<string, unknown>, k: string): number | null => {
   const v = f[k];
   return typeof v === "number" && Number.isInteger(v) && v >= 0 ? v : null;
@@ -185,7 +186,8 @@ export function computeObligations(agreement: AgreementInput, today: string): Ob
     if (trial) push("trial_end", trial, ["trialEndDate"]);
     if (notice !== null) {
       // While a trial is still running, the deadline is set by the trial end, not the later regular charge.
-      if (trial && daysBetween(today, trial) >= 0) push("cancel_by", addDays(trial, -notice), ["trialEndDate", "cancelNoticeDays"]);
+      if (trial && daysBetween(today, trial) >= 0)
+        push("cancel_by", addDays(trial, -notice), ["trialEndDate", "cancelNoticeDays"]);
       else if (next && charge) {
         push("cancel_by", addDays(charge.date, -notice), [
           "nextChargeDate",

@@ -36,7 +36,8 @@ export const addDays = (iso: string, n: number): string => toIso(need(iso) + n *
 /** Whole days from a to b; negative when b is earlier. */
 export const daysBetween = (a: string, b: string): number => Math.round((need(b) - need(a)) / DAY_MS);
 
-export const daysInMonth = (year: number, month0: number): number => new Date(Date.UTC(year, month0 + 1, 0)).getUTCDate();
+export const daysInMonth = (year: number, month0: number): number =>
+  new Date(Date.UTC(year, month0 + 1, 0)).getUTCDate();
 
 /** Adds calendar months and clamps to the month end (Jan 31 + 1 month = Feb 28 or 29). */
 export function addMonths(iso: string, n: number): string {

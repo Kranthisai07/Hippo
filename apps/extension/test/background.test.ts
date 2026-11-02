@@ -27,3 +27,40 @@ describe("who may ask the service worker", () => {
     expect(reply).not.toHaveBeenCalled();
   });
 });
+
+describe("signing in", () => {
+  it("a second click while the sign in window is open joins the first attempt", async () => {
+    const { chrome } = fakeChrome();
+    vi.resetModules();
+    await import("../src/background");
+    const l = chrome.runtime.onMessage.addListener.mock.calls[0]![0] as Listener;
+    let finish!: (url: string) => void;
+    chrome.identity.launchWebAuthFlow.mockImplementation(() => new Promise<string>((r) => (finish = r)));
+    const a = vi.fn();
+    const b = vi.fn();
+    l({ type: "signIn" }, { id: "ext" }, a);
+    l({ type: "signIn" }, { id: "ext" }, b);
+    await vi.waitFor(() => expect(chrome.identity.launchWebAuthFlow).toHaveBeenCalledTimes(1));
+    finish("https://abc.chromiumapp.org/?error=denied");
+    await vi.waitFor(() => expect(a).toHaveBeenCalled());
+    await vi.waitFor(() => expect(b).toHaveBeenCalled());
+    expect(chrome.identity.launchWebAuthFlow).toHaveBeenCalledTimes(1);
+    expect(a.mock.calls[0]![0]).toEqual(b.mock.calls[0]![0]);
+  });
+
+  it("says plainly that a sign in window is already open when Chrome refuses a second flow", async () => {
+    const { chrome } = fakeChrome();
+    vi.resetModules();
+    await import("../src/background");
+    const l = chrome.runtime.onMessage.addListener.mock.calls[0]![0] as Listener;
+    chrome.identity.launchWebAuthFlow.mockRejectedValue(new Error("Only one web auth flow is allowed at a time."));
+    const reply = vi.fn();
+    l({ type: "signIn" }, { id: "ext" }, reply);
+    await vi.waitFor(() =>
+      expect(reply).toHaveBeenCalledWith({
+        ok: false,
+        error: "A Hippo sign-in window is already open. Finish or close it, then try again.",
+      }),
+    );
+  });
+});

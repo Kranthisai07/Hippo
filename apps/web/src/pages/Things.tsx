@@ -1,9 +1,9 @@
-import { Package, Upload } from "lucide-react";
+import { FileSignature, FileText, Package, Upload, Wrench } from "lucide-react";
 import { Link, useParams } from "react-router";
 import { StatusChip } from "../components/FieldRow";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui";
 import { api } from "../lib/api";
-import { humanize, valueLines } from "../lib/format";
+import { humanize, readableDate, valueLines } from "../lib/format";
 import { useLoad } from "../lib/useLoad";
 
 export function Things() {
@@ -78,14 +78,27 @@ export function ThingDetail() {
           .join(", ")}
       </p>
 
-      <section className="stack" aria-labelledby="docs-h">
-        <h2 id="docs-h">Documents</h2>
+      <section className="card stack" aria-labelledby="docs-h">
+        <h2 id="docs-h" className="card-h">
+          <FileText size={20} aria-hidden="true" /> Documents
+        </h2>
         {docs.length === 0 ? (
-          <p className="muted">No documents are linked to this item yet.</p>
+          <EmptyState
+            as="h3"
+            icon={FileText}
+            title="Nothing linked yet"
+            action={
+              <Link to="/upload" className="btn btn-sm">
+                <Upload size={16} aria-hidden="true" /> Upload a document
+              </Link>
+            }
+          >
+            Upload a manual, receipt or warranty and it can be kept with this item.
+          </EmptyState>
         ) : (
           <ul className="list">
             {docs.map((d) => (
-              <li key={d.id} className="card">
+              <li key={d.id} className="card-row">
                 <Link to={`/review/${encodeURIComponent(d.id)}`}>{d.filename}</Link>
               </li>
             ))}
@@ -93,13 +106,17 @@ export function ThingDetail() {
         )}
       </section>
 
-      <section className="stack" aria-labelledby="agr-h">
-        <h2 id="agr-h">Agreements</h2>
+      <section className="card stack" aria-labelledby="agr-h">
+        <h2 id="agr-h" className="card-h">
+          <FileSignature size={20} aria-hidden="true" /> Agreements
+        </h2>
         {agreements.length === 0 ? (
-          <p className="muted">No agreements yet.</p>
+          <EmptyState as="h3" icon={FileSignature} title="No agreements yet">
+            Warranties, plans and policies for this item show up here once you have reviewed their document.
+          </EmptyState>
         ) : (
           agreements.map((g) => (
-            <div key={g.id} className="card stack">
+            <div key={g.id} className="card-row stack">
               <h3>{humanize(g.kind)}</h3>
               <dl className="stack">
                 {g.fields.map((f) => (
@@ -115,15 +132,19 @@ export function ThingDetail() {
         )}
       </section>
 
-      <section className="stack" aria-labelledby="hist-h">
-        <h2 id="hist-h">Service history</h2>
+      <section className="card stack" aria-labelledby="hist-h">
+        <h2 id="hist-h" className="card-h">
+          <Wrench size={20} aria-hidden="true" /> Service history
+        </h2>
         {history.length === 0 ? (
-          <p className="muted">Nothing recorded yet. Tell Alexa when you have it serviced.</p>
+          <EmptyState as="h3" icon={Wrench} title="Nothing recorded yet.">
+            Service visits will appear here when there are some. You can upload a service receipt any time.
+          </EmptyState>
         ) : (
           <ul className="list">
             {history.map((h) => (
-              <li key={h.id} className="card">
-                <strong>{h.action}</strong> <span className="muted num">{h.ts.slice(0, 10)}</span>
+              <li key={h.id} className="card-row">
+                <strong>{h.action}</strong> <span className="muted num">{readableDate(h.ts.slice(0, 10))}</span>
                 {h.note && <p className="muted">{h.note}</p>}
               </li>
             ))}

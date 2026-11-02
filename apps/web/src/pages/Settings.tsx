@@ -1,4 +1,4 @@
-import { Trash2 } from "lucide-react";
+import { FileText, Mail, Mic, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { ErrorState, Skeleton, useToast } from "../components/ui";
@@ -74,7 +74,9 @@ export function SettingsPage() {
       <h1>Settings</h1>
 
       <section className="card stack" aria-labelledby="digest-h">
-        <h2 id="digest-h">Daily email</h2>
+        <h2 id="digest-h" className="card-h">
+          <Mail size={20} aria-hidden="true" /> Daily email
+        </h2>
         <form
           className="stack"
           onSubmit={(e) => {
@@ -107,7 +109,9 @@ export function SettingsPage() {
       </section>
 
       <section className="card stack" aria-labelledby="docs-h">
-        <h2 id="docs-h">Your documents</h2>
+        <h2 id="docs-h" className="card-h">
+          <FileText size={20} aria-hidden="true" /> Your documents
+        </h2>
         {removed && (
           <p className="banner banner-ok" role="status">
             {removed}
@@ -158,8 +162,24 @@ export function SettingsPage() {
         )}
       </section>
 
+      <section className="card stack" aria-labelledby="voice-h">
+        <h2 id="voice-h" className="card-h">
+          <Mic size={20} aria-hidden="true" /> Voice assistant
+        </h2>
+        <p className="muted">
+          Try asking Hippo about your paperwork out loud, with a demo of the voice assistant add-on.
+        </p>
+        <div>
+          <Link className="btn" to="/ask">
+            Voice assistant demo
+          </Link>
+        </div>
+      </section>
+
       <section className="card stack danger-zone" aria-labelledby="wipe-h">
-        <h2 id="wipe-h">Delete all data</h2>
+        <h2 id="wipe-h" className="card-h">
+          <Trash2 size={20} aria-hidden="true" /> Delete all data
+        </h2>
         <p className="muted">
           This removes every document and file, the page text, extracted fields, dates, reminders and things. It cannot
           be undone. You stay signed in.

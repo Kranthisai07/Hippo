@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import { createAuth } from "@hippo/auth";
 import { createMemoryRepository } from "core/src/repository";
-import { createApp, type WebDeps } from "../src/app";
+import { createApp, type AppDeps, type WebDeps } from "../src/app";
+import { createFixtureIngest } from "../src/api/demoIngest";
 import { createLocalUploader, createMemoryObjectStore } from "../src/api/storage";
 import { createIndexCache, createMemoryIndexSource } from "../src/mcp/indexCache";
 import { seedHousehold } from "../src/seed";
@@ -31,11 +32,12 @@ export interface Client {
 
 export type Web = Awaited<ReturnType<typeof makeWeb>>;
 
-export async function makeWeb(over: { web?: WebDeps } = {}) {
+export async function makeWeb(over: { web?: WebDeps; app?: Partial<AppDeps> } = {}) {
   const repo = createMemoryRepository();
   const indexSource = createMemoryIndexSource();
   const objectStore = createMemoryObjectStore();
   const logs: string[] = [];
+  const requestLog: string[] = [];
   const clock = { t: NOW };
   await seedHousehold(repo, { today: ANCHOR, householdId: A, indexSource, pageStore: objectStore });
   const auth = createAuth({
@@ -50,13 +52,24 @@ export async function makeWeb(over: { web?: WebDeps } = {}) {
     now: () => clock.t,
   });
   let n = 0;
+  const newId = () => `t${++n}`;
   const app = createApp({
     auth,
     repo,
     indexSource,
     now: () => clock.t,
-    newId: () => `t${++n}`,
-    web: { objectStore, uploader: createLocalUploader(), origins: [DEV_ORIGIN], ...over.web },
+    newId,
+    // The app's own lines (one per request) stay apart from `logs`, where the login helper looks for the last code.
+    log: (line) => requestLog.push(line),
+    web: {
+      objectStore,
+      uploader: createLocalUploader(),
+      origins: [DEV_ORIGIN],
+      // The demo ingest, as createApp used to default to, so the upload tests keep their behaviour.
+      onUploaded: createFixtureIngest({ repo, objectStore, indexStore: indexSource, now: () => clock.t, newId }),
+      ...over.web,
+    },
+    ...over.app,
   });
 
   const clientFor = (cookie: string): Client => {
@@ -132,6 +145,7 @@ export async function makeWeb(over: { web?: WebDeps } = {}) {
     indexSource,
     objectStore,
     logs,
+    requestLog,
     clock,
     a,
     b,

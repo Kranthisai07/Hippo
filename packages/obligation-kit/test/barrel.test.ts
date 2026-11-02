@@ -12,7 +12,13 @@ describe("package barrel", () => {
     }
   });
   it("still exports the pure parsers and matchers", () => {
-    for (const name of ["parseCpscResponse", "matchCpscRecall", "parseNhtsaResponse", "matchNhtsaRecall", "canonicalizeVehicle"]) {
+    for (const name of [
+      "parseCpscResponse",
+      "matchCpscRecall",
+      "parseNhtsaResponse",
+      "matchNhtsaRecall",
+      "canonicalizeVehicle",
+    ]) {
       expect(name in kit, name).toBe(true);
     }
   });

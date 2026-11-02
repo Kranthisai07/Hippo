@@ -1,12 +1,9 @@
-import { createHash } from "node:crypto";
-import { readdirSync, readFileSync } from "node:fs";
 import type { Agreement, Doc, DocType, Repository } from "core/src/contracts";
 import { linkAssetHint, linkVehicleHint, type AssetRecord } from "core/src/linking";
 import { pageTextKey } from "core/src/repository/shared";
 import { buildIndex, chunkPages, loadIndex, serializeIndex, type Chunk } from "core/src/retrieval";
-import { ExtractionSchemas, leavesToAgreementFields, type AgreementFields, type AgreementKind } from "obligation-kit";
-import { syncObligations } from "../obligations";
-import { PARTY_FIELD } from "../seed";
+import type { AgreementFields, AgreementKind } from "obligation-kit";
+import { PARTY_FIELD, syncObligations } from "../obligations";
 import type { IndexSource } from "../mcp/indexCache";
 import type { ObjectStore } from "./storage";
 
@@ -45,29 +42,6 @@ export async function readPages(store: ObjectStore, householdId: string, docId: 
     return null;
   }
 }
-
-const FIXTURES = new URL("../../../../fixtures/", import.meta.url);
-const sha256 = (b: Uint8Array): string => createHash("sha256").update(b).digest("hex");
-
-interface Expected {
-  docType: AgreementKind;
-  pages: number;
-  fields: Record<string, unknown>;
-}
-
-/** SHA-256 of every fixture document to its file stem, read once on first use. */
-let fixtureHashes: Map<string, string> | undefined;
-function knownFixtures(): Map<string, string> {
-  fixtureHashes ??= new Map(
-    readdirSync(new URL("docs/", FIXTURES))
-      .filter((f) => /\.(pdf|jpg)$/.test(f))
-      .map((f) => [sha256(readFileSync(new URL(`docs/${f}`, FIXTURES))), f.replace(/\.[^.]+$/, "")]),
-  );
-  return fixtureHashes;
-}
-const readJsonFile = <T>(path: string): T => JSON.parse(readFileSync(new URL(path, FIXTURES), "utf8")) as T;
-
-export const NOT_A_DEMO_DOC = "This build can only read the demo documents until the real reader is connected.";
 
 /** The asset a document is about, only when there is exactly one sure match. Anything less is left for the person. */
 export function linkedAssets(kind: AgreementKind, fields: Record<string, unknown>, assets: AssetRecord[]): string[] {
@@ -146,28 +120,4 @@ export interface FixtureIngestDeps {
   indexStore?: IndexStore | undefined;
   now: () => number;
   newId: () => string;
-}
-
-/**
- * Stand-in for the ingest worker (T2.2) so the web app can be built today: a file that is byte for byte one of
- * fixtures/docs gets its hand written extraction (fields `extracted`, never confirmed) and page text; anything else fails.
- */
-export function createFixtureIngest(deps: FixtureIngestDeps): OnUploaded {
-  const { repo, objectStore } = deps;
-  return async ({ householdId: hh, docId }) => {
-    const doc = await repo.getDoc(hh, docId);
-    if (!doc) return;
-    const bytes = await objectStore.get(doc.s3Key);
-    const stem = bytes ? knownFixtures().get(sha256(bytes)) : undefined;
-    if (!stem) {
-      await repo.putDoc(hh, { ...doc, status: "failed", failureReason: NOT_A_DEMO_DOC });
-      return;
-    }
-    const expected = readJsonFile<Expected>(`expected/${stem}.json`);
-    const kind = expected.docType;
-    const parsed = ExtractionSchemas[kind].parse(expected.fields) as Record<string, unknown>;
-    const flat = leavesToAgreementFields(kind, parsed);
-    const pages = readJsonFile<{ pages: string[] }>(`expected/pages/${stem}.json`).pages;
-    await saveIngested(deps, { householdId: hh, doc, kind, flat, pages, agreementId: `agr-${deps.newId()}` });
-  };
 }

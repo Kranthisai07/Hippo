@@ -119,7 +119,15 @@ const maskTokens = (s: string): string =>
     return `${lead}ending ${digits.slice(-4).join("")}${trail}`;
   });
 
-const maskPlain = (s: string): string => maskTokens(maskDigitRuns(s));
+/**
+ * A number typed one digit at a time ("4 1 1 1 1 1 1 1"). Seven single digits in a row, joined by one space, dot or
+ * dash, are one number. Each step is one character, so it runs in linear time.
+ */
+const SINGLE_DIGITS = /(?<![\p{L}\p{Nd}$])\p{Nd}(?:[\s.\-–—]\p{Nd}){6,}(?!\p{Nd})/gu;
+const maskSingleDigits = (s: string): string =>
+  s.replace(SINGLE_DIGITS, (run) => `ending ${(run.match(/\p{Nd}/gu) ?? []).slice(-4).join("")}`);
+
+const maskPlain = (s: string): string => maskTokens(maskDigitRuns(maskSingleDigits(s)));
 
 /** Things that look like numbers but are not account numbers. Kept only when they pass the checks above. */
 const PROTECTED = new RegExp(

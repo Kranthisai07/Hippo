@@ -16,6 +16,7 @@ const READS = [
   "/api/alerts?open=true",
   "/api/assets",
   "/api/assets/A-car",
+  "/api/export",
 ];
 const WRITES: [string, string, unknown][] = [
   ["POST", "/api/uploads", { filename: "a.pdf", contentType: "application/pdf", size: 5 }],

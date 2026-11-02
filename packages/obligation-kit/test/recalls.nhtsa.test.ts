@@ -36,9 +36,27 @@ const rec = (o: Partial<NhtsaRecall> = {}): NhtsaRecall => ({
 const raw = (o: Record<string, unknown> = {}) => ({
   Count: 1,
   Message: "ok",
-  results: [{ NHTSACampaignNumber: "26V1", ReportReceivedDate: "21/05/2026", Component: "X", Summary: "s", Consequence: "c", Remedy: "r", Manufacturer: "m", Make: "HONDA", Model: "CR-V", ModelYear: "2021", ...o }],
+  results: [
+    {
+      NHTSACampaignNumber: "26V1",
+      ReportReceivedDate: "21/05/2026",
+      Component: "X",
+      Summary: "s",
+      Consequence: "c",
+      Remedy: "r",
+      Manufacturer: "m",
+      Make: "HONDA",
+      Model: "CR-V",
+      ModelYear: "2021",
+      ...o,
+    },
+  ],
 });
-const mm = (rows: [string, string][], year = "2021") => ({ count: rows.length, message: "ok", results: rows.map(([make, model]) => ({ modelYear: year, make, model })) });
+const mm = (rows: [string, string][], year = "2021") => ({
+  count: rows.length,
+  message: "ok",
+  results: rows.map(([make, model]) => ({ modelYear: year, make, model })),
+});
 
 describe("urls", () => {
   it("recallsByVehicleUrl", () => {
@@ -47,7 +65,9 @@ describe("urls", () => {
     );
   });
   it("modelsUrl", () => {
-    expect(modelsUrl({ make: "HONDA", year: 2021 })).toBe("https://api.nhtsa.gov/products/vehicle/models?modelYear=2021&make=HONDA&issueType=r");
+    expect(modelsUrl({ make: "HONDA", year: 2021 })).toBe(
+      "https://api.nhtsa.gov/products/vehicle/models?modelYear=2021&make=HONDA&issueType=r",
+    );
   });
   it("encodes spaces", () => {
     expect(recallsByVehicleUrl({ make: "LAND ROVER", model: "RANGE ROVER", year: 2020 })).toContain("make=LAND+ROVER");
@@ -75,35 +95,57 @@ describe("urls", () => {
 
 describe("canonicalizeVehicle", () => {
   it("resolves CRV to CR-V against the real model list", () => {
-    expect(canonicalizeVehicle({ make: "Honda", model: "CRV", year: 2021 }, models)).toEqual({ nhtsaMake: "HONDA", nhtsaModel: "CR-V" });
+    expect(canonicalizeVehicle({ make: "Honda", model: "CRV", year: 2021 }, models)).toEqual({
+      nhtsaMake: "HONDA",
+      nhtsaModel: "CR-V",
+    });
   });
   it("is case and spacing insensitive", () => {
-    expect(canonicalizeVehicle({ make: "honda", model: "cr v", year: 2021 }, models)).toEqual({ nhtsaMake: "HONDA", nhtsaModel: "CR-V" });
+    expect(canonicalizeVehicle({ make: "honda", model: "cr v", year: 2021 }, models)).toEqual({
+      nhtsaMake: "HONDA",
+      nhtsaModel: "CR-V",
+    });
   });
   it("does not confuse CR-V with CR-V HYBRID", () => {
-    expect(canonicalizeVehicle({ make: "HONDA", model: "CR-V Hybrid", year: 2021 }, models)?.nhtsaModel).toBe("CR-V HYBRID");
+    expect(canonicalizeVehicle({ make: "HONDA", model: "CR-V Hybrid", year: 2021 }, models)?.nhtsaModel).toBe(
+      "CR-V HYBRID",
+    );
   });
   it("duplicate rows of one spelling are fine", () => {
-    const r = mm([["FORD", "F-150"], ["FORD", "F-150"]]);
-    expect(canonicalizeVehicle({ make: "Ford", model: "F150", year: 2021 }, r)).toEqual({ nhtsaMake: "FORD", nhtsaModel: "F-150" });
+    const r = mm([
+      ["FORD", "F-150"],
+      ["FORD", "F-150"],
+    ]);
+    expect(canonicalizeVehicle({ make: "Ford", model: "F150", year: 2021 }, r)).toEqual({
+      nhtsaMake: "FORD",
+      nhtsaModel: "F-150",
+    });
   });
   it("null when nothing matches", () => {
     expect(canonicalizeVehicle({ make: "Honda", model: "Nonexistent", year: 2021 }, models)).toBeNull();
     expect(canonicalizeVehicle({ make: "Toyota", model: "CRV", year: 2021 }, models)).toBeNull();
   });
   it("null when two different spellings fold the same", () => {
-    const r = mm([["HONDA", "CR-V"], ["HONDA", "CRV"]]);
+    const r = mm([
+      ["HONDA", "CR-V"],
+      ["HONDA", "CRV"],
+    ]);
     expect(canonicalizeVehicle({ make: "Honda", model: "CRV", year: 2021 }, r)).toBeNull();
   });
   it("null when two make spellings fold the same", () => {
-    const r = mm([["LAND ROVER", "X"], ["LANDROVER", "X"]]);
+    const r = mm([
+      ["LAND ROVER", "X"],
+      ["LANDROVER", "X"],
+    ]);
     expect(canonicalizeVehicle({ make: "Land Rover", model: "X", year: 2021 }, r)).toBeNull();
   });
   it("ignores rows for another model year", () => {
     expect(canonicalizeVehicle({ make: "HONDA", model: "CR-V", year: 2020 }, models)).toBeNull();
   });
   it("empty results gives null", () => {
-    expect(canonicalizeVehicle({ make: "HONDA", model: "CR-V", year: 2021 }, { count: 0, message: "ok", results: [] })).toBeNull();
+    expect(
+      canonicalizeVehicle({ make: "HONDA", model: "CR-V", year: 2021 }, { count: 0, message: "ok", results: [] }),
+    ).toBeNull();
   });
   it.each([null, {}, "x", { results: "no" }])("throws on malformed response %j", (b) => {
     expect(() => canonicalizeVehicle({ make: "HONDA", model: "CR-V", year: 2021 }, b)).toThrow(NhtsaApiError);
@@ -129,12 +171,19 @@ describe("parseNhtsaResponse", () => {
   it("zero results is an empty list", () => {
     expect(parseNhtsaResponse(zero)).toEqual([]);
   });
-  it.each(["2026-05-21", "21-05-2026", "5/21/2026", "31/02/2026", "00/05/2026", "21/13/2026", "21/05/26", "","ab/cd/efgh"])(
-    "throws on date %j",
-    (d) => {
-      expect(() => parseNhtsaResponse(raw({ ReportReceivedDate: d }))).toThrow(NhtsaApiError);
-    },
-  );
+  it.each([
+    "2026-05-21",
+    "21-05-2026",
+    "5/21/2026",
+    "31/02/2026",
+    "00/05/2026",
+    "21/13/2026",
+    "21/05/26",
+    "",
+    "ab/cd/efgh",
+  ])("throws on date %j", (d) => {
+    expect(() => parseNhtsaResponse(raw({ ReportReceivedDate: d }))).toThrow(NhtsaApiError);
+  });
   it("accepts a leap day and rejects a non-leap one", () => {
     expect(parseNhtsaResponse(raw({ ReportReceivedDate: "29/02/2024" }))[0]?.reportDate).toBe("2024-02-29");
     expect(() => parseNhtsaResponse(raw({ ReportReceivedDate: "29/02/2026" }))).toThrow(NhtsaApiError);
@@ -157,7 +206,12 @@ describe("parseNhtsaResponse", () => {
 describe("matchNhtsaRecall", () => {
   const recalls = parseNhtsaResponse(crv);
   it("seeded Honda is high for all four campaigns, may affect", () => {
-    for (const r of recalls) expect(matchNhtsaRecall(car, r)).toMatchObject({ confidence: "high", wording: "may_affect", recallId: r.recallId });
+    for (const r of recalls)
+      expect(matchNhtsaRecall(car, r)).toMatchObject({
+        confidence: "high",
+        wording: "may_affect",
+        recallId: r.recallId,
+      });
     expect(recalls.filter((r) => matchNhtsaRecall(car, r))).toHaveLength(4);
   });
   it("different year is null", () => {
@@ -209,7 +263,10 @@ describe("nhtsaSpeech", () => {
     expect(s).not.toContain(":");
   });
   it("sanitizes a hostile label and a long component", () => {
-    const t = nhtsaSpeech(rec({ component: "A".repeat(500) + ":B" }), "**Car** [x](https://evil.example.com) " + "word ".repeat(80));
+    const t = nhtsaSpeech(
+      rec({ component: "A".repeat(500) + ":B" }),
+      "**Car** [x](https://evil.example.com) " + "word ".repeat(80),
+    );
     expect(count(t)).toBeLessThan(45);
     expect(t).not.toMatch(/https?:|\*|\[|\]|\(|\)/);
     expect(t).toMatch(/may affect/i);

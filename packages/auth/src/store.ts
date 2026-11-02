@@ -43,6 +43,8 @@ export interface AuthStore {
   putRefresh(key: string, rec: RefreshRecord): Promise<void>;
   consumeRefresh(key: string): Promise<Consumed<RefreshRecord>>;
   revokeFamily(familyId: string): Promise<void>;
+  /** Ends every web session and every refresh token of one user. A durable store needs an index by `sub` for this. */
+  revokeUser(sub: string): Promise<void>;
   putSession(key: string, rec: SessionRecord): Promise<void>;
   getSession(key: string): Promise<SessionRecord | undefined>;
   deleteSession(key: string): Promise<void>;
@@ -66,31 +68,42 @@ export function createMemoryStore(): AuthStore {
   const sessions = new Map<string, SessionRecord>();
   const magic = new Map<string, MagicRecord>();
   const counters = new Map<string, number[]>();
+  // A revoked family stays dead: records already issued are used up, and a record put into it later is born used. This
+  // closes the race where a rotation (consume the old token, then put the new one) straddles a revoke.
+  const revokedFamilies = new Set<string>();
 
   const consume = <T>(m: Map<string, { rec: T; used: boolean }>, key: string): Consumed<T> => {
     const e = m.get(key);
     if (!e) return { status: "unknown" };
-    if (e.used) return { status: "used", record: e.rec };
+    if (e.used || revokedFamilies.has((e.rec as { familyId: string }).familyId)) {
+      return { status: "used", record: e.rec };
+    }
     e.used = true;
     return { status: "ok", record: e.rec };
   };
 
   return {
     async putCode(key, rec) {
-      codes.set(key, { rec, used: false });
+      codes.set(key, { rec, used: revokedFamilies.has(rec.familyId) });
     },
     async consumeCode(key) {
       return consume(codes, key);
     },
     async putRefresh(key, rec) {
-      refresh.set(key, { rec, used: false });
+      refresh.set(key, { rec, used: revokedFamilies.has(rec.familyId) });
     },
     async consumeRefresh(key) {
       return consume(refresh, key);
     },
     async revokeFamily(familyId) {
+      revokedFamilies.add(familyId);
       for (const e of refresh.values()) if (e.rec.familyId === familyId) e.used = true;
       for (const e of codes.values()) if (e.rec.familyId === familyId) e.used = true;
+    },
+    async revokeUser(sub) {
+      for (const e of refresh.values()) if (e.rec.sub === sub) ((e.used = true), revokedFamilies.add(e.rec.familyId));
+      for (const e of codes.values()) if (e.rec.sub === sub) ((e.used = true), revokedFamilies.add(e.rec.familyId));
+      for (const [k, v] of sessions) if (v.sub === sub) sessions.delete(k);
     },
     async putSession(key, rec) {
       sessions.set(key, rec);
@@ -115,12 +128,14 @@ export function createMemoryStore(): AuthStore {
       const last = hits[hits.length - 1];
       const waits: number[] = [];
       if (hits.length >= max) waits.push(hits[hits.length - max]! + windowMs - nowMs);
-      if (last !== undefined && nowMs - last < minGapMs) waits.push(last + minGapMs - nowMs);
+      if (minGapMs > 0 && last !== undefined && nowMs - last < minGapMs) waits.push(last + minGapMs - nowMs);
       if (waits.length > 0) {
         counters.set(key, hits);
         return { ok: false, retryAfterMs: Math.max(...waits) };
       }
+      // Sorted, because callers on different machines arrive out of clock order and the wait is read from the ends.
       hits.push(nowMs);
+      hits.sort((a, b) => a - b);
       counters.set(key, hits);
       return { ok: true };
     },

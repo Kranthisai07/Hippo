@@ -105,8 +105,20 @@ describe("accessToken", () => {
     expect(await accessToken()).toBeNull();
     expect(await isSignedIn()).toBe(false);
   });
-  it("signOut clears the tokens", async () => {
+  it("signOut clears the tokens and revokes the refresh token on the server", async () => {
     expiring();
+    fetchMock.mockResolvedValue(new Response(null, { status: 200 }));
+    await signOut();
+    expect(await isSignedIn()).toBe(false);
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(String(url)).toBe("http://localhost:8787/oauth/revoke");
+    const body = init.body as URLSearchParams;
+    expect(body.get("token")).toBe("r1");
+    expect(body.get("client_id")).toBe("hippo-demo");
+  });
+  it("signOut still signs out when the server cannot be reached", async () => {
+    expiring();
+    fetchMock.mockRejectedValue(new TypeError("Failed to fetch"));
     await signOut();
     expect(await isSignedIn()).toBe(false);
   });

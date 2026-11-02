@@ -11,7 +11,7 @@ Run it locally: `pnpm --filter @hippo/api dev` (port 8787). Everything is in mem
 - Writes (`POST`, `PUT`, `PATCH`, `DELETE`) need an `Origin` header that is the request's own origin, the issuer origin, or one of `HIPPO_ALLOWED_ORIGINS`. A missing or other Origin is 403 `forbidden_origin`. Reads need no Origin.
 - A write that has a JSON body needs `Content-Type: application/json` (415 otherwise). `DELETE /api/docs/<id>` has no body, so it needs no content type. The only non JSON write is the raw upload `PUT`.
 - JSON bodies are at most 64 KiB (413). Every body is validated strictly: an unknown key, a wrong type or a missing key is 400.
-- Errors are `{ "error": { "code": string, "message": string } }`: 400 `invalid_request`, 401 `unauthenticated`, 403 `forbidden_origin`, 404 `not_found`, 409 `conflict`, 413 `too_large`, 415 `unsupported_type`, 429 `rate_limited`, 500 `internal`. The message is plain English for a person. It never contains document text or a value you sent, and there is never a stack trace.
+- Errors are `{ "error": { "code": string, "message": string } }`: 400 `invalid_request`, 401 `unauthenticated`, 403 `forbidden_origin`, 404 `not_found`, 409 `conflict`, 413 `too_large`, 415 `unsupported_type`, 422 `limit_reached`, 429 `rate_limited`, 500 `internal`, 503 `unavailable`. The message is plain English for a person. It never contains document text or a value you sent, and there is never a stack trace.
 - Another household's id and an id that does not exist give the same 404 with the same body.
 - Every answer has `Cache-Control: no-store`.
 - Document text is untrusted. Every string that came from a document (`value`, `quote`, page text, labels, file names) is returned as a plain JSON string and the web app must render it as text, never as HTML.
@@ -30,7 +30,7 @@ Run it locally: `pnpm --filter @hippo/api dev` (port 8787). Everything is in mem
 
 ## Upload and documents
 
-Allowed types: `application/pdf`, `image/jpeg`, `image/png` (exact match, no parameters). HEIC (`image/heic`, `image/heif`, or a `.heic` name) is 415 and the message tells the person to convert it to JPEG first (Textract does not accept HEIC). Size 1 byte to 15 MB (15,728,640 bytes): 0 or less is 400, more is 413. At most 30 announced uploads per household per hour (429 with `Retry-After`).
+Allowed types: `application/pdf`, `image/jpeg`, `image/png` (exact match, no parameters). HEIC (`image/heic`, `image/heif`, or a `.heic` name) is 415 and the message tells the person to convert it to JPEG first (Textract does not accept HEIC). Size 1 byte to 15 MB (15,728,640 bytes): 0 or less is 400, more is 413. At most 30 announced uploads per household per hour (429 with `Retry-After`). 503 `unavailable` ("Uploads are not available yet.") when no ingest is connected to the server, which is the case on the Cloudflare Worker today.
 
 | Route | Request | Response |
 | :--- | :--- | :--- |
@@ -107,6 +107,7 @@ The real worker plugs in by passing its own `onUploaded` (or by running outside 
 | Route | Request | Response |
 | :--- | :--- | :--- |
 | `PUT /api/settings` | `{ digestOn: boolean, email?: string }` | `{ digestOn, email }`. The email is trimmed, lower cased and validated, at most 254 characters. Leaving it out keeps the saved one. |
+| `GET /api/export` | none | One JSON download (`hippo-export.json`): settings, documents, agreements with their quotes, assets and alerts for the household, masked like every other read. At most 5 a hour (429 with `Retry-After`). |
 | `DELETE /api/data` | `{ confirm: "delete all my data" }` (exactly) | `204`. Deletes everything for the household, its files and its clause index. The session stays valid. |
 
 ## Dev walkthrough (the lease demo)
@@ -142,7 +143,10 @@ For the browser extension, under `/ext`, not `/api`. Auth is `Authorization: Bea
 
 - 403: saving is off (no `onCaptured` hook). `apps/api/src/server.ts` loads the hook only when the server is bound to a loopback host, has a loopback issuer and no public domain (`isLocalOnly`). Anything else refuses.
 - 409: the same text was saved already, or the household already tracks that vendor. `X-Hippo-Doc` holds the existing document id, when there is one.
-- 429: more than 30 saves per household per hour, with `Retry-After`.
+- 422 `limit_reached`: the household already holds 200 saved pages. The message says to delete some in Hippo.
+- 429: more than 30 saves per household per hour, or 60 list reads per household per minute, with `Retry-After`.
+- Every `/ext` call also counts against a per address limit of 300 a minute, and every `/oauth` call against 120 a minute (429 in the OAuth shape `{ "error": "rate_limited" }`). The address is the socket address, or the header named by `HIPPO_CLIENT_IP_HEADER` on a host whose proxy writes it (`cf-connecting-ip`). A client can never choose its own bucket by sending that header unless the host names it.
+- CORS: `Origin` must match the allowed list exactly (the extension's `chrome-extension://<id>` and the web origins). A preflight (`OPTIONS`) from a listed origin gets 204 with that origin echoed back, `Authorization, Content-Type` as allowed headers, no credentials and never `*`. Any other origin, including `null`, is 403.
 - A saved page is a Doc with key `captures/<household>/<doc>/page.txt`, status `needs_review` and every field `extracted`. It then follows the normal review, confirm and delete routes.
 
 ## Not in this API
@@ -151,4 +155,21 @@ For the browser extension, under `/ext`, not `/api`. Auth is `Authorization: Bea
 - Anything that takes a household id.
 - Recall lookups from the browser: recalls come from the daily job and arrive as alerts.
 - A presigned S3 upload (`createS3Presigner`) is not built yet; the `Uploader` interface (`prepare({ key, contentType, size }) -> { method, url, headers, expiresInSeconds }`) is where it plugs in.
-- Real rate limiting beyond the upload cap, and any persistence: the local server keeps files, the repository and sessions in memory.
+- Durable rate limit counters and persistence: the local server keeps files, the repository, sessions and counters in memory. A hosted server passes its own `RateLimiter`.
+
+## Sign out and logging
+
+- `POST /oauth/revoke` (RFC 7009, form body `token`, `client_id`): ends a refresh token and its whole family, including the token a rotation handed out last. Always 200, so a caller learns nothing about the token. Advertised as `revocation_endpoint`. The extension calls it on Sign out.
+- `POST /oauth/logout-all` (JSON, cookie session): ends every web session and every refresh token of the person. Access tokens already issued end by themselves within 15 minutes.
+- Every response carries `X-Request-Id`. The server logs one JSON line per request: `{ ts, id, method, path, status, ms }`, and security events as `{ ts, audit, sub, reason }` with a hashed `sub`. Query strings, headers, bodies, emails, codes and tokens are never logged.
+
+## Sign in with Google
+
+Only when the server has `HIPPO_GOOGLE_CLIENT_ID` and `HIPPO_GOOGLE_CLIENT_SECRET` (on the Worker, the secret is a `wrangler secret`). Otherwise the routes answer 404 and the login page shows no button. Google proves which email address the person controls (scopes `openid email`, ID token checked for signature, issuer, audience, expiry, our nonce and `email_verified`), and the address goes through the same household mapping as an emailed code.
+
+- `GET /oauth/providers` answers `{ "google": boolean }`, so the web app shows only buttons that work.
+- `POST /oauth/authorize` with `action=google` (an OAuth client such as the extension): needs the page's CSRF value like every other action, then redirects to Google.
+- `GET /oauth/google/start?return=<address>` (the web app): redirects to Google. `return` must be a path on this server or an address whose origin is exactly one of the configured web origins (`HIPPO_ALLOWED_ORIGINS`); anything else falls back to this server's `/`.
+- `GET /oauth/google/callback` is the one address registered in the Google console (`<issuer>/oauth/google/callback`). It needs the attempt cookie `hippo_gpending` (signed, `HttpOnly`, `SameSite=Lax`, path `/oauth/google`, 10 minutes, cleared on every outcome) and a `state` equal to the one in it. A client sign in ends with the client's own redirect (`code` and its `state`, or `access_denied` when the person said no on Google's page); a web sign in ends with the cookie session and a redirect to `return`. Every other outcome is one plain page: "Google sign in did not work. Try again or use an email code." with status 400 and no reason.
+- Audit events: `login_ok` with reason `google`, and `login_failed` with reason `google_state`, `google_token`, `google_id_token` or `google_denied`. The client secret, codes, ID tokens and addresses are never logged.
+

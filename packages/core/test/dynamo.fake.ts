@@ -45,6 +45,7 @@ export function createFakeDynamo(): FakeDynamo {
         return {};
       }
       case "GetCommand": {
+        if (input.ConsistentRead !== true) throw new Error("fake: a base table read must be strongly consistent");
         const row = rows.get(id(input.Key.PK, input.Key.SK));
         return { Item: row ? structuredClone(row) : undefined };
       }
@@ -95,6 +96,8 @@ export function createFakeDynamo(): FakeDynamo {
     if (input.IndexName && !onIndex) throw new Error("fake: unknown index");
     if (onIndex && input.ConsistentRead)
       throw Object.assign(new Error("Consistent reads are not supported on GSIs"), { name: "ValidationException" });
+    if (!onIndex && input.ConsistentRead !== true)
+      throw new Error("fake: a base table read must be strongly consistent");
     const hashName = onIndex ? "GSI1PK" : "PK";
     const rangeName = onIndex ? "GSI1SK" : "SK";
     const hashValue = onIndex ? v[":g"] : v[":pk"];

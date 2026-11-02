@@ -1,4 +1,4 @@
-import { PdfError, type PdfErrorCode } from "core/src/pages";
+import { PdfError, type PdfErrorCode } from "core/src/pages/errors";
 import { IngestFailure } from "./types";
 
 // Every sentence here is shown to a person in the web app. Plain, specific, and never built from document text.

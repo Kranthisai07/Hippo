@@ -41,6 +41,8 @@ pnpm dev:web    # terminal 2: the web app on http://localhost:5173
 
 Open http://localhost:5173 (use `localhost`, not `127.0.0.1`) and press the demo sign in button. The public landing page is at http://localhost:5173/welcome.
 
+**Continue with Google (optional).** Create a Google Cloud OAuth client of type Web application with the redirect address `http://localhost:8787/oauth/google/callback` and scopes `openid email`, and put `HIPPO_GOOGLE_CLIENT_ID` and `HIPPO_GOOGLE_CLIENT_SECRET` in a file named `.env.google` in the repository root (git ignored, never commit it). Then start the API with those variables in its environment, for example in Git Bash `set -a; . ./.env.google; set +a; pnpm dev`. The sign in pages then show "Continue with Google". Details and what Google is asked for: docs/PRIVACY.md and docs/WEB_API.md.
+
 1. **Upload to deadline.** Settings, delete `lease.pdf` (it is pre loaded), then Upload and drop `fixtures/docs/lease.pdf`. Coming up shows "Give notice by 2026-11-01" waiting for you. Open "Review and confirm", click the page 4 quote, press "Confirm all dates": only now does it become a reminder.
 2. **Coverage by voice.** Open http://localhost:5173/ask, press "Sign in as the demo account" and click "My dishwasher is leaking, am I covered?". This page is a real MCP client (OAuth with PKCE, then `tools/call` over Streamable HTTP). It shows the spoken answer and the Coverage card.
 3. **Proactive catch.** The first answer after the server starts begins with "Before that, your car insurance renews in 9 days." Click "What is coming up?" for the Coming Up and Recall cards. `pnpm daily:run` prints the daily digest (a dry run).

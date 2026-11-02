@@ -123,7 +123,8 @@ describe("add_record is a union of an asset and a subscription", () => {
 
   it("refuses an asset field on a subscription and the other way round", () => {
     expect(
-      MODEL_TOOLS.add_record.safeParse({ kind: "subscription", vendor: "G", amount: 1, cycle: "monthly", brand: "x" }).success,
+      MODEL_TOOLS.add_record.safeParse({ kind: "subscription", vendor: "G", amount: 1, cycle: "monthly", brand: "x" })
+        .success,
     ).toBe(false);
     expect(MODEL_TOOLS.add_record.safeParse({ kind: "asset", name: "A", vendor: "x" }).success).toBe(false);
     expect(MODEL_TOOLS.add_record.safeParse({ kind: "pet", name: "A" }).success).toBe(false);

@@ -118,8 +118,11 @@ html:has(.lp) {
   white-space: nowrap;
   color: var(--ink);
 }
-.lp-brand svg {
-  color: var(--accent);
+.lp-brand .brand-mark {
+  transition: transform 400ms var(--ease-spring);
+}
+.lp-brand:hover .brand-mark {
+  transform: rotate(-6deg) scale(1.06);
 }
 .lp-nav-links {
   display: flex;

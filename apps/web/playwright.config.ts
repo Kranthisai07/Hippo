@@ -16,7 +16,16 @@ export default defineConfig({
       command: "pnpm --filter @hippo/api start",
       cwd: "../..",
       port: 8787,
-      env: { HIPPO_DEMO_CODE: "123456", HIPPO_ALLOWED_ORIGINS: "http://localhost:5173" },
+      env: {
+        HIPPO_DEMO_CODE: "123456",
+        HIPPO_ALLOWED_ORIGINS: "http://localhost:5173",
+        // Dummy values: they only make the Google button show on the sign in page. Nothing here calls Google.
+        HIPPO_GOOGLE_CLIENT_ID: "e2e-client-id",
+        HIPPO_GOOGLE_CLIENT_SECRET: "e2e-client-secret",
+        HIPPO_CLIENT_NAME: "Hippo for Chrome",
+        HIPPO_PRIVACY_URL: "https://hippo.example/privacy",
+        HIPPO_TERMS_URL: "https://hippo.example/terms",
+      },
       reuseExistingServer: false,
       timeout: 60_000,
     },

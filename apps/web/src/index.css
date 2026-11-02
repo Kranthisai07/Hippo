@@ -263,6 +263,9 @@ main:focus {
     color var(--t),
     transform 300ms var(--ease-spring);
 }
+.nav-short {
+  display: none;
+}
 .nav a:hover {
   background: var(--surface-3);
   color: var(--ink);
@@ -361,7 +364,7 @@ main:focus {
     font-size: 16px;
   }
   .shell {
-    padding-bottom: 104px;
+    padding-bottom: 96px;
   }
   .bar {
     grid-template-columns: 1fr auto;
@@ -373,7 +376,7 @@ main:focus {
   /* Tab bar: fixed to the bottom, same links. */
   .nav {
     position: fixed;
-    inset: auto var(--s3) calc(var(--s3) + env(safe-area-inset-bottom)) var(--s3);
+    inset: auto var(--s2) calc(var(--s2) + env(safe-area-inset-bottom)) var(--s2);
     z-index: var(--z-nav);
     justify-content: space-between;
     gap: 0;
@@ -393,8 +396,12 @@ main:focus {
     justify-content: center;
     gap: 2px;
     min-height: 52px;
-    padding: 0 var(--s1);
+    padding: 0 2px;
     font-size: 0.72rem;
+    white-space: nowrap;
+  }
+  .nav a > span {
+    max-width: 100%;
   }
   .nav a[aria-current="page"] {
     background: var(--accent-soft);
@@ -1079,23 +1086,69 @@ mark {
   justify-content: space-between;
   flex-wrap: wrap;
 }
+/* Phone: count and button on the first row, and under them the dates this will confirm in a row that scrolls sideways,
+   so the bar always shows what one tap confirms. */
 @media (max-width: 820px) {
   .sticky-bar {
-    bottom: calc(88px + env(safe-area-inset-bottom));
-    padding: var(--s3);
+    bottom: calc(80px + env(safe-area-inset-bottom));
+    padding: var(--s2) var(--s3);
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: var(--s2) var(--s3);
+  }
+  .sticky-bar > .stack {
+    display: contents;
+  }
+  .sticky-bar > .stack > strong {
+    grid-column: 1;
+    grid-row: 1;
+    font-size: 0.9rem;
+    line-height: 1.25;
+  }
+  .sticky-bar > .btn {
+    grid-column: 2;
+    grid-row: 1;
+    white-space: nowrap;
+  }
+  .sticky-bar > .stack > ul {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    display: flex;
+    flex-wrap: nowrap;
+    gap: var(--s2);
+    min-width: 0;
+    overflow-x: auto;
+    padding-bottom: var(--s1);
+    scrollbar-width: thin;
+  }
+  .sticky-bar > .stack > ul > li {
+    flex: none;
+  }
+}
+@media (max-width: 340px) {
+  .nav a {
+    font-size: 0.66rem;
+  }
+}
+@media (max-width: 440px) {
+  /* Still the link's name for screen readers; only hidden from the eye. */
+  .nav-full {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .nav-short {
+    display: inline;
   }
 }
 .sticky-bar ul {
   list-style: none;
   margin: 0;
   padding: 0;
-}
-@media (max-width: 820px) {
-  .sticky-bar ul {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    padding-bottom: var(--s1);
-  }
 }
 .success {
   border: 2px solid var(--ok);
@@ -1164,18 +1217,14 @@ mark {
   color: var(--ink-2);
 }
 .signin-points li {
-  padding-left: var(--s5);
-  position: relative;
+  display: flex;
+  gap: var(--s3);
+  align-items: flex-start;
 }
-.signin-points li::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0.55em;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--accent);
+.signin-points svg {
+  flex: none;
+  margin-top: 4px;
+  color: var(--accent);
 }
 .signin-about {
   display: inline-flex;
@@ -1183,13 +1232,77 @@ mark {
   min-height: 44px;
   font-weight: 600;
 }
-.signin-form.card {
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
-  background: transparent;
-  padding: var(--s6);
+.signin-col {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
   justify-content: center;
+  padding: var(--s6) var(--s6) var(--s4);
+}
+.signin-form {
+  gap: var(--s4);
+}
+.signin-sub {
+  margin-top: var(--s1);
+}
+.signin-sub strong {
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.btn-block {
+  width: 100%;
+  min-height: 48px;
+}
+.signin-or {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  color: var(--ink-2);
+  font-size: 0.875rem;
+}
+.signin-or::before,
+.signin-or::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+.signin-code {
+  min-height: 56px;
+  font-size: 1.6rem;
+  font-weight: 600;
+  letter-spacing: 0.4em;
+  text-align: center;
+  padding-left: calc(var(--s3) + 0.4em);
+}
+.signin-hint {
+  margin-top: var(--s2);
+}
+.signin-quiet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+}
+.signin-demo {
+  display: flex;
+  justify-content: center;
+  padding-top: var(--s2);
+  border-top: 1px dashed var(--line);
+}
+.tag {
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 1px var(--s2);
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  color: var(--ink-2);
+  border: 1px solid var(--line);
+}
+.signin-col .footer {
+  justify-content: center;
+  padding: var(--s3) 0 0;
 }
 @media (max-width: 720px) {
   .signin {
@@ -1208,8 +1321,12 @@ mark {
   .signin-points {
     display: none;
   }
-  .signin-form.card {
-    padding: var(--s5);
+  .signin-col {
+    padding: var(--s5) var(--s4) var(--s3);
+  }
+  .signin-code {
+    letter-spacing: 0.3em;
+    padding-left: calc(var(--s3) + 0.3em);
   }
 }
 
@@ -1257,4 +1374,71 @@ mark {
   .bar-email {
     display: none;
   }
+}
+
+/* Section cards: an icon beside the heading, rows inside a card read as rows, not nested cards. */
+.card-h {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+}
+.card-h svg {
+  flex: none;
+  color: var(--accent);
+}
+.danger-zone .card-h svg {
+  color: var(--urgent);
+}
+.card-row {
+  padding: var(--s3) var(--s4);
+  border: 1px solid var(--line);
+  border-radius: var(--r2);
+  background: var(--surface-2);
+}
+.card .empty.card {
+  padding: var(--s4);
+  gap: var(--s2);
+  box-shadow: none;
+  background: transparent;
+  border-style: dashed;
+}
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+  background: var(--accent-wash);
+}
+.stat-label {
+  font-size: 0.875rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.stat-value {
+  font-size: clamp(2.2rem, 1.6rem + 2.4vw, 3rem);
+  font-weight: 750;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  color: var(--accent);
+}
+
+/* Settings on a phone: the checkbox stays beside its sentence, and a file name shares its row with Delete. */
+label.row {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+}
+label.row input[type="checkbox"] {
+  flex: none;
+  margin: 2px 0 0;
+}
+.card .list > li.row > .grow {
+  flex: 1 1 7rem;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+.card .empty.card .empty-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
 }
