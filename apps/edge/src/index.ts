@@ -4,11 +4,15 @@ import type { Hono } from "hono";
 import { limiterFromStore } from "../../api/src/api/limiter";
 import { createApp } from "../../api/src/app";
 import { ensureHousehold } from "../../api/src/household";
+import { createGmailClient } from "../../api/src/import/gmail";
+import { createImportService } from "../../api/src/import/service";
+import { createTokenBox } from "../../api/src/import/tokenBox";
 import { createUnsubscribe } from "../../api/src/unsubscribe";
 import { DEV_EXTENSION_ID, productionProblems } from "../../api/src/config";
 import { createCaptureIngest } from "../../workers/src/ingest/capture";
 import { createCloudflareMailer, type EmailBindingLike } from "./cloudflareMailer";
 import { createD1AuthStore } from "./d1AuthStore";
+import { createD1ImportStore } from "./d1ImportStore";
 import { runDailyJob } from "./daily";
 import { createR2IndexStore, createR2ObjectStore, type R2BucketLike } from "./r2";
 
@@ -37,6 +41,8 @@ export interface Env {
   /** "Continue with Google". Both or neither. The secret is a `wrangler secret`. */
   HIPPO_GOOGLE_CLIENT_ID?: string;
   HIPPO_GOOGLE_CLIENT_SECRET?: string;
+  /** "1" turns on the one time Gmail scan. Needs the Google settings above and the gmail.readonly scope in the Google console. */
+  HIPPO_GMAIL_IMPORT?: string;
   /** The sign in window: what it says it continues to, and the public pages it links to. All optional. */
   HIPPO_CLIENT_NAME?: string;
   HIPPO_PRIVACY_URL?: string;
@@ -121,6 +127,30 @@ export function buildApp(env: Env, opts: BuildOptions = {}): Hono {
 
   const authStore = createD1AuthStore(env.DB, { now });
   const repo = createD1Repository(env.DB);
+  const objectStore = createR2ObjectStore(env.BUCKET);
+  const indexStore = createR2IndexStore(env.BUCKET);
+  const onCaptured = createCaptureIngest({ repo, objectStore, indexStore, now, log });
+
+  const googleOn = Boolean(env.HIPPO_GOOGLE_CLIENT_ID && env.HIPPO_GOOGLE_CLIENT_SECRET);
+  const importOn = env.HIPPO_GMAIL_IMPORT === "1";
+  if (importOn && !googleOn) {
+    throw new StartupError(
+      "Refusing to start: HIPPO_GMAIL_IMPORT needs HIPPO_GOOGLE_CLIENT_ID and HIPPO_GOOGLE_CLIENT_SECRET",
+    );
+  }
+  // Off unless switched on: no service, so the import routes answer 404 and /api/me says "off".
+  const importService = importOn
+    ? createImportService({
+        store: createD1ImportStore(env.DB),
+        box: createTokenBox(signingKey),
+        gmail: createGmailClient({ fetch: (u, i) => fetch(u, i) }),
+        capture: onCaptured,
+        repo,
+        now,
+        newId: () => crypto.randomUUID(),
+        log,
+      })
+    : undefined;
   const auth = createAuth({
     issuer,
     resource: `${issuer}/mcp`,
@@ -133,7 +163,23 @@ export function buildApp(env: Env, opts: BuildOptions = {}): Hono {
     ...(mailer ? { mailer } : {}),
     logMagicCodes: false,
     ...(env.HIPPO_GOOGLE_CLIENT_ID && env.HIPPO_GOOGLE_CLIENT_SECRET
-      ? { google: { clientId: env.HIPPO_GOOGLE_CLIENT_ID, clientSecret: env.HIPPO_GOOGLE_CLIENT_SECRET } }
+      ? {
+          google: {
+            clientId: env.HIPPO_GOOGLE_CLIENT_ID,
+            clientSecret: env.HIPPO_GOOGLE_CLIENT_SECRET,
+            ...(importService
+              ? {
+                  import: {
+                    // The scan starts here; the person lands on the waiting page, or is told to come back tomorrow.
+                    onGranted: async (who) => {
+                      const r = await importService.start(who);
+                      return "id" in r ? `/import?job=${encodeURIComponent(r.id)}` : "/connect?gmail=too_soon";
+                    },
+                  },
+                }
+              : {}),
+          },
+        }
       : {}),
     audit: (e) =>
       log(JSON.stringify({ ts: new Date(now()).toISOString(), audit: e.event, sub: e.sub, reason: e.reason })),
@@ -142,8 +188,6 @@ export function buildApp(env: Env, opts: BuildOptions = {}): Hono {
     now,
   });
 
-  const objectStore = createR2ObjectStore(env.BUCKET);
-  const indexStore = createR2IndexStore(env.BUCKET);
   return createApp({
     auth,
     repo,
@@ -159,7 +203,8 @@ export function buildApp(env: Env, opts: BuildOptions = {}): Hono {
       objectStore,
       indexStore,
       origins: webOrigins,
-      onCaptured: createCaptureIngest({ repo, objectStore, indexStore, now, log }),
+      onCaptured,
+      ...(importService ? { importService } : {}),
     },
   });
 }
@@ -178,6 +223,16 @@ export async function purgeAuthStore(env: Env, now: () => number = () => Date.no
   }
 }
 
+/** Ends scans whose token has expired (clearing the sealed token) and drops finished ones after 30 days. */
+export async function purgeImportJobs(env: Env, now: () => number = () => Date.now()): Promise<void> {
+  try {
+    await createD1ImportStore(env.DB).purge(now());
+  } catch (e) {
+    console.error(`import cleanup failed (${e instanceof Error ? e.name : "error"})`);
+    throw e;
+  }
+}
+
 /** True in the first 15 minute run after 03:00 UTC, the one run a day that also does the cleanup. */
 export const isCleanupRun = (nowMs: number): boolean => {
   const d = new Date(nowMs);
@@ -190,7 +245,12 @@ export const isCleanupRun = (nowMs: number): boolean => {
  */
 export async function runScheduled(env: Env, now: () => number = () => Date.now()): Promise<void> {
   const failures: unknown[] = [];
-  const jobs = [...(isCleanupRun(now()) ? [() => purgeAuthStore(env, now)] : []), () => runDailyJob(env, now)];
+  const cleanup = isCleanupRun(now());
+  const jobs = [
+    ...(cleanup ? [() => purgeAuthStore(env, now)] : []),
+    ...(cleanup && env.HIPPO_GMAIL_IMPORT === "1" ? [() => purgeImportJobs(env, now)] : []),
+    () => runDailyJob(env, now),
+  ];
   for (const job of jobs) {
     try {
       await job();

@@ -454,3 +454,54 @@ describe("a free beta: Google sign in and no email binding", () => {
     expect(() => setup({ ...GOOD_PRODUCTION, EMAIL: undefined })).toThrow(/No way to sign in/);
   });
 });
+
+describe("the Gmail import switch", () => {
+  const GOOGLE = {
+    HIPPO_GOOGLE_CLIENT_ID: "client-id.apps.googleusercontent.com",
+    HIPPO_GOOGLE_CLIENT_SECRET: "secret",
+  };
+
+  it("is off by default: no gmail in the providers, the import routes answer 404", async () => {
+    const t = setup(GOOGLE);
+    expect(((await (await t.req("/oauth/providers")).json()) as { gmail: boolean }).gmail).toBe(false);
+    const r = await t.req("/oauth/google/import/start");
+    expect(r.status).toBe(404);
+  });
+
+  it("is on only when switched on, and then the consent step exists (it still needs a session)", async () => {
+    const t = setup({ ...GOOGLE, HIPPO_GMAIL_IMPORT: "1" });
+    expect(((await (await t.req("/oauth/providers")).json()) as { gmail: boolean }).gmail).toBe(true);
+    expect((await t.req("/oauth/google/import/start")).status).not.toBe(404);
+    expect((await t.req("/api/import/latest")).status).toBe(401);
+  });
+
+  it("any other value leaves it off", async () => {
+    const t = setup({ ...GOOGLE, HIPPO_GMAIL_IMPORT: "true" });
+    expect(((await (await t.req("/oauth/providers")).json()) as { gmail: boolean }).gmail).toBe(false);
+  });
+
+  it("refuses to start without the Google settings, naming settings and no values", () => {
+    expect(() => setup({ HIPPO_GMAIL_IMPORT: "1" })).toThrow(/HIPPO_GMAIL_IMPORT needs HIPPO_GOOGLE_CLIENT_ID/);
+  });
+
+  it("the daily cleanup ends a scan whose token expired, and only when the switch is on", async () => {
+    const day = Date.UTC(2026, 10, 2, 3, 5, 0);
+    for (const [flag, cleared] of [
+      ["1", true],
+      [undefined, false],
+    ] as const) {
+      const { env, db } = makeEnv({ ...GOOGLE, ...(flag ? { HIPPO_GMAIL_IMPORT: flag } : {}) });
+      await db
+        .prepare(
+          "INSERT INTO import_jobs (id, household, status, created_at, finished_at, token_cipher, token_expires_at, state) VALUES ('j', 'hh', 'running', ?, NULL, 'v1.a.b', ?, '{}')",
+        )
+        .bind(day - 7200_000, day - 1000)
+        .all();
+      await runScheduled(env, () => day);
+      const row = (await db.prepare("SELECT status, token_cipher FROM import_jobs WHERE id = 'j'").all())
+        .results![0] as { status: string; token_cipher: string | null };
+      expect(row.token_cipher === null, `switch ${flag}`).toBe(cleared);
+      expect(row.status).toBe(cleared ? "failed" : "running");
+    }
+  });
+});
