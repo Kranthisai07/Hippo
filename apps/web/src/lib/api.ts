@@ -96,7 +96,7 @@ export const api = {
   // Session
   demoSession: () => json<{ email: string }>("POST", "/oauth/session", { demo: true }),
   /** Which extra sign in methods this server offers, so the page shows only buttons that work. */
-  providers: () => json<{ google: boolean; demo: boolean; email: boolean }>("GET", "/oauth/providers"),
+  providers: () => json<{ google: boolean; demo: boolean; email: boolean; gmail: boolean }>("GET", "/oauth/providers"),
   magicCode: (email: string) => json<{ ok: true }>("POST", "/oauth/magic-code", { email }),
   session: (email: string, code: string) => json<{ email: string }>("POST", "/oauth/session", { email, code }),
   logout: () => json<{ ok: true }>("POST", "/oauth/logout", {}),

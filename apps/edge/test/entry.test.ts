@@ -325,12 +325,27 @@ describe("Continue with Google on the Worker", () => {
 
   it("is offered only when both the client id and the secret are set", async () => {
     const off = setup();
-    expect(await (await off.req("/oauth/providers")).json()).toEqual({ google: false, demo: false, email: true });
+    expect(await (await off.req("/oauth/providers")).json()).toEqual({
+      google: false,
+      demo: false,
+      email: true,
+      gmail: false,
+    });
     const on = setup({ HIPPO_GOOGLE_CLIENT_ID: ID, HIPPO_GOOGLE_CLIENT_SECRET: "secret" });
-    expect(await (await on.req("/oauth/providers")).json()).toEqual({ google: true, demo: false, email: true });
+    expect(await (await on.req("/oauth/providers")).json()).toEqual({
+      google: true,
+      demo: false,
+      email: true,
+      gmail: false,
+    });
     // One without the other is not enough, and in the relaxed mode it simply stays off.
     const half = setup({ HIPPO_GOOGLE_CLIENT_ID: ID });
-    expect(await (await half.req("/oauth/providers")).json()).toEqual({ google: false, demo: false, email: true });
+    expect(await (await half.req("/oauth/providers")).json()).toEqual({
+      google: false,
+      demo: false,
+      email: true,
+      gmail: false,
+    });
   });
   it("starts a web sign in by sending the browser to Google with the Worker's own callback address", async () => {
     const t = setup({ HIPPO_GOOGLE_CLIENT_ID: ID, HIPPO_GOOGLE_CLIENT_SECRET: "secret" });
@@ -415,7 +430,12 @@ describe("a free beta: Google sign in and no email binding", () => {
 
   it("starts in production, and says email codes are off and Google is on", async () => {
     const t = setup(beta);
-    expect(await (await t.req("/oauth/providers")).json()).toEqual({ google: true, demo: false, email: false });
+    expect(await (await t.req("/oauth/providers")).json()).toEqual({
+      google: true,
+      demo: false,
+      email: false,
+      gmail: false,
+    });
   });
 
   it("refuses to send a code, and no code or address reaches the log", async () => {
