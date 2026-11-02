@@ -663,3 +663,18 @@ Run on this machine, no Cloudflare account and nothing deployed. What each row c
 | The size of the sign in window Chrome opens | Headless gave a 1280x720 viewport; a headed Chrome window may differ | UNVERIFIED |
 | The store build in Chrome | Built and read back (manifest, files, zip) in `apps/extension/test/storeBuild.test.ts`; not loaded in Chrome, because it points at a public address by design | UNVERIFIED |
 | Email Sending, a deployed Worker, free plan limits on the real build, Google on a `workers.dev` address | Not run | UNVERIFIED |
+
+### 10.22 The first beta on a real Cloudflare account (2026-11-02)
+
+Deployed with the owner's approval on the free plan: Worker `hippo` at `https://hippo.sm-spike-kranthi.workers.dev`, its own D1 database and R2 bucket. Everything below was run against that real address.
+
+| Item | Observed | Status |
+| :--- | :--- | :--- |
+| Fail closed | Before `HIPPO_SIGNING_KEY` existed the Worker answered 500 and still served the app files; after the secrets were set it answered 200 within about 15 seconds | VERIFIED |
+| `wrangler dev --local` results hold on the real platform | `main` with `[assets]` and `run_worker_first` works as designed: `/` and deep links give the app, `/api/me` is a JSON 401, `/oauth/providers` is `{ google: true, demo: false, email: false }`, `/unsubscribe` answers 400 for a bad link, `_headers` apply to the files (nosniff, frame-ancestors none, no referrer, HSTS) | VERIFIED |
+| Cron trigger | Deployed with `17 3 * * *` (accepted on the free plan: the deploy printed `schedule: 17 3 * * *`). A real scheduled run has not happened yet | Deploy VERIFIED, run UNVERIFIED |
+| Google sign in on the Worker address | After adding `https://hippo.sm-spike-kranthi.workers.dev/oauth/google/callback` to the OAuth client, "Continue with Google" signed the owner in, set the session and created the household (`digestOn: true`, `uploads: false`) | VERIFIED (the owner's account; the app is in Testing mode) |
+| The extension's server path, with that real Google identity | Authorize with the extension's redirect address gave a `chromiumapp.org` redirect with the code and the same state; the PKCE token exchange answered 200; `POST /ext/captures` saved a page (201); `GET /ext/subscriptions` listed it; the review page opened and "Confirm all dates" marked the three date fields confirmed. The vendor, amount and cycle fields stay unconfirmed until confirmed one by one, so the subscription still shows "to review" by design. The test page was deleted afterwards | VERIFIED |
+| The store build in real Chromium | Built with `VITE_HIPPO_PUBLIC_KEY` set to the development key, so the id stays `gcanedelajoahpaoeeonbdlieoepcobc`; loaded unpacked in headless Chromium, its `launchWebAuthFlow` window opened the deployed sign in page with Google only (no email form, no demo) | VERIFIED |
+| Free plan limits on the real build | The deploy of the 1.6 MB, 29 file app and a 1 MB class Worker was accepted | VERIFIED for this size |
+| The popup in real Chrome, the Chrome Web Store, a real scheduled run, Email Sending, other Google users | Not run | UNVERIFIED |
