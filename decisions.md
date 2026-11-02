@@ -182,3 +182,9 @@ No decisions log exists on main (MEMORY.md is only in old worktrees), so this fi
 - **Accessibility:** "Send a new code" now announces "A new code was sent" in the status region.
 - **Left open:** the demo button still shows on any build not marked hosted, because the page cannot ask the server whether the demo is on (needs `/oauth/providers` to report it, in `packages/auth`).
 - **Checked:** web 133 tests, all 8 Playwright tests including axe on every page at 1280 and 390 in light and dark.
+
+## 2026-11-02: the Worker cleans up expired sign in records daily (+claude)
+- **What:** `apps/edge/src/index.ts` gains a `scheduled` handler (and exported `purgeAuthStore`) that calls the D1 auth store's `purgeExpired`; `wrangler.toml` gets `[triggers] crons = ["17 3 * * *"]`.
+- **Why:** Codex review on PR #27 found `purgeExpired` had no runtime caller, so expired sessions, codes, refresh tokens, magic codes and rate counters of addresses that never return would grow forever in D1. My phase 2 notes assumed the cleanup ran; it did not.
+- **Why this way:** the handler builds only the auth store from the database binding, not the whole app, so cleanup still runs when the app refuses to start on a bad setting. A failure is logged by error name only and rethrown so Cloudflare records the failed run. Daily at an off-peak minute is enough because the windows are an hour to 30 days.
+- **Checked:** 2 new tests (expired rows deleted and live ones kept; failure logs only the error name); mutation check (handler body removed) fails the first. Edge 97 tests pass. **Unverified:** that cron triggers are allowed on the free plan, and a real scheduled run on Cloudflare.

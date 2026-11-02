@@ -32,6 +32,7 @@ The Worker is strict by default: only `HIPPO_ENV=development` or `local` relaxes
 npx wrangler d1 migrations apply <database> --remote --config wrangler.staging.toml
 npx wrangler secret put HIPPO_SIGNING_KEY --config wrangler.staging.toml   # pipe a random value in, never type it
 npx wrangler deploy --config wrangler.staging.toml
+# the [triggers] cron in wrangler.toml is copied with the rest and runs the daily cleanup of expired sign in records
 npx wrangler tail --config wrangler.staging.toml --format pretty > tail.log &
 node scripts/smoke.mjs https://<worker address> tail.log
 ```

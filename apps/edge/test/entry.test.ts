@@ -13,7 +13,8 @@ import {
 } from "../../../packages/auth/test/helpers";
 import { createSqliteD1 } from "../../../packages/core/test/d1.sqlite";
 import { createHash } from "node:crypto";
-import worker, { buildApp, householdOf, StartupError, type Env } from "../src/index";
+import worker, { buildApp, householdOf, purgeAuthStore, StartupError, type Env } from "../src/index";
+import { createD1AuthStore } from "../src/d1AuthStore";
 import { fakeBucket } from "./fakes";
 
 // The whole Workers app, in process: the entry wired to the D1 stores (on node:sqlite), an R2 fake and a fake email
@@ -343,5 +344,34 @@ describe("Continue with Google on the Worker", () => {
   });
   it("in production a client id without its secret stops the start, naming the settings", () => {
     expect(() => setup({ ...GOOD_PRODUCTION, HIPPO_GOOGLE_CLIENT_ID: ID })).toThrow(/HIPPO_GOOGLE_CLIENT_ID/);
+  });
+});
+
+describe("the daily cleanup", () => {
+  it("the Worker has a scheduled handler that deletes expired sign in records and keeps live ones", async () => {
+    const db = createSqliteD1();
+    const store = createD1AuthStore(db, { now: () => T0 });
+    const rec = { clientId: "c", resource: "r", scope: "s", sub: "u", householdId: "h", familyId: "f" };
+    await store.putRefresh("old", { ...rec, expiresAt: T0 - 1000 });
+    await store.putRefresh("live", { ...rec, expiresAt: T0 + 9e9 });
+    await store.putSession("sold", { email: "a@x.example", sub: "u", householdId: "h", expiresAt: T0 - 1000 });
+    const env = { DB: db } as unknown as Env;
+    expect(typeof worker.scheduled).toBe("function");
+    await worker.scheduled({}, env);
+    expect(db.count("auth_refresh")).toBe(1);
+    expect(db.count("auth_sessions")).toBe(0);
+  });
+
+  it("logs only the error name when the cleanup fails, and says so", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const broken = {
+      prepare: () => {
+        throw new TypeError("secret detail");
+      },
+    } as unknown as Env["DB"];
+    await expect(purgeAuthStore({ DB: broken } as Env)).rejects.toThrow();
+    expect(spy).toHaveBeenCalledWith("auth cleanup failed (TypeError)");
+    expect(JSON.stringify(spy.mock.calls)).not.toContain("secret detail");
+    spy.mockRestore();
   });
 });

@@ -158,6 +158,20 @@ export function buildApp(env: Env, opts: BuildOptions = {}): Hono {
   });
 }
 
+/**
+ * The daily cleanup: deletes expired sessions, codes, refresh tokens, magic codes, old revocation records and old
+ * rate counters, so the sign in tables stay bounded by their expiry windows. It needs only the database, so it runs even
+ * when the app itself refuses to start. A failure is logged by error name only.
+ */
+export async function purgeAuthStore(env: Env, now: () => number = () => Date.now()): Promise<void> {
+  try {
+    await createD1AuthStore(env.DB, { now }).purgeExpired(now());
+  } catch (e) {
+    console.error(`auth cleanup failed (${e instanceof Error ? e.name : "error"})`);
+    throw e;
+  }
+}
+
 let app: Hono | undefined;
 let lastFailure = "";
 
@@ -175,5 +189,9 @@ export default {
       return new Response("Service unavailable", { status: 500, headers: { "Cache-Control": "no-store" } });
     }
     return app.fetch(request, env);
+  },
+  // The cron trigger in wrangler.toml.
+  async scheduled(_controller: unknown, env: Env): Promise<void> {
+    await purgeAuthStore(env);
   },
 };
