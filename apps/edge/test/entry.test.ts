@@ -15,6 +15,7 @@ import { createSqliteD1 } from "../../../packages/core/test/d1.sqlite";
 import { createHash } from "node:crypto";
 import worker, { buildApp, householdOf, purgeAuthStore, StartupError, type Env } from "../src/index";
 import { createD1AuthStore } from "../src/d1AuthStore";
+import { createD1Repository } from "core/src/repository/d1";
 import { fakeBucket } from "./fakes";
 
 // The whole Workers app, in process: the entry wired to the D1 stores (on node:sqlite), an R2 fake and a fake email
@@ -324,12 +325,12 @@ describe("Continue with Google on the Worker", () => {
 
   it("is offered only when both the client id and the secret are set", async () => {
     const off = setup();
-    expect(await (await off.req("/oauth/providers")).json()).toEqual({ google: false });
+    expect(await (await off.req("/oauth/providers")).json()).toEqual({ google: false, demo: false });
     const on = setup({ HIPPO_GOOGLE_CLIENT_ID: ID, HIPPO_GOOGLE_CLIENT_SECRET: "secret" });
-    expect(await (await on.req("/oauth/providers")).json()).toEqual({ google: true });
+    expect(await (await on.req("/oauth/providers")).json()).toEqual({ google: true, demo: false });
     // One without the other is not enough, and in the relaxed mode it simply stays off.
     const half = setup({ HIPPO_GOOGLE_CLIENT_ID: ID });
-    expect(await (await half.req("/oauth/providers")).json()).toEqual({ google: false });
+    expect(await (await half.req("/oauth/providers")).json()).toEqual({ google: false, demo: false });
   });
   it("starts a web sign in by sending the browser to Google with the Worker's own callback address", async () => {
     const t = setup({ HIPPO_GOOGLE_CLIENT_ID: ID, HIPPO_GOOGLE_CLIENT_SECRET: "secret" });
@@ -373,5 +374,29 @@ describe("the daily cleanup", () => {
     expect(spy).toHaveBeenCalledWith("auth cleanup failed (TypeError)");
     expect(JSON.stringify(spy.mock.calls)).not.toContain("secret detail");
     spy.mockRestore();
+  });
+});
+
+describe("a new person's household", () => {
+  it("exists from the first sign in with their address and the daily email on, so the daily job can see them", async () => {
+    const t = setup();
+    await t.signIn("new@hippo.test");
+    const repo = createD1Repository(t.db);
+    const hh = await householdOf("new@hippo.test");
+    expect(await repo.getHousehold(hh)).toMatchObject({ id: hh, email: "new@hippo.test", digestOn: true });
+  });
+
+  it("signing in does not undo a setting the person already saved", async () => {
+    const t = setup();
+    const hh = await householdOf("keep@hippo.test");
+    const repo = createD1Repository(t.db);
+    await repo.putHousehold(hh, {
+      id: hh,
+      email: "home@hippo.test",
+      digestOn: false,
+      createdAt: "2026-01-01T00:00:00.000Z",
+    });
+    await t.signIn("keep@hippo.test");
+    expect(await repo.getHousehold(hh)).toMatchObject({ email: "home@hippo.test", digestOn: false });
   });
 });

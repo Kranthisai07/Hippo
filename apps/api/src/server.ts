@@ -5,6 +5,7 @@ import { serve, type ServerType } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { createMemoryRepository } from "core/src/repository";
 import { createApp } from "./app";
+import { ensureHousehold } from "./household";
 import { createFixtureIngest } from "./api/demoIngest";
 import { DEV_EXTENSION_ID, productionProblems } from "./config";
 import { createLocalUploader, createMemoryObjectStore } from "./api/storage";
@@ -122,6 +123,7 @@ export async function startServer(opts: ServerOptions = {}): Promise<Running> {
 
   const allowedOrigins = list(env.HIPPO_ALLOWED_ORIGINS, ["http://localhost:5173", "http://localhost:3000"]);
   const auth = createAuth({
+    onLogin: ({ email, householdId }) => ensureHousehold(repo, { householdId, email }, clock),
     // The web dev server sends the cookie session calls (/oauth/session) from its own origin.
     allowedOrigins: [new URL(issuer).origin, ...allowedOrigins],
     issuer,

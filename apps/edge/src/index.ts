@@ -3,6 +3,7 @@ import { createD1Repository, type D1Like } from "core/src/repository/d1";
 import type { Hono } from "hono";
 import { limiterFromStore } from "../../api/src/api/limiter";
 import { createApp } from "../../api/src/app";
+import { ensureHousehold } from "../../api/src/household";
 import { DEV_EXTENSION_ID, productionProblems } from "../../api/src/config";
 import { createCaptureIngest } from "../../workers/src/ingest/capture";
 import { createCloudflareMailer, type EmailBindingLike } from "./cloudflareMailer";
@@ -116,6 +117,7 @@ export function buildApp(env: Env, opts: BuildOptions = {}): Hono {
   const allowedOrigins = [...webOrigins, ...(extensionId ? [`chrome-extension://${extensionId}`] : [])];
 
   const authStore = createD1AuthStore(env.DB, { now });
+  const repo = createD1Repository(env.DB);
   const auth = createAuth({
     issuer,
     resource: `${issuer}/mcp`,
@@ -123,6 +125,7 @@ export function buildApp(env: Env, opts: BuildOptions = {}): Hono {
     clients: [{ clientId, redirectUris, ...(env.HIPPO_CLIENT_NAME ? { name: env.HIPPO_CLIENT_NAME } : {}) }],
     links: linksFromEnv(env),
     resolveHousehold: householdOf,
+    onLogin: ({ email, householdId }) => ensureHousehold(repo, { householdId, email }, now),
     log,
     ...(mailer ? { mailer } : {}),
     logMagicCodes: false,
@@ -136,7 +139,6 @@ export function buildApp(env: Env, opts: BuildOptions = {}): Hono {
     now,
   });
 
-  const repo = createD1Repository(env.DB);
   const objectStore = createR2ObjectStore(env.BUCKET);
   const indexStore = createR2IndexStore(env.BUCKET);
   return createApp({
