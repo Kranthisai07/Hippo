@@ -51,8 +51,11 @@ export function originProblem(setting: string, value: string | undefined): strin
   if (u.protocol !== "https:") return `${setting} must be an https address.`;
   if (u.username || u.password) return `${setting} must not hold a user name or password.`;
   if (/[*]/.test(value)) return `${setting} must not hold a wildcard.`;
-  if (u.pathname !== "/" || u.search || u.hash)
-    return `${setting} must be an origin only, with no path, query or fragment.`;
+  // Exactly the normalized origin: the same text is built into the extension's code, which adds its own paths to it, so a
+  // trailing slash (a path of "/") or capital letters would produce "//oauth/token" or a different address than the manifest.
+  if (value !== u.origin || u.pathname !== "/" || u.search || u.hash) {
+    return `${setting} must be an origin only, exactly like https://host (no trailing slash, path, query or fragment, and lower case).`;
+  }
   const h = u.hostname;
   if (h === "localhost" || h.endsWith(".localhost") || /^[\d.]+$/.test(h) || h.includes(":") || !h.includes(".")) {
     return `${setting} must be a public host name, not localhost or an IP address.`;

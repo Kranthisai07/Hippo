@@ -56,6 +56,11 @@ describe("the store manifest", () => {
     ["an IPv6 address", "https://[2001:db8::1]"],
     ["a name with no dot", "https://hippo"],
     ["a wildcard", "https://*.hippo-app.workers.dev"],
+    ["a trailing slash, which the built code would turn into //oauth/token", "https://api.hippo-app.workers.dev/"],
+    [
+      "capital letters, which the manifest would lower case but the code would not",
+      "https://API.hippo-app.workers.dev",
+    ],
     ["a path", "https://api.hippo-app.workers.dev/app"],
     ["a query", "https://api.hippo-app.workers.dev/?x=1"],
     ["credentials", "https://user:pass@api.hippo-app.workers.dev"],
