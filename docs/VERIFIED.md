@@ -646,3 +646,20 @@ Read live (page fetch, summarised by a tool, not read raw) from developers.cloud
 | Cron on Free | Limits page lists "Cron Triggers per account": Free 5, Paid 250. The limit is per account, not per Worker; no per-Worker figure found. The cron page itself does not mention the Free plan | VERIFIED 5 per account; per-Worker cap UNVERIFIED | https://developers.cloudflare.com/workers/platform/limits/ |
 | Cron config | `[triggers] crons = ["..."]` (string array, required); `crons = []` disables, commenting out does not | VERIFIED | https://developers.cloudflare.com/workers/wrangler/configuration/ |
 | `--test-scheduled` | Exposes `/cdn-cgi/local/scheduled`, query `cron` (e.g. `?cron=*+*+*+*+*`), also `time` (overrides `controller.scheduledTime`) and `format=json`. Local dev never runs crons on its own. The `/__scheduled` path is NOT in the current docs | VERIFIED `/cdn-cgi/local/scheduled`; `/__scheduled` UNVERIFIED | https://developers.cloudflare.com/workers/wrangler/commands/workers/ and https://developers.cloudflare.com/workers/configuration/cron-triggers/ |
+
+### 10.21 The hosted path on the local Workers runtime and in real Chromium (2026-11-02)
+
+Run on this machine, no Cloudflare account and nothing deployed. What each row checked is in `apps/edge/scripts/smoke.mjs` and in a one off script that is not committed.
+
+| Item | Observed | Status |
+| :--- | :--- | :--- |
+| `wrangler dev --local` with `main` and `[assets]` together | Starts, serves the built web app and the API from one address (10.20 had this combination UNVERIFIED) | VERIFIED locally |
+| App at `/`, a deep link, a built file | `/` and `/review/x` give the app, the built script is served as script with `immutable` caching, `_headers` nosniff and frame-ancestors apply | VERIFIED locally |
+| API paths with `run_worker_first` | `/api/me` is a JSON 401, `/oauth/providers`, `/unsubscribe`, `/healthz`, `/mcp` reach the Worker, an unknown `/api` path is not answered with the app | VERIFIED locally |
+| The loop | Sign in by emailed code, save a page, review, confirm the dates, trigger the cron at `/cdn-cgi/local/scheduled`: the daily summary is logged with the households that signed in and no mail sent (no email binding). 40 of 40 smoke steps pass, including the concurrency checks | VERIFIED locally |
+| An alert from a confirmed date on the real runtime | The smoke run created 0 alerts (the fixture's dates were outside the window on the day it ran). Alert creation is proven with a fixed clock in `apps/edge/test/daily.test.ts` | NOT shown on the real runtime |
+| Real Chromium with the extension loaded unpacked (Playwright, `channel: "chromium"`) | The extension id is `gcanedelajoahpaoeeonbdlieoepcobc`, the id the development key pins. The service worker's `chrome.identity.launchWebAuthFlow` opened the new sign in page, an emailed code signed in, and the flow answered with a `https://<id>.chromiumapp.org/` address holding the code and the same state | VERIFIED in headless Chromium |
+| The popup itself in real Chrome | Not driven: the popup refuses to run as a tab by design (its message guard rejects tab senders) and the toolbar click that grants `activeTab` cannot be automated | UNVERIFIED |
+| The size of the sign in window Chrome opens | Headless gave a 1280x720 viewport; a headed Chrome window may differ | UNVERIFIED |
+| The store build in Chrome | Built and read back (manifest, files, zip) in `apps/extension/test/storeBuild.test.ts`; not loaded in Chrome, because it points at a public address by design | UNVERIFIED |
+| Email Sending, a deployed Worker, free plan limits on the real build, Google on a `workers.dev` address | Not run | UNVERIFIED |
