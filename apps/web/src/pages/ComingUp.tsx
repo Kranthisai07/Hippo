@@ -6,7 +6,7 @@ import { api } from "../lib/api";
 import { KIND_LABEL, addDays, chipParts, daysAwayText, plainAction } from "../lib/format";
 import { buildTimeline, groupByWeek, type Entry } from "../lib/timeline";
 import { inferToday } from "../lib/today";
-import { useAuth } from "../lib/auth";
+import { useAuth, useUploads } from "../lib/auth";
 import { useLoad } from "../lib/useLoad";
 import type { AlertAction, Doc, ObligationType } from "../lib/types";
 
@@ -121,6 +121,7 @@ function EntryCard({
 }
 
 export function ComingUp() {
+  const uploads = useUploads();
   const [days, setDays] = useState<(typeof WINDOWS)[number]>(90);
   const [kind, setKind] = useState<string | null>(null);
   const toast = useToast();
@@ -222,13 +223,19 @@ export function ComingUp() {
         <EmptyState
           icon={CalendarCheck}
           title={`Nothing coming up in the next ${days} days`}
-          action={
-            <Link to="/upload" className="btn btn-primary">
-              <Upload size={18} aria-hidden="true" /> Upload a document
-            </Link>
-          }
+          {...(uploads
+            ? {
+                action: (
+                  <Link to="/upload" className="btn btn-primary">
+                    <Upload size={18} aria-hidden="true" /> Upload a document
+                  </Link>
+                ),
+              }
+            : {})}
         >
-          Upload your lease, a warranty, an insurance policy or a subscription to see when to act.
+          {uploads
+            ? "Upload your lease, a warranty, an insurance policy or a subscription to see when to act."
+            : "Save a billing page with the Hippo Chrome extension, then review and confirm its dates, to see when to act."}
         </EmptyState>
       )}
 

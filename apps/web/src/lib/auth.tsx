@@ -25,6 +25,9 @@ const Ctx = createContext<AuthValue>({
 
 export const useAuth = () => useContext(Ctx);
 
+/** False only when the server says it cannot read uploads (the Cloudflare backend today). Until it answers, assume it can. */
+export const useUploads = (): boolean => useAuth().me?.uploads !== false;
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<Status>("loading");
   const [me, setMe] = useState<Me | null>(null);

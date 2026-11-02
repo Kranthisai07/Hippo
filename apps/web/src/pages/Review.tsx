@@ -8,7 +8,7 @@ import { api } from "../lib/api";
 import { confirmPlan } from "../lib/confirm";
 import { SOURCE_FIELDS, chipParts, collectRefs, daysAwayText, humanize, plainAction, valueLines } from "../lib/format";
 import { inferToday } from "../lib/today";
-import { useAuth } from "../lib/auth";
+import { useAuth, useUploads } from "../lib/auth";
 import { pollDoc } from "../lib/upload";
 import { useLoad } from "../lib/useLoad";
 import type { AgreementView, Doc, ObligationRecord } from "../lib/types";
@@ -83,6 +83,7 @@ function Deadlines({
 }
 
 export function Review() {
+  const uploads = useUploads();
   const { docId = "" } = useParams();
   const toast = useToast();
   const { me } = useAuth();
@@ -174,8 +175,8 @@ export function Review() {
   return (
     <>
       <div className="stack">
-        <Link to="/upload" className="small">
-          Back to upload
+        <Link to={uploads ? "/upload" : "/subscriptions"} className="small">
+          {uploads ? "Back to upload" : "Back to subscriptions"}
         </Link>
         <div className="row">
           <h1 className="grow">{doc.filename}</h1>

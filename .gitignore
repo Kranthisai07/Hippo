@@ -25,3 +25,5 @@ apps/extension/store/assets/_*.png
 # The extension: the store package and its unpacked folder
 apps/extension/dist-store/
 apps/extension/release/
+
+apps/edge/wrangler.release.toml

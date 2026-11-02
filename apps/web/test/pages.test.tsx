@@ -397,3 +397,49 @@ describe("the legal pages", () => {
     );
   });
 });
+
+describe("with no uploads on the server", () => {
+  const noUploads = () => vi.spyOn(api, "me").mockResolvedValue({ email: "a@b.co", digestOn: true, uploads: false });
+  const withUploads = () => vi.spyOn(api, "me").mockResolvedValue({ email: "a@b.co", digestOn: true, uploads: true });
+
+  it("Coming up asks for a saved page, and offers no link to the Upload page", async () => {
+    noUploads();
+    vi.spyOn(api, "listDocs").mockResolvedValue({ docs: [] });
+    vi.spyOn(api, "listAlerts").mockResolvedValue({ alerts: [] });
+    vi.spyOn(api, "listAssets").mockResolvedValue({ assets: [] });
+    vi.spyOn(api, "listObligations").mockResolvedValue({ items: [] });
+    wrap(
+      <AuthProvider>
+        <ComingUp />
+      </AuthProvider>,
+    );
+    expect(await screen.findByText(/Save a billing page with the Hippo Chrome extension/)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Upload a document/ })).toBeNull();
+  });
+
+  it("Coming up still offers the upload when the server reads uploads", async () => {
+    withUploads();
+    vi.spyOn(api, "listDocs").mockResolvedValue({ docs: [] });
+    vi.spyOn(api, "listAlerts").mockResolvedValue({ alerts: [] });
+    vi.spyOn(api, "listAssets").mockResolvedValue({ assets: [] });
+    vi.spyOn(api, "listObligations").mockResolvedValue({ items: [] });
+    wrap(
+      <AuthProvider>
+        <ComingUp />
+      </AuthProvider>,
+    );
+    expect(await screen.findByRole("link", { name: /Upload a document/ })).toBeInTheDocument();
+  });
+
+  it("Things does not point at an Upload page that is not there", async () => {
+    noUploads();
+    vi.spyOn(api, "listAssets").mockResolvedValue({ assets: [] });
+    wrap(
+      <AuthProvider>
+        <Things />
+      </AuthProvider>,
+    );
+    expect(await screen.findByText(/That is not available in this version yet/)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Upload a document/ })).toBeNull();
+  });
+});
