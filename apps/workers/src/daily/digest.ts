@@ -9,7 +9,7 @@ const DEFAULT_MAX_ITEMS = 10;
  * exactly digest.alertIds as emailed. A failed send marks nothing, so the same alerts go out again on the next run.
  */
 export async function runDigest(
-  deps: Pick<DailyDeps, "repository" | "sender" | "now" | "appUrl" | "config">,
+  deps: Pick<DailyDeps, "repository" | "sender" | "now" | "appUrl" | "unsubscribeUrl" | "config">,
   householdId: string,
   household: Household,
   today: string,
@@ -24,6 +24,7 @@ export async function runDigest(
   const digest = buildDigest({
     alerts,
     appUrl: deps.appUrl,
+    ...(deps.unsubscribeUrl ? { unsubscribeUrl: await deps.unsubscribeUrl(householdId) } : {}),
     today,
     digestOn: true,
     maxItems: deps.config?.digestMaxItems ?? DEFAULT_MAX_ITEMS,

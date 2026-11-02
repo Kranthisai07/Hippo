@@ -34,6 +34,8 @@ export interface AppDeps {
   log?: (line: string) => void;
   /** The web JSON API under /api (docs/WEB_API.md). Everything is optional: the defaults are in memory and local. */
   web?: WebDeps;
+  /** The "turn off this email" page (unsubscribe.ts), mounted at /unsubscribe. Left out, there is no such page. */
+  unsubscribe?: Hono;
 }
 
 export interface WebDeps {
@@ -58,6 +60,7 @@ export const DEFAULT_MAX_BODY_BYTES = 128 * 1024;
 /** Coarse per address limits in front of the sign-in and extension routes. The exact limits sit behind them. */
 export const OAUTH_PER_MINUTE = 120;
 export const EXT_PER_MINUTE = 300;
+export const UNSUBSCRIBE_PER_MINUTE = 30;
 const MCP_PATH = "/mcp";
 
 const rpcError = (
@@ -138,6 +141,16 @@ export function createApp(deps: AppDeps): Hono {
       ...(origin !== undefined && allowed.has(origin) ? { "Access-Control-Allow-Origin": origin } : {}),
     });
   });
+
+  app.use("/unsubscribe", async (c, next) => {
+    const r = await limiter(`ip:unsub:${clientAddress(c, deps.clientIpHeader)}`, 60_000, UNSUBSCRIBE_PER_MINUTE);
+    if (r.ok) return next();
+    return c.text("Too many requests. Please wait a minute.", 429, {
+      "Cache-Control": "no-store",
+      "Retry-After": String(r.retryAfterSec),
+    });
+  });
+  if (deps.unsubscribe) app.route("/unsubscribe", deps.unsubscribe);
 
   app.route("/", deps.auth.app);
 

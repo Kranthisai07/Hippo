@@ -22,6 +22,12 @@ export interface DigestInput {
   /** Defaults to on; the caller passes the household setting. */
   digestOn?: boolean;
   maxItems?: number;
+  /**
+   * A link that turns this email off without signing in. It must be on the same address as `appUrl` and end in
+   * `/unsubscribe`, so a wrong value can never send people somewhere else. It is a signed opaque token, so it is not held
+   * to the long-number rule that protects the app link.
+   */
+  unsubscribeUrl?: string;
 }
 
 export interface Digest {
@@ -54,6 +60,19 @@ function dayNumber(iso: string): number | null {
   const back = new Date(t);
   if (back.getUTCMonth() !== mo - 1 || back.getUTCDate() !== d) return null;
   return t / 86_400_000;
+}
+
+function validateUnsubscribeUrl(raw: string, appUrl: string): string {
+  const bad = () => new Error("unsubscribeUrl must be the /unsubscribe page on the same address as appUrl");
+  if (typeof raw !== "string" || !/^[\x21-\x7e]+$/.test(raw) || /["'<>\\`]/.test(raw)) throw bad();
+  let u: URL;
+  try {
+    u = new URL(raw);
+  } catch {
+    throw bad();
+  }
+  if (u.origin !== new URL(appUrl).origin || u.pathname !== "/unsubscribe" || u.username || u.password) throw bad();
+  return u.href;
 }
 
 function validateAppUrl(raw: string): string {
@@ -156,6 +175,7 @@ function order(a: DigestAlert, b: DigestAlert): number {
 
 export function buildDigest(input: DigestInput): Digest | null {
   const link = validateAppUrl(input.appUrl);
+  const off = input.unsubscribeUrl === undefined ? null : validateUnsubscribeUrl(input.unsubscribeUrl, link);
   const today = dayNumber(input.today);
   if (today === null) throw new Error(`today must be an ISO date (YYYY-MM-DD), got: ${JSON.stringify(input.today)}`);
   if (input.digestOn === false) return null;
@@ -205,6 +225,7 @@ export function buildDigest(input: DigestInput): Digest | null {
     ...items.map((i) => [`- ${i.label}`, ...i.lines.map((l) => `  ${l}`)].join("\n")),
     ...(moreLine ? [moreLine] : []),
     `Open Hippo: ${link}`,
+    ...(off ? [`Turn off this email: ${off}`] : []),
   ].join("\n\n");
 
   const p = 'style="margin:0 0 14px;font-size:16px;line-height:1.4"';
@@ -213,6 +234,7 @@ export function buildDigest(input: DigestInput): Digest | null {
     ...items.map((i) => `<p ${p}><strong>${esc(i.label)}</strong>${i.lines.map((l) => `<br>${esc(l)}`).join("")}</p>`),
     ...(moreLine ? [`<p ${p}>${moreLine}</p>`] : []),
     `<p ${p}><a href="${esc(link)}" style="color:#0b5cad">Open Hippo</a></p>`,
+    ...(off ? [`<p ${p}><a href="${esc(off)}" style="color:#555">Turn off this email</a></p>`] : []),
     "</div>",
   ].join("\n");
 

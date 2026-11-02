@@ -16,8 +16,9 @@ The Worker is strict by default: only `HIPPO_ENV=development` or `local` relaxes
 
 ## What is and is not connected
 
-- Connected: sign in by emailed code with PKCE, the extension routes (`/ext`), the web API (`/api`) except uploads, `/mcp`, rate limits in D1, revocation, export and delete.
-- Not connected: uploads and PDF reading (the app answers 503), the daily job and digest, Google sign in, Resend.
+- Connected: sign in by emailed code with PKCE and Continue with Google, the extension routes (`/ext`), the web API (`/api`) except uploads, `/mcp`, rate limits in D1, revocation, export and delete, a household record created at first sign in, and the daily cron (`scheduled`): cleanup of expired sign in records, then deadlines and alerts, the recall check and the digest email (apps/edge/src/daily.ts).
+- The digest is mailed only when the `EMAIL` binding, an https `HIPPO_ISSUER` and a `HIPPO_SIGNING_KEY` of 32 characters or more are all present. Otherwise the job still makes the alerts (so Coming up is right) and counts the digest as a dry run. Every digest ends with a signed turn off link (`/unsubscribe`, valid 90 days).
+- Not connected: uploads and PDF reading (the app answers 503, and the web app leaves the Upload page out), Resend, serving the web app from the Worker (slice 4).
 - `wrangler.toml` holds no secret. `HIPPO_SIGNING_KEY` is a `wrangler secret`. The D1 `database_id` is a placeholder until staging.
 
 ## Checks

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createD1ItemClient, createD1Repository } from "../src/repository/d1";
+import { createD1ItemClient, createD1Repository, listD1HouseholdIds } from "../src/repository/d1";
 import type { Item } from "../src/repository/items";
 import { createSqliteD1 } from "./d1.sqlite";
 import { runRepositorySuite } from "./repository.suite";
@@ -110,5 +110,38 @@ describe("the D1 item client's own behaviour", () => {
     expect(skOf(await c.query({ hash: "H#a", range: { beginsWith: "x'; DROP" } }))).toEqual([evil]);
     expect(db.ran.every((sql) => !sql.includes("DROP"))).toBe(true);
     expect(db.count()).toBe(1);
+  });
+});
+
+describe("listing households for the daily job", () => {
+  const hh = (id: string) => ({ id, digestOn: true, createdAt: "2026-01-01T00:00:00.000Z" });
+
+  it("returns every household that has a record, in order, and ignores other items", async () => {
+    const db = createSqliteD1();
+    const repo = createD1Repository(db);
+    await repo.putHousehold("hh_b", hh("hh_b"));
+    await repo.putHousehold("hh_a", hh("hh_a"));
+    // A household with documents but no record is not listed: the job has nothing to read for it.
+    await repo.putDoc("hh_c", {
+      id: "d",
+      s3Key: "k",
+      filename: "f.txt",
+      docType: "other",
+      status: "uploaded",
+      uploadedAt: "2026-01-01T00:00:00.000Z",
+      assetIds: [],
+    });
+    expect(await listD1HouseholdIds(db)).toEqual(["hh_a", "hh_b"]);
+  });
+
+  it("gives back ids that contain the key separator exactly as they were saved", async () => {
+    const db = createSqliteD1();
+    const repo = createD1Repository(db);
+    await repo.putHousehold("a#b%c", hh("a#b%c"));
+    expect(await listD1HouseholdIds(db)).toEqual(["a#b%c"]);
+  });
+
+  it("is empty before anyone signs in", async () => {
+    expect(await listD1HouseholdIds(createSqliteD1())).toEqual([]);
   });
 });
