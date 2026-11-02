@@ -26,7 +26,7 @@ Run it locally: `pnpm --filter @hippo/api dev` (port 8787). Everything is in mem
 | `POST /oauth/session` | Body `{ email, code }` or `{ demo: true }`. Sets the cookie. Implemented by `@hippo/auth`, not by this API. |
 | `POST /oauth/magic-code` | Body `{ email }`. The demo prints the code in the server log. |
 | `POST /oauth/logout` | Clears the cookie. |
-| `GET /api/me` | `{ email, digestOn }`. `email` is the digest address if one is saved, otherwise the login email. |
+| `GET /api/me` | `{ email, digestOn, uploads }`. `email` is the digest address if one is saved, otherwise the login email. `uploads` is false when this server cannot read uploaded files (the Cloudflare backend today), and the web app then leaves the Upload page out. |
 
 ## Upload and documents
 
@@ -141,7 +141,7 @@ For the browser extension, under `/ext`, not `/api`. Auth is `Authorization: Bea
 | `POST /ext/captures` | `{ title, host, text }`, strict. `host` is a site name, not an address. `text` is 1 to 60,000 characters. | `201 { saved: true, docId, reviewUrl }`, or `200 { saved: false }` when the page has no subscription and nothing was stored. |
 | `GET /ext/subscriptions` | none | Same as `GET /api/subscriptions`. |
 
-- 403: saving is off (no `onCaptured` hook). `apps/api/src/server.ts` loads the hook only when the server is bound to a loopback host, has a loopback issuer and no public domain (`isLocalOnly`). Anything else refuses.
+- 403: saving is off (no `onCaptured` hook). The Node server (`apps/api/src/server.ts`) loads the hook only when it is bound to a loopback host, has a loopback issuer and no public domain (`isLocalOnly`), because its demo household is shared. The Cloudflare backend (`apps/edge`) always has the hook, and every person has their own household.
 - 409: the same text was saved already, or the household already tracks that vendor. `X-Hippo-Doc` holds the existing document id, when there is one.
 - 422 `limit_reached`: the household already holds 200 saved pages. The message says to delete some in Hippo.
 - 429: more than 30 saves per household per hour, or 60 list reads per household per minute, with `Retry-After`.
@@ -167,7 +167,7 @@ For the browser extension, under `/ext`, not `/api`. Auth is `Authorization: Bea
 
 Only when the server has `HIPPO_GOOGLE_CLIENT_ID` and `HIPPO_GOOGLE_CLIENT_SECRET` (on the Worker, the secret is a `wrangler secret`). Otherwise the routes answer 404 and the login page shows no button. Google proves which email address the person controls (scopes `openid email`, ID token checked for signature, issuer, audience, expiry, our nonce and `email_verified`), and the address goes through the same household mapping as an emailed code.
 
-- `GET /oauth/providers` answers `{ "google": boolean }`, so the web app shows only buttons that work.
+- `GET /oauth/providers` answers `{ "google": boolean, "demo": boolean }`, so the web app shows only sign in buttons that work. `demo` is true only when the server has the demo login on.
 - `POST /oauth/authorize` with `action=google` (an OAuth client such as the extension): needs the page's CSRF value like every other action, then redirects to Google.
 - `GET /oauth/google/start?return=<address>` (the web app): redirects to Google. `return` must be a path on this server or an address whose origin is exactly one of the configured web origins (`HIPPO_ALLOWED_ORIGINS`); anything else falls back to this server's `/`.
 - `GET /oauth/google/callback` is the one address registered in the Google console (`<issuer>/oauth/google/callback`). It needs the attempt cookie `hippo_gpending` (signed, `HttpOnly`, `SameSite=Lax`, path `/oauth/google`, 10 minutes, cleared on every outcome) and a `state` equal to the one in it. A client sign in ends with the client's own redirect (`code` and its `state`, or `access_denied` when the person said no on Google's page); a web sign in ends with the cookie session and a redirect to `return`. Every other outcome is one plain page: "Google sign in did not work. Try again or use an email code." with status 400 and no reason.

@@ -333,3 +333,23 @@ describe("digest sending", () => {
     });
   });
 });
+
+describe("the turn off link in the email", () => {
+  it("is asked for once per household and added to the mail", async () => {
+    const w = await makeWorld();
+    const asked: string[] = [];
+    await w.run(undefined, {
+      unsubscribeUrl: async (id) => (asked.push(id), `https://app.hippo.test/unsubscribe?t=tok-${id}`),
+    });
+    expect(asked).toEqual([A]);
+    expect(w.mail.sent[0]!.text).toContain(`Turn off this email: https://app.hippo.test/unsubscribe?t=tok-${A}`);
+  });
+
+  it("a link on another address makes the digest fail for that household only, and nothing is sent", async () => {
+    const w = await makeWorld();
+    await addHousehold(w, B);
+    const r = await w.run(undefined, { unsubscribeUrl: async () => "https://evil.test/unsubscribe?t=x" });
+    expect(w.mail.sent).toHaveLength(0);
+    expect(r.households.every((h) => h.email.status === "failed")).toBe(true);
+  });
+});

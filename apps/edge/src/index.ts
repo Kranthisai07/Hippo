@@ -3,10 +3,13 @@ import { createD1Repository, type D1Like } from "core/src/repository/d1";
 import type { Hono } from "hono";
 import { limiterFromStore } from "../../api/src/api/limiter";
 import { createApp } from "../../api/src/app";
+import { ensureHousehold } from "../../api/src/household";
+import { createUnsubscribe } from "../../api/src/unsubscribe";
 import { DEV_EXTENSION_ID, productionProblems } from "../../api/src/config";
 import { createCaptureIngest } from "../../workers/src/ingest/capture";
 import { createCloudflareMailer, type EmailBindingLike } from "./cloudflareMailer";
 import { createD1AuthStore } from "./d1AuthStore";
+import { runDailyJob } from "./daily";
 import { createR2IndexStore, createR2ObjectStore, type R2BucketLike } from "./r2";
 
 // The Workers entry: the same Hono app as the Node server, on D1 (data, sign in state, rate counters), R2 (files and the
@@ -116,6 +119,7 @@ export function buildApp(env: Env, opts: BuildOptions = {}): Hono {
   const allowedOrigins = [...webOrigins, ...(extensionId ? [`chrome-extension://${extensionId}`] : [])];
 
   const authStore = createD1AuthStore(env.DB, { now });
+  const repo = createD1Repository(env.DB);
   const auth = createAuth({
     issuer,
     resource: `${issuer}/mcp`,
@@ -123,6 +127,7 @@ export function buildApp(env: Env, opts: BuildOptions = {}): Hono {
     clients: [{ clientId, redirectUris, ...(env.HIPPO_CLIENT_NAME ? { name: env.HIPPO_CLIENT_NAME } : {}) }],
     links: linksFromEnv(env),
     resolveHousehold: householdOf,
+    onLogin: ({ email, householdId }) => ensureHousehold(repo, { householdId, email }, now),
     log,
     ...(mailer ? { mailer } : {}),
     logMagicCodes: false,
@@ -136,7 +141,6 @@ export function buildApp(env: Env, opts: BuildOptions = {}): Hono {
     now,
   });
 
-  const repo = createD1Repository(env.DB);
   const objectStore = createR2ObjectStore(env.BUCKET);
   const indexStore = createR2IndexStore(env.BUCKET);
   return createApp({
@@ -145,6 +149,7 @@ export function buildApp(env: Env, opts: BuildOptions = {}): Hono {
     indexSource: indexStore,
     now,
     allowedOrigins,
+    unsubscribe: createUnsubscribe({ signingKey, repo, now, links: linksFromEnv(env) }).app,
     limiter: limiterFromStore(authStore, now),
     clientIpHeader: env.HIPPO_CLIENT_IP_HEADER ?? "cf-connecting-ip",
     hsts: issuer.startsWith("https://"),
@@ -172,6 +177,21 @@ export async function purgeAuthStore(env: Env, now: () => number = () => Date.no
   }
 }
 
+/** The daily work, one job after the other: the cleanup of expired sign in records, then the daily job. */
+export async function runScheduled(env: Env, now: () => number = () => Date.now()): Promise<void> {
+  const failures: unknown[] = [];
+  for (const job of [() => purgeAuthStore(env, now), () => runDailyJob(env, now)]) {
+    try {
+      await job();
+    } catch (e) {
+      failures.push(e);
+      // Only the error name: a provider or database message could hold an address or part of a page.
+      console.error(`scheduled job failed (${e instanceof Error ? e.name : "error"})`);
+    }
+  }
+  if (failures.length > 0) throw failures[0];
+}
+
 let app: Hono | undefined;
 let lastFailure = "";
 
@@ -190,8 +210,9 @@ export default {
     }
     return app.fetch(request, env);
   },
-  // The cron trigger in wrangler.toml.
+  // The cron trigger in wrangler.toml. Each job gets its turn even when the other fails; the first failure is then rethrown
+  // so Cloudflare records the run as failed.
   async scheduled(_controller: unknown, env: Env): Promise<void> {
-    await purgeAuthStore(env);
+    await runScheduled(env);
   },
 };

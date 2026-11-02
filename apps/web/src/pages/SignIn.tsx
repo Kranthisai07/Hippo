@@ -5,7 +5,6 @@ import googleG from "../assets/google-g.svg";
 import { Brand, Footer } from "../components/Layout";
 import { ApiError, api } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import { HOSTED } from "../lib/hosted";
 
 const POINTS = [
   "Every date shows the exact words it came from.",
@@ -29,6 +28,9 @@ export function SignIn() {
   const [waitUntil, setWaitUntil] = useState(0);
   const [, setNow] = useState(0);
   const [google, setGoogle] = useState(false);
+  const [demo, setDemo] = useState(false);
+  // Whether an emailed code can reach people on this server. True until the server says otherwise.
+  const [emailCodes, setEmailCodes] = useState(true);
   const timer = useRef<number | undefined>(undefined);
   const codeInput = useRef<HTMLInputElement>(null);
 
@@ -36,7 +38,7 @@ export function SignIn() {
   // A failure here only means no Google button, never a broken page.
   useEffect(() => {
     api.providers().then(
-      (p) => setGoogle(p.google),
+      (p) => (setGoogle(p.google), setDemo(p.demo), setEmailCodes(p.email !== false)),
       () => undefined,
     );
   }, []);
@@ -144,53 +146,57 @@ export function SignIn() {
                   <img src={googleG} alt="" width="20" height="20" />
                   Continue with Google
                 </a>
-                <p className="signin-or" aria-hidden="true">
-                  or
-                </p>
+                {emailCodes && (
+                  <p className="signin-or" aria-hidden="true">
+                    or
+                  </p>
+                )}
               </>
             )}
 
-            <form className="stack" onSubmit={submit}>
-              {sent ? (
-                <div>
-                  <label className="field-label" htmlFor="code">
-                    Code from your email
-                  </label>
-                  <input
-                    id="code"
-                    ref={codeInput}
-                    className="input num signin-code"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    maxLength={12}
-                    required
-                    value={code}
-                    onChange={(e) => setCode(e.target.value)}
-                  />
-                  {!HOSTED && LOCAL && (
-                    <p className="muted small signin-hint">On this computer the code is printed in the server log.</p>
-                  )}
-                </div>
-              ) : (
-                <div>
-                  <label className="field-label" htmlFor="email">
-                    Email
-                  </label>
-                  <input
-                    id="email"
-                    className="input"
-                    type="email"
-                    autoComplete="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
-                </div>
-              )}
-              <button type="submit" className="btn btn-primary btn-block" disabled={off}>
-                {sent ? "Sign in" : "Send me a code"}
-              </button>
-            </form>
+            {emailCodes && (
+              <form className="stack" onSubmit={submit}>
+                {sent ? (
+                  <div>
+                    <label className="field-label" htmlFor="code">
+                      Code from your email
+                    </label>
+                    <input
+                      id="code"
+                      ref={codeInput}
+                      className="input num signin-code"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      maxLength={12}
+                      required
+                      value={code}
+                      onChange={(e) => setCode(e.target.value)}
+                    />
+                    {demo && LOCAL && (
+                      <p className="muted small signin-hint">On this computer the code is printed in the server log.</p>
+                    )}
+                  </div>
+                ) : (
+                  <div>
+                    <label className="field-label" htmlFor="email">
+                      Email
+                    </label>
+                    <input
+                      id="email"
+                      className="input"
+                      type="email"
+                      autoComplete="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                    />
+                  </div>
+                )}
+                <button type="submit" className="btn btn-primary btn-block" disabled={off}>
+                  {sent ? "Sign in" : "Send me a code"}
+                </button>
+              </form>
+            )}
 
             {sent && (
               <div className="signin-quiet">
@@ -222,7 +228,7 @@ export function SignIn() {
               )}
             </div>
 
-            {!sent && !HOSTED && (
+            {!sent && demo && (
               <div className="signin-demo">
                 <button
                   type="button"

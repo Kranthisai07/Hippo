@@ -12,6 +12,7 @@
     "dev": "pnpm --filter @hippo/api dev",
     "dev:web": "pnpm --filter @hippo/web dev",
     "ingest:fixture": "pnpm --filter @hippo/workers ingest:fixture",
+    "build:hosted": "pnpm --filter @hippo/web build",
     "daily:run": "pnpm --filter @hippo/workers daily:run",
     "inspect": "node scripts/not-built.mjs inspect T1.5",
     "deploy": "node scripts/not-built.mjs deploy T4.3",

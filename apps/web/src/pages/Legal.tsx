@@ -4,7 +4,7 @@ import { Brand, Footer } from "../components/Layout";
 const PRIVACY: [string, string][] = [
   [
     "What Hippo keeps",
-    "The documents you upload, the dates and terms read from them with the exact quote and page each came from, whether you confirmed each one, the things and subscriptions built from them, your settings, and the email address you sign in with. It is kept for your household and is only shown to you. Hippo is still a prototype: the public demo keeps everything in memory and forgets it when the server restarts, so do not put real documents in it.",
+    "The documents you upload, the dates and terms read from them with the exact quote and page each came from, whether you confirmed each one, the things and subscriptions built from them, your settings, and the email address you sign in with. It is kept for your household and is only shown to you. In the hosted Hippo that data is stored with Cloudflare, our hosting provider, and with no one else. Hippo is still a prototype: the public demo keeps everything in memory and forgets it when the server restarts, so do not put real documents in it.",
   ],
   [
     "The browser extension",
@@ -12,7 +12,7 @@ const PRIVACY: [string, string][] = [
   ],
   [
     "Signing in",
-    "You sign in with a code sent to your email, or with Google. Google only tells Hippo which email address you control. Hippo asks Google for nothing else.",
+    "You sign in with Google, or with a code sent to your email where that is available. Google only tells Hippo which email address you control. Hippo asks Google for nothing else.",
   ],
   [
     "What Hippo does not do",
@@ -22,7 +22,7 @@ const PRIVACY: [string, string][] = [
   ["Logs", "Hippo is built so the text of your documents is not written to its logs."],
   [
     "Email",
-    "If you turn on the daily email, it names what is due soon and links back here. It never includes a full policy or account number.",
+    "Hippo sends a daily email only when something is due soon. It is on by default, every email has a link that turns it off without signing in, and you can change it in Settings. It names what is due and links back to Hippo, and never includes a full policy or account number.",
   ],
   [
     "Deleting",

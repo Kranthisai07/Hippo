@@ -546,3 +546,31 @@ describe("recalls rank below deadlines and never crowd them out (Q-012)", () => 
     expect(must([...list].reverse()).alertIds).toEqual(must(list).alertIds);
   });
 });
+
+describe("the turn off link", () => {
+  const off = "https://app.hippo.example/unsubscribe?t=abc.def";
+  it("is added to both the text and the html when given", () => {
+    const d = must([mk()], { unsubscribeUrl: off });
+    expect(d.text).toContain(`Turn off this email: ${off}`);
+    expect(d.html).toContain("Turn off this email");
+    expect(d.html).toContain(`href="${off}"`);
+  });
+  it("is left out when not given", () => {
+    expect(must([mk()]).text).not.toContain("Turn off");
+  });
+  it.each([
+    ["another address", "https://evil.example/unsubscribe?t=x"],
+    ["another path", "https://app.hippo.example/login?t=x"],
+    ["a script", "javascript:alert(1)"],
+    ["a quote that could break out of the attribute", 'https://app.hippo.example/unsubscribe?t="x'],
+    ["embedded credentials", "https://u:p@app.hippo.example/unsubscribe?t=x"],
+    ["not a link", "turn it off"],
+  ])("is refused for %s", (_name, bad) => {
+    expect(() => build([mk()], { unsubscribeUrl: bad })).toThrow(/unsubscribeUrl/);
+  });
+  it("does not hold the opaque token to the long number rule that guards the app link", () => {
+    expect(() =>
+      build([mk()], { unsubscribeUrl: "https://app.hippo.example/unsubscribe?t=1234567890123.abc" }),
+    ).not.toThrow();
+  });
+});

@@ -26,6 +26,9 @@ export const TTL_ATTRIBUTE = "ttl";
 /** Escape the two characters the key format uses: "%" first, then "#". Reversible and never produces "#". */
 export const enc = (part: string): string => part.replaceAll("%", "%25").replaceAll("#", "%23");
 
+/** The reverse of enc. */
+export const dec = (part: string): string => part.replaceAll("%23", "#").replaceAll("%25", "%");
+
 export const pk = (householdId: string): string => `HH#${enc(householdId)}`;
 
 export const HOUSEHOLD_SK = "HOUSEHOLD";

@@ -38,6 +38,8 @@ export interface DailyDeps {
   now: () => number;
   /** Link in the digest. Must satisfy the digest builder's URL rules. */
   appUrl: string;
+  /** A link that turns this household's digest off without signing in (see buildDigest). Left out: no such line. */
+  unsubscribeUrl?: (householdId: string) => Promise<string>;
   config?: DailyConfig;
 }
 

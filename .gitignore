@@ -21,3 +21,7 @@ apps/edge/wrangler.staging.toml
 *.log
 .playwright-mcp/
 apps/extension/store/assets/_*.png
+
+# The extension: the store package and its unpacked folder
+apps/extension/dist-store/
+apps/extension/release/

@@ -1,11 +1,12 @@
 {
   "name": "@hippo/extension",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "license": "MIT",
   "type": "module",
   "scripts": {
     "build": "vite build",
+    "build:store": "vite build --mode store",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

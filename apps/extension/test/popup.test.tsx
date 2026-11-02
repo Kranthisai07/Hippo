@@ -186,8 +186,8 @@ describe("what leaves the browser", () => {
   });
 });
 
-describe("the manifest", () => {
-  const manifest = JSON.parse(readFileSync(join(process.cwd(), "public/manifest.json"), "utf8"));
+describe("the manifest template (the local build; the store build is in storeBuild.test.ts)", () => {
+  const manifest = JSON.parse(readFileSync(join(process.cwd(), "manifest.template.json"), "utf8"));
 
   it("asks for the four permissions and nothing wider", () => {
     expect([...manifest.permissions].sort()).toEqual(["activeTab", "identity", "scripting", "storage"]);

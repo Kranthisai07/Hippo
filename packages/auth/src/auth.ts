@@ -59,6 +59,12 @@ export interface AuthOptions {
   google?: GoogleOptions;
   /** Public pages linked from the sign in window (privacy, terms, home). Absolute http or https addresses only. */
   links?: PageLinks;
+  /**
+   * Called after a person proves which address they control (an emailed code, Google, the demo, an existing session),
+   * with the verified address and the household it maps to. Use it to make sure the household exists. A failure is logged
+   * by error name only and never stops the sign in.
+   */
+  onLogin?: (who: { email: string; sub: string; householdId: string }) => Promise<void>;
   /** Emails the code. When set it replaces the log line. A failure is logged by error name only and never shown. */
   mailer?: Mailer;
   /** Service credentials for the client_credentials grant (scope mcp:service only). */
@@ -236,6 +242,15 @@ export function createAuth(opts: AuthOptions): Auth {
     return { sub: "u_" + (await sha256b64url(email)).slice(0, 22), householdId };
   };
 
+  const notifyLogin = async (email: string, id: { sub: string; householdId: string }): Promise<void> => {
+    if (!opts.onLogin) return;
+    try {
+      await opts.onLogin({ email, ...id });
+    } catch (e) {
+      opts.log(`[hippo-auth] onLogin failed (${e instanceof Error ? e.name : "error"})`);
+    }
+  };
+
   const subOf = async (email: string): Promise<string> => "u_" + (await sha256b64url(email)).slice(0, 22);
 
   const retrySec = (ms: number): number => Math.max(1, Math.ceil(ms / 1000));
@@ -329,6 +344,7 @@ export function createAuth(opts: AuthOptions): Auth {
     const sid = token(random);
     await store.putSession(await sha256b64url(sid), { email, ...id, expiresAt: now() + TTL.sessionMs });
     opts.audit?.({ event: "login_ok", sub: id.sub, reason });
+    await notifyLogin(email, id);
     setCookie(c, SESSION_COOKIE, sid, cookieOpts("/", TTL.sessionMs / 1000));
     return { email, householdId: id.householdId };
   };
@@ -422,7 +438,7 @@ export function createAuth(opts: AuthOptions): Auth {
     p: AuthzParams,
     csrf: string,
     extra: { email?: string; notice?: string; error?: string; step?: "email" | "code" } = {},
-    status: 200 | 401 | 429 = 200,
+    status: 200 | 400 | 401 | 429 = 200,
   ): Promise<Response> => {
     const s = await sessionFromId(getCookie(c, SESSION_COOKIE));
     const html = loginPage({
@@ -434,6 +450,7 @@ export function createAuth(opts: AuthOptions): Auth {
       demo: Boolean(opts.demoUser),
       google: Boolean(opts.google),
       sessionEmail: s?.email,
+      emailCodes,
       step: extra.step ?? "email",
       links: opts.links,
       ...(clientName(p.clientId) ? { clientName: clientName(p.clientId) } : {}),
@@ -447,6 +464,7 @@ export function createAuth(opts: AuthOptions): Auth {
     // The household comes from the server side mapping, never from the request.
     const id = await identity(email);
     opts.audit?.({ event: "login_ok", sub: id.sub, reason });
+    await notifyLogin(email, id);
     const code = token(random);
     await store.putCode(await sha256b64url(code), {
       clientId: p.clientId,
@@ -469,6 +487,9 @@ export function createAuth(opts: AuthOptions): Auth {
   // Continue with Google (docs/VERIFIED.md 10.9). The state of the attempt lives in one signed cookie, so no table is needed.
 
   const google = opts.google;
+  // An emailed code can reach someone only through a mailer, or (the demo and local runs) the log. With neither, asking for
+  // a code would look like it worked and send nothing, so every route that takes an email says it is not available.
+  const emailCodes = Boolean(opts.mailer) || opts.logMagicCodes !== false;
   const googleCallback = `${issuer}${GOOGLE_PATH}/callback`;
   const pendingKey = google ? derivePendingKey(key) : undefined;
   const idKeys = google ? googleKeys(google) : undefined;
@@ -488,8 +509,10 @@ export function createAuth(opts: AuthOptions): Auth {
     return c.redirect(await googleAuthUrl(google!, { redirectUri: googleCallback, ...attempt }), 302);
   };
 
-  // Which sign in methods this server offers, so the web app shows only buttons that work.
-  app.get("/oauth/providers", (c) => c.json({ google: Boolean(google) }, 200, noStore));
+  // Which sign in methods this server offers (Google, and the demo login), so the web app shows only buttons that work.
+  app.get("/oauth/providers", (c) =>
+    c.json({ google: Boolean(google), demo: Boolean(opts.demoUser), email: emailCodes }, 200, noStore),
+  );
 
   // Sign in to the web app with Google: ends with the cookie session and a redirect back to the web app.
   app.get(`${GOOGLE_PATH}/start`, async (c) => {
@@ -576,6 +599,9 @@ export function createAuth(opts: AuthOptions): Auth {
       if (!opts.demoUser) return renderLogin(c, p, csrfCookie, { error: "Demo login is off." }, 401);
       email = normalizeEmail(opts.demoUser.email);
     } else if (action === "send") {
+      if (!emailCodes) {
+        return renderLogin(c, p, csrfCookie, { error: "Email codes are not available here. Use Google instead." }, 400);
+      }
       const e = normalizeEmail(single(sp, "email"));
       const wait = e ? await issueMagic(e) : null;
       if (wait !== null) {
@@ -830,6 +856,7 @@ export function createAuth(opts: AuthOptions): Auth {
     const g = jsonGuard(c);
     if (g) return g;
     const email = normalizeEmail((await readJson(c))?.email);
+    if (!emailCodes) return c.json({ error: "not_available" }, 404, noStore);
     if (!email) return c.json({ error: "invalid_request" }, 400, noStore);
     const wait = await issueMagic(email);
     if (wait !== null) return limited(c, wait);

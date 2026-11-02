@@ -31,6 +31,8 @@ export function Footer() {
 
 export function Layout() {
   const { signOut, me } = useAuth();
+  // A server that cannot read uploads (the Cloudflare backend today) does not offer the page.
+  const links = LINKS.filter((l) => l.to !== "/upload" || me?.uploads !== false);
   return (
     <div className="shell">
       <a className="skip" href="#main">
@@ -39,7 +41,7 @@ export function Layout() {
       <header className="bar">
         <Brand />
         <nav className="nav" aria-label="Main">
-          {LINKS.map(({ to, label, short, icon: Icon, end }) => (
+          {links.map(({ to, label, short, icon: Icon, end }) => (
             <NavLink key={to} to={to} end={end} viewTransition>
               <Icon size={20} strokeWidth={1.75} aria-hidden="true" />
               {short ? (

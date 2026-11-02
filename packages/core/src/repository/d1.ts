@@ -1,5 +1,6 @@
 import type { Repository } from "../contracts";
 import { createItemRepository, type Item, type ItemClient, type WriteRequest } from "./items";
+import { dec, HOUSEHOLD_SK } from "./keys";
 
 // The repository on Cloudflare D1 (schema: apps/edge/migrations/0001_items.sql). It implements ItemClient, so the
 // repository logic is the one in items.ts and the shared repository suite proves it. This file imports no AWS SDK.
@@ -93,6 +94,18 @@ export function createD1ItemClient(db: D1Like): ItemClient {
       }
     },
   };
+}
+
+/**
+ * The ids of every household that has a record, for the daily job (the Repository has no such method). One query over the
+ * primary key, in order. shortcut: all ids in memory, fine for thousands of households, page it beyond that.
+ */
+export async function listD1HouseholdIds(db: D1Like): Promise<string[]> {
+  const res = await db.prepare("SELECT DISTINCT pk FROM items WHERE sk = ? ORDER BY pk").bind(HOUSEHOLD_SK).all();
+  return ((res.results ?? []) as { pk: string }[])
+    .map((r) => r.pk)
+    .filter((p) => p.startsWith("HH#"))
+    .map((p) => dec(p.slice(3)));
 }
 
 export const createD1Repository = (db: D1Like): Repository => createItemRepository(createD1ItemClient(db));

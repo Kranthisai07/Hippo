@@ -15,6 +15,7 @@ import { createSqliteD1 } from "../../../packages/core/test/d1.sqlite";
 import { createHash } from "node:crypto";
 import worker, { buildApp, householdOf, purgeAuthStore, StartupError, type Env } from "../src/index";
 import { createD1AuthStore } from "../src/d1AuthStore";
+import { createD1Repository } from "core/src/repository/d1";
 import { fakeBucket } from "./fakes";
 
 // The whole Workers app, in process: the entry wired to the D1 stores (on node:sqlite), an R2 fake and a fake email
@@ -324,12 +325,12 @@ describe("Continue with Google on the Worker", () => {
 
   it("is offered only when both the client id and the secret are set", async () => {
     const off = setup();
-    expect(await (await off.req("/oauth/providers")).json()).toEqual({ google: false });
+    expect(await (await off.req("/oauth/providers")).json()).toEqual({ google: false, demo: false, email: true });
     const on = setup({ HIPPO_GOOGLE_CLIENT_ID: ID, HIPPO_GOOGLE_CLIENT_SECRET: "secret" });
-    expect(await (await on.req("/oauth/providers")).json()).toEqual({ google: true });
+    expect(await (await on.req("/oauth/providers")).json()).toEqual({ google: true, demo: false, email: true });
     // One without the other is not enough, and in the relaxed mode it simply stays off.
     const half = setup({ HIPPO_GOOGLE_CLIENT_ID: ID });
-    expect(await (await half.req("/oauth/providers")).json()).toEqual({ google: false });
+    expect(await (await half.req("/oauth/providers")).json()).toEqual({ google: false, demo: false, email: true });
   });
   it("starts a web sign in by sending the browser to Google with the Worker's own callback address", async () => {
     const t = setup({ HIPPO_GOOGLE_CLIENT_ID: ID, HIPPO_GOOGLE_CLIENT_SECRET: "secret" });
@@ -373,5 +374,60 @@ describe("the daily cleanup", () => {
     expect(spy).toHaveBeenCalledWith("auth cleanup failed (TypeError)");
     expect(JSON.stringify(spy.mock.calls)).not.toContain("secret detail");
     spy.mockRestore();
+  });
+});
+
+describe("a new person's household", () => {
+  it("exists from the first sign in with their address and the daily email on, so the daily job can see them", async () => {
+    const t = setup();
+    await t.signIn("new@hippo.test");
+    const repo = createD1Repository(t.db);
+    const hh = await householdOf("new@hippo.test");
+    expect(await repo.getHousehold(hh)).toMatchObject({ id: hh, email: "new@hippo.test", digestOn: true });
+  });
+
+  it("signing in does not undo a setting the person already saved", async () => {
+    const t = setup();
+    const hh = await householdOf("keep@hippo.test");
+    const repo = createD1Repository(t.db);
+    await repo.putHousehold(hh, {
+      id: hh,
+      email: "home@hippo.test",
+      digestOn: false,
+      createdAt: "2026-01-01T00:00:00.000Z",
+    });
+    await t.signIn("keep@hippo.test");
+    expect(await repo.getHousehold(hh)).toMatchObject({ email: "home@hippo.test", digestOn: false });
+  });
+});
+
+describe("a free beta: Google sign in and no email binding", () => {
+  const ID = "id.apps.googleusercontent.com";
+  const beta: Partial<Env> = {
+    ...GOOD_PRODUCTION,
+    EMAIL: undefined,
+    HIPPO_GOOGLE_CLIENT_ID: ID,
+    HIPPO_GOOGLE_CLIENT_SECRET: "secret",
+  };
+
+  it("starts in production, and says email codes are off and Google is on", async () => {
+    const t = setup(beta);
+    expect(await (await t.req("/oauth/providers")).json()).toEqual({ google: true, demo: false, email: false });
+  });
+
+  it("refuses to send a code, and no code or address reaches the log", async () => {
+    const t = setup(beta);
+    const res = await t.req("/oauth/magic-code", {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: ISSUER },
+      body: JSON.stringify({ email: "private@hippo.test" }),
+    });
+    expect(res.status).toBe(404);
+    // Not a digit pattern: request ids and times in the log can hold any six digits.
+    expect(t.logs.join("\n")).not.toMatch(/private@|sign in code|magic code/i);
+  });
+
+  it("still refuses to start with neither a mailer nor Google", () => {
+    expect(() => setup({ ...GOOD_PRODUCTION, EMAIL: undefined })).toThrow(/No way to sign in/);
   });
 });
