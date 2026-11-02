@@ -247,3 +247,8 @@ No decisions log exists on main (MEMORY.md is only in old worktrees), so this fi
 - **Found by looking at the deployed app:** Coming up, Subscriptions, Things, Settings and Review still sent people to an Upload page this server does not have. They now say to save a page with the extension (or nothing) when `uploads` is false, through one hook, `useUploads`.
 - **Owner details added:** publisher Kranthi Gadi and contact devnest007@gmail.com on the privacy and terms pages and in the listing.
 - **Not checked:** the extension against this address (next), a real scheduled run, the Chrome Web Store.
+
+## 2026-11-02: the top bar shows a circle with the first letter, not the address (+claude)
+- **What:** `apps/web/src/components/Layout.tsx` replaces the printed address with `.bar-avatar`, a round accent badge with the first letter. The full address is its accessible name (`role="img"`, `aria-label="Signed in as ..."`) and its hover text. The old rules that hid the address below 1100 and 1440 px are gone, so the badge shows at every width, including on a phone.
+- **Why:** the owner did not want the address shown in the bar.
+- **Checked:** web 143 tests including the new one (letter shown, address not in the page, label and title present); all 8 Playwright specs with axe in light and dark; screenshots at desktop and phone looked at. Not checked: a letter that is not A to Z (an address starting with a digit or symbol shows that character).
