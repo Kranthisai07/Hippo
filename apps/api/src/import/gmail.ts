@@ -37,6 +37,8 @@ export interface MailMessage {
   id: string;
   /** The sender's address only, lower case. */
   from: string;
+  /** The display name the sender chose (`Kestrel Learning` in `Kestrel Learning <billing@...>`), or "". Usually the brand. */
+  fromName: string;
   subject: string;
   /** The Date header as Google sent it, or "". */
   date: string;
@@ -142,6 +144,13 @@ export function senderAddress(from: string): string {
   return (m?.[1] ?? "").toLowerCase().slice(0, 254);
 }
 
+/** The display name in a From header: the part before the address, without quotes, or "". */
+export function senderName(from: string): string {
+  const i = from.indexOf("<");
+  if (i <= 0) return "";
+  return from.slice(0, i).replace(/["\\]/g, "").replace(/\s+/g, " ").trim().slice(0, 80);
+}
+
 /** Turns a Gmail message (`format=full`) into what the import needs. Never throws on odd input. */
 export function parseMessage(id: string, payload: unknown): MailMessage {
   const root = (payload && typeof payload === "object" ? payload : {}) as Part;
@@ -164,9 +173,11 @@ export function parseMessage(id: string, payload: unknown): MailMessage {
   };
   walk(root, 0);
   const text = (plain.join("\n").trim() || htmlToText(html.join("\n"))).slice(0, MAX_BODY_CHARS);
+  const fromHeader = decodeHeader(header(root, "From"));
   return {
     id,
-    from: senderAddress(decodeHeader(header(root, "From"))),
+    from: senderAddress(fromHeader),
+    fromName: senderName(fromHeader),
     subject: decodeHeader(header(root, "Subject")),
     date: header(root, "Date").slice(0, 100),
     text,

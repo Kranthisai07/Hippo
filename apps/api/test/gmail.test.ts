@@ -7,6 +7,7 @@ import {
   htmlToText,
   parseMessage,
   senderAddress,
+  senderName,
 } from "../src/import/gmail";
 import { b64url, createFakeGmail, mailPayload, type FakeMail } from "./fakeGmail";
 
@@ -180,5 +181,22 @@ describe("the client", () => {
       sleep: noWait,
     });
     expect(await down.revoke("x")).toBe(false);
+  });
+});
+
+describe("the sender's display name", () => {
+  it.each([
+    ["Kestrel Learning <billing@kestrel.example>", "Kestrel Learning"],
+    ['"Kestrel, Inc." <b@k.example>', "Kestrel, Inc."],
+    ["<only@address.example>", ""],
+    ["plain@address.example", ""],
+    ["", ""],
+  ])("%s gives %j", (header, expected) => {
+    expect(senderName(header)).toBe(expected);
+  });
+  it("is kept on a parsed message", () => {
+    expect(
+      parseMessage("m", mailPayload(mail({ id: "m", from: "=?UTF-8?B?Q2Fmw6k=?= Bill <b@c.example>" }))).fromName,
+    ).toBe("Café Bill");
   });
 });

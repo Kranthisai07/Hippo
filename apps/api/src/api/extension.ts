@@ -3,13 +3,11 @@ import type { Doc, Repository } from "core/src/contracts";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
-import { maskNumbers } from "../mcp/speak";
 import { listSubscriptions } from "../subscriptions";
 import { ApiError, errorBody, readJson } from "./http";
-import { sha256Hex } from "./hash";
+import { prepareCapture } from "./captureDoc";
 import { enforce, type RateLimiter } from "./limiter";
 import { UPLOADS_PER_HOUR } from "./routes";
-import { sanitizeFilename } from "./storage";
 
 // What the browser extension calls. Bearer tokens, because an extension has no session cookie on this site. No model and
 // nothing confirmed here: a capture lands on the same review screen as an upload.
@@ -119,12 +117,17 @@ export function createExtensionApi(deps: ExtensionDeps): Hono<{ Variables: { hh:
       "Too many pages saved. Please try again later.",
     );
 
-    // Masked again here: a client is never trusted to have done it.
-    const title = maskNumbers(body.title.replace(/\s+/g, " ").trim());
-    const text = `${title}\n${maskNumbers(body.text)}`;
-
-    // The id comes from the text, so the same page saved twice is the same document.
-    const docId = `doc-${(await sha256Hex(text)).slice(0, 24)}`;
+    // Masked again here: a client is never trusted to have done it. The id comes from the text, so the same page saved
+    // twice is the same document.
+    const { doc, text, host } = await prepareCapture({
+      householdId: hh,
+      title: body.title,
+      host: body.host,
+      text: body.text,
+      now: deps.now,
+      prefix: "captures",
+    });
+    const docId = doc.id;
     const existing = await repo.getDoc(hh, docId);
     if (existing && existing.status !== "failed") {
       throw new ApiError(409, "This page is already saved.", { "X-Hippo-Doc": docId });
@@ -137,17 +140,7 @@ export function createExtensionApi(deps: ExtensionDeps): Hono<{ Variables: { hh:
         `You have saved ${MAX_CAPTURED_PAGES} pages, which is the limit. Delete some in Hippo to save more.`,
       );
     }
-    const doc: Doc = {
-      id: docId,
-      s3Key: `captures/${hh}/${docId}/page.txt`,
-      // The site name is masked too: a host can hold an account number, and this name is quoted back by the voice tools.
-      filename: sanitizeFilename(maskNumbers(`${body.host.toLowerCase()} ${title}`).replace(/[\\/]/g, " "), "txt"),
-      docType: "other",
-      status: "uploaded",
-      uploadedAt: new Date(deps.now()).toISOString(),
-      assetIds: [],
-    };
-    const result = await deps.onCaptured({ householdId: hh, doc, text, host: body.host.toLowerCase() });
+    const result = await deps.onCaptured({ householdId: hh, doc, text, host });
     if (result.status === "duplicate") {
       throw new ApiError(
         409,
