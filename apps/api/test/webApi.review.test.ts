@@ -712,19 +712,30 @@ describe("delete a document", () => {
 });
 
 describe("settings and delete all data", () => {
-  it("saves the digest setting and the address", async () => {
+  it("saves the digest setting, and the address is the sign in address (typed in any case)", async () => {
     const w = await makeWeb();
-    const r = await w.a.send("PUT", "/api/settings", { digestOn: false, email: "  Family@Example.COM " });
+    const r = await w.a.send("PUT", "/api/settings", { digestOn: false, email: "  Demo@Hippo.TEST " });
     expect(r.status).toBe(200);
-    expect(await json(r)).toEqual({ digestOn: false, email: "family@example.com" });
-    expect((await w.repo.getHousehold("hh_demo"))?.email).toBe("family@example.com");
+    expect(await json(r)).toEqual({ digestOn: false, email: "demo@hippo.test" });
+    expect((await w.repo.getHousehold("hh_demo"))?.email).toBe("demo@hippo.test");
   });
 
-  it("leaving the address out keeps the one saved", async () => {
+  it("refuses another address, and changes nothing", async () => {
     const w = await makeWeb();
-    await w.a.send("PUT", "/api/settings", { digestOn: true, email: "family@example.com" });
+    const before = await w.repo.getHousehold("hh_demo");
+    const r = await w.a.send("PUT", "/api/settings", { digestOn: false, email: "stranger@example.com" });
+    expect(r.status).toBe(400);
+    expect(JSON.stringify(await json(r))).toContain("address you signed in with");
+    expect(await w.repo.getHousehold("hh_demo")).toEqual(before);
+  });
+
+  it("leaving the address out saves the sign in address, and repairs a record that held another one", async () => {
+    const w = await makeWeb();
+    const rec = (await w.repo.getHousehold("hh_demo"))!;
+    await w.repo.putHousehold("hh_demo", { ...rec, email: "old@example.com" });
     const r = await json(await w.a.send("PUT", "/api/settings", { digestOn: false }));
-    expect(r).toEqual({ digestOn: false, email: "family@example.com" });
+    expect(r).toEqual({ digestOn: false, email: "demo@hippo.test" });
+    expect((await w.repo.getHousehold("hh_demo"))?.email).toBe("demo@hippo.test");
   });
 
   it("a household with no record yet gets one", async () => {
@@ -751,11 +762,13 @@ describe("settings and delete all data", () => {
     expect((await w.a.send("PUT", "/api/settings", body)).status).toBe(400);
   });
 
-  it("an address of exactly 254 characters is accepted", async () => {
+  it("a valid address of exactly 254 characters passes the format check and is then refused as not the sign in address", async () => {
     const w = await makeWeb();
     const email = `${"a".repeat(64)}@${"b".repeat(63)}.${"c".repeat(63)}.${"d".repeat(57)}.com`;
     expect(email.length).toBe(254);
-    expect((await w.a.send("PUT", "/api/settings", { digestOn: true, email })).status).toBe(200);
+    const r = await w.a.send("PUT", "/api/settings", { digestOn: true, email });
+    expect(r.status).toBe(400);
+    expect(JSON.stringify(await json(r))).toContain("address you signed in with");
   });
 
   it("DELETE /api/data needs the exact phrase", async () => {

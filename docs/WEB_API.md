@@ -106,7 +106,7 @@ The real worker plugs in by passing its own `onUploaded` (or by running outside 
 
 | Route | Request | Response |
 | :--- | :--- | :--- |
-| `PUT /api/settings` | `{ digestOn: boolean, email?: string }` | `{ digestOn, email }`. The email is trimmed, lower cased and validated, at most 254 characters. Leaving it out keeps the saved one. |
+| `PUT /api/settings` | `{ digestOn: boolean, email?: string }` | `{ digestOn, email }`. The daily email always goes to the address the person signed in with. An `email` in the body is trimmed, lower cased and validated, and must equal that address, otherwise 400 "The daily email goes to the address you signed in with." Leaving it out is the same. The response holds the sign in address. |
 | `GET /api/export` | none | One JSON download (`hippo-export.json`): settings, documents, agreements with their quotes, assets and alerts for the household, masked like every other read. At most 5 a hour (429 with `Retry-After`). |
 | `DELETE /api/data` | `{ confirm: "delete all my data" }` (exactly) | `204`. Deletes everything for the household, its files and its clause index. The session stays valid. |
 

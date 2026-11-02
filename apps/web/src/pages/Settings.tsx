@@ -14,7 +14,6 @@ export function SettingsPage() {
   const { me, refresh } = useAuth();
   const docs = useLoad(() => api.listDocs(), []);
   const [digestOn, setDigestOn] = useState(true);
-  const [email, setEmail] = useState("");
   const [saving, setSaving] = useState(false);
   const [asking, setAsking] = useState<string | null>(null);
   const [removed, setRemoved] = useState<string | null>(null);
@@ -24,14 +23,13 @@ export function SettingsPage() {
   useEffect(() => {
     if (me) {
       setDigestOn(me.digestOn);
-      setEmail(me.email);
     }
   }, [me]);
 
   async function save() {
     setSaving(true);
     try {
-      await api.putSettings({ digestOn, email: email.trim() });
+      await api.putSettings({ digestOn });
       await refresh();
       toast("Settings saved.");
     } catch (e) {
@@ -89,18 +87,10 @@ export function SettingsPage() {
             <input type="checkbox" checked={digestOn} onChange={(e) => setDigestOn(e.target.checked)} />
             Send me a short email when something is due soon
           </label>
-          <div>
-            <label className="field-label" htmlFor="digest-email">
-              Send it to
-            </label>
-            <input
-              id="digest-email"
-              type="email"
-              className="input"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
+          <p className="muted" data-testid="digest-to">
+            Sent to <strong>{me?.email}</strong>, the address you signed in with. Every email has a link that turns it
+            off.
+          </p>
           <div>
             <button type="submit" className="btn btn-primary" disabled={saving}>
               Save

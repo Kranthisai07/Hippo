@@ -247,3 +247,9 @@ No decisions log exists on main (MEMORY.md is only in old worktrees), so this fi
 - **Found by looking at the deployed app:** Coming up, Subscriptions, Things, Settings and Review still sent people to an Upload page this server does not have. They now say to save a page with the extension (or nothing) when `uploads` is false, through one hook, `useUploads`.
 - **Owner details added:** publisher Kranthi Gadi and contact devnest007@gmail.com on the privacy and terms pages and in the listing.
 - **Not checked:** the extension against this address (next), a real scheduled run, the Chrome Web Store.
+
+## 2026-11-02: the daily email goes only to the address the person signed in with (+claude)
+- **What:** `PUT /api/settings` answers 400 for any `email` that is not the session address and always saves the session address (which also repairs a stale record). The Settings page shows "Sent to <address>" and no input.
+- **Why:** gate found in review of the hosted path. With the email on by default, a typed address that nobody had proved could aim a digest at a stranger, and the turn off link only turns off the sender's own household.
+- **Why this way:** the sign in address is already proved (Google or an emailed code), so no new verification flow is needed and none of the beta's tiers needs one. A "send the digest elsewhere" feature would need a code sent to the new address, which needs a mailer; it is not built.
+- **Checked:** api 806 and web 144 tests; mutation check (the refusal removed) fails two named tests.
