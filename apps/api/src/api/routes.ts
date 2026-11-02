@@ -12,6 +12,7 @@ import { maskNumbers } from "../mcp/speak";
 import type { IndexCache } from "../mcp/indexCache";
 import { agreementView, allReviewed, docView, isKnownField, valueSchemaOf } from "./agreements";
 import { readPages, updateIndex, type IndexStore, type OnUploaded } from "./fixtureIngest";
+import type { ImportService } from "../import/service";
 import { enforce, type RateLimiter } from "./limiter";
 import { ApiError, errorBody, notFound, readBytes, readJson } from "./http";
 import { maskAlert, maskAsset, maskEvent, maskObligation } from "./mask";
@@ -40,6 +41,8 @@ export interface WebApiDeps {
   /** Browser origins that may send writes with the cookie. The request's own origin is always allowed. */
   origins: string[];
   limiter: RateLimiter;
+  /** Left out, the Gmail import is off: /me says so and the import routes answer 404. */
+  importService?: ImportService;
 }
 
 /** Every list a route returns is cut at this many rows. */
@@ -118,7 +121,49 @@ export function createWebApi(deps: WebApiDeps): Hono<{ Variables: { hh: string; 
       email: household?.email ?? c.var.email,
       digestOn: household?.digestOn ?? true,
       uploads: Boolean(deps.onUploaded),
+      gmail: deps.importService ? (household?.gmail ?? "offer") : "off",
     });
+  });
+
+  // Gmail import. The household is the session's; a job of another household is a plain 404.
+
+  const importing = (): ImportService => {
+    if (!deps.importService) throw notFound();
+    return deps.importService;
+  };
+  const STEPS_PER_HOUR = 200;
+
+  api.get("/import/latest", async (c) => c.json({ import: await importing().latest(c.var.hh) }));
+
+  api.post("/import/decline", async (c) => {
+    await importing().decline(c.var.hh);
+    return c.json({ gmail: "declined" });
+  });
+
+  api.get("/import/:id", async (c) => {
+    const view = await importing().view(c.var.hh, c.req.param("id"));
+    if (!view) throw notFound();
+    return c.json(view);
+  });
+
+  api.post("/import/:id/step", async (c) => {
+    const svc = importing();
+    await enforce(
+      deps.limiter,
+      `imp:${c.var.hh}`,
+      3_600_000,
+      STEPS_PER_HOUR,
+      "Too many requests. Please try again later.",
+    );
+    const view = await svc.step(c.var.hh, c.req.param("id"));
+    if (!view) throw notFound();
+    return c.json(view);
+  });
+
+  api.post("/import/:id/cancel", async (c) => {
+    const view = await importing().cancel(c.var.hh, c.req.param("id"));
+    if (!view) throw notFound();
+    return c.json(view);
   });
 
   api.get("/subscriptions", async (c) => c.json(await listSubscriptions(repo, c.var.hh, today())));
