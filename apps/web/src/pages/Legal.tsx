@@ -12,11 +12,15 @@ const PRIVACY: [string, string][] = [
   ],
   [
     "Signing in",
-    "You sign in with Google, or with a code sent to your email where that is available. Google only tells Hippo which email address you control. Hippo asks Google for nothing else.",
+    "You sign in with Google, or with a code sent to your email where that is available. When you sign in, Google only tells Hippo which email address you control. Reading your Gmail is a separate step that you start yourself, described below.",
+  ],
+  [
+    "Finding subscriptions in Gmail (optional, one time)",
+    "Only if you press Connect Gmail, and only after you agree on Google's own page, Hippo reads your Gmail once with read only access. It searches the last two years for subscription emails such as receipts, trials and renewals, and for each one it finds it keeps the text of that email with numbers hidden, the sender, and the dates in it. It also lists emails that look like leases, warranties, manuals or policies by subject, sender and date, without opening them or their attachments. When the scan ends, Hippo asks Google to end its access and deletes the access token. It does not keep a way back in; to scan again you are asked again. It never sends, deletes or changes an email, and never reads your mail in the background. People at Hippo do not read your email, except if you give explicit permission for a specific message, to investigate abuse or a security problem, or where the law requires it. Hippo's use and transfer of information received from Google APIs to any other app adheres to the Google API Services User Data Policy, including the Limited Use requirements. The data from your email is used only to show you your subscriptions and dates. It is not used for advertising or to train AI models, and it is not sold or shared. What it finds is saved like any other document, so you can delete it in Settings, one document at a time or all at once. During the beta Google shows a warning that the app is in testing; that is expected.",
   ],
   [
     "What Hippo does not do",
-    "It does not read your email or your bank. It only knows what you upload, tell it, or save yourself with the extension. It does not sell your data and does not use it for advertising.",
+    "It does not read your email unless you choose the optional Gmail scan above, and it never reads your bank. Otherwise it only knows what you upload, tell it, or save yourself with the extension. It does not sell your data and does not use it for advertising.",
   ],
   ["Numbers", "Policy and account numbers are shown with only the last 4 digits."],
   ["Logs", "Hippo is built so the text of your documents is not written to its logs."],

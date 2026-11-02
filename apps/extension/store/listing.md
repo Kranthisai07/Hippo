@@ -26,7 +26,7 @@ What you stay in control of
 - A page with no subscription on it is not kept.
 
 What it does not do
-- It does not read your email, your bank, or any page in the background.
+- The extension does not read your email, your bank, or any page in the background. (The Hippo web app has a separate, optional one time Gmail scan. It is not part of the extension and the extension asks for no Gmail permission.)
 - It does not cancel anything for you.
 
 ## Permission justifications

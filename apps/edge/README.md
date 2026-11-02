@@ -19,6 +19,7 @@ The Worker is strict by default: only `HIPPO_ENV=development` or `local` relaxes
 
 - Connected: sign in by emailed code with PKCE and Continue with Google, the extension routes (`/ext`), the web API (`/api`) except uploads, `/mcp`, rate limits in D1, revocation, export and delete, a household record created at first sign in, and the daily cron (`scheduled`): cleanup of expired sign in records, then deadlines and alerts, the recall check and the digest email (apps/edge/src/daily.ts).
 - The digest is mailed only when the `EMAIL` binding, an https `HIPPO_ISSUER` and a `HIPPO_SIGNING_KEY` of 32 characters or more are all present. Otherwise the job still makes the alerts (so Coming up is right) and counts the digest as a dry run. Every digest ends with a signed turn off link (`/unsubscribe`, valid 90 days).
+- Optional and off by default: the one time Gmail scan (`HIPPO_GMAIL_IMPORT`, see "Turning on the Gmail scan" below).
 - Not connected: uploads and PDF reading (the app answers 503, and the web app leaves the Upload page out), Resend. The web app is served from the Worker (see the first release steps below).
 - `wrangler.toml` holds no secret. `HIPPO_SIGNING_KEY` is a `wrangler secret`. The D1 `database_id` is a placeholder until staging.
 
@@ -56,3 +57,14 @@ Nothing here has been run on a real account for this tier yet (`docs/VERIFIED.md
 
 The cron runs every 15 minutes. Each run does the daily job for the next few households (`HIPPO_DAILY_BATCH`, default 1, at most 50) that have not had it today, so every household is done once a day and one run stays small. About 3 ms of work per household was measured on Node (`docs/VERIFIED.md` 10.23). The default of 1 fits the Workers free plan (10 ms of CPU per run) and still finishes 96 households a day; on the paid plan (30 s of CPU) raise `HIPPO_DAILY_BATCH`, for example to 10. The first run after 03:00 UTC also deletes expired sign in records. With no email binding the reminder job still makes the alerts (Coming up is right) and counts the digest as a dry run. To turn email on later: add `[[send_email]]` with `name = "EMAIL"`, set `HIPPO_MAIL_FROM` to an address on a verified domain, and redeploy. People then get sign in codes by email, and the daily digest with its turn off link, with no code change.
 
+## Turning on the Gmail scan (optional, owner steps)
+
+Dark by default: with `HIPPO_GMAIL_IMPORT` unset (or any value but `1`) there is no consent step, no import routes and `/api/me` says `gmail: "off"`. Deploying the code changes nothing for anyone. To turn it on, in this order:
+
+1. **Workers Paid plan.** A scan makes many Gmail calls and saves each page found, far over the free plan's 10 ms of CPU and 50 subrequests per request (docs/VERIFIED.md 10.23; the price is not verified here). Each step does 25 messages, so a step on the free plan would hit the limit. Do not switch the scan on without it.
+2. **Apply the migration:** `wrangler d1 migrations apply hippo --remote --config wrangler.release.toml` (adds `import_jobs`, `0005_import.sql`).
+3. **Google console:** enable the Gmail API, add the scope `https://www.googleapis.com/auth/gmail.readonly` under Google Auth Platform, Data access, and add each person who may try it as a test user (Testing mode allows 100; Google shows them an unverified app warning, and the authorization expires after 7 days, docs/VERIFIED.md 10.24). No new redirect address is needed: the scan returns to the same `<issuer>/oauth/google/callback` as sign in.
+4. Set `HIPPO_GMAIL_IMPORT = "1"` in `[vars]` and `wrangler deploy`. The Worker refuses to start if it is on without the Google client id and secret.
+5. Check by hand with your own account: `/oauth/providers` answers `gmail: true`, sign in, Connect Gmail, watch the scan, then confirm in Google's account permissions that the access is gone.
+
+The daily cleanup (the 03:00 UTC run) also ends scans whose token has expired and deletes finished scan records after 30 days. A public launch (anyone, not just test users) needs Google's restricted scope verification and a security assessment, which are not done.

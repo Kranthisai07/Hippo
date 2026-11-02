@@ -21,16 +21,31 @@ Today "the database" and "the object store" are both in memory when you run the 
 
 ## What Hippo does not do
 
-- It does not read your email or your bank to find subscriptions. You upload documents, say things, or save a page yourself with the browser extension.
+- It does not read your bank. It does not read your email either, unless you choose the optional one time Gmail scan (the next section). Otherwise you upload documents, say things, or save a page yourself with the browser extension.
 - It does not file claims.
 - It does not cancel subscriptions.
 - It does not push to your Echo. Reminders come at your next Alexa+ question or in a daily email digest.
 - It does not look at vehicle identification numbers. Vehicle recalls are matched by make, model and year, so they always say "may affect your car".
 - It is not legal or insurance advice. A coverage answer says what your document says and what the deadline is. It never says a claim will be approved. Check the document and talk to your insurer or seller.
 
+## Finding subscriptions in Gmail (optional, one time)
+
+Off unless the operator switches it on (`HIPPO_GMAIL_IMPORT=1`), and then only when a signed in person presses Connect Gmail and agrees on Google's own page. The scope is `gmail.readonly`, a restricted scope: read only, no sending, no deleting, no changing.
+
+- **What is read:** a search of the last two years for subscription mail (receipts, invoices, trials, renewals, billing), newest first, at most 500 messages, plus a search for mail with a lease, warranty, manual or policy subject or attachment name (at most 30 shown).
+- **What is kept:** for each subscription message, the text with numbers masked, the sender's site name, and the dates found, saved like any other document and shown as "to review". For the spotted documents only the subject, the sender's site name, the date and the attachment file name are kept, in the scan record. No attachment is opened or stored. Nothing is kept from messages that are not subscriptions.
+- **The token:** Google's access token is kept only sealed (AES-GCM, with a key derived from the server's signing key), for at most an hour, in the `import_jobs` table. No refresh token is requested, so there is no way back in. When the scan ends, fails, is cancelled or expires, Hippo asks Google to revoke the token and deletes the sealed copy. The daily cleanup ends any scan whose token has expired. A finished scan record (counts, the spotted list) is deleted after 30 days.
+- **Limits:** one finished scan a day per household; the browser drives the scan in small steps (25 messages each) and a step is limited per hour.
+- **Logs:** counts and error names only. Never an address, a subject, a message id or a token.
+- **Who can read it:** only the signed in household. Nobody at Hippo reads your email except with your explicit permission for a specific message, to investigate abuse or a security problem, or where the law requires it.
+- **Limited Use:** Hippo's use and transfer of information received from Google APIs to any other app adheres to the Google API Services User Data Policy, including the Limited Use requirements. The data is used only to show you your subscriptions and dates, is not used for advertising or to train AI models, and is not sold or shared.
+- **Deleting:** what a scan found is an ordinary document: delete it, or use Delete all data, and its fields, dates and reminders go with it. To end Google's access by hand, use https://myaccount.google.com/permissions.
+- **Accuracy:** the rules read English and US dollar prices and fixed layouts, so some subscriptions are missed or only partly found. Nothing becomes a reminder until the person confirms its dates.
+- **Status:** the beta runs with the Google app in Testing mode: only listed test users can connect, and Google shows an unverified app warning. A public launch needs Google's restricted scope verification and a security assessment (docs/VERIFIED.md 10.24). Not done.
+
 ## The browser extension
 
-The extension (`apps/extension`) does not change the rule above: it reads no email and no bank data, and it never reads in the background.
+The extension (`apps/extension`) never touches your email: it reads no email and no bank data, and it never reads in the background. The Gmail scan below is a feature of the web app, not of the extension.
 
 - It can read a page only after you click its button, and only that tab (`activeTab`). There is no content script on other pages and no access to all sites.
 - It reads the text visible on the page, the page title and the site name. It does not read form values or the page source, and it never sends the full address, because an address can hold a token.
