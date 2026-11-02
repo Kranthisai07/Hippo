@@ -389,7 +389,7 @@ describe("a new person's household", () => {
     expect(await repo.getHousehold(hh)).toMatchObject({ id: hh, email: "new@hippo.test", digestOn: true });
   });
 
-  it("signing in does not undo a setting the person already saved", async () => {
+  it("signing in repairs an address that is not the sign in address, and keeps the on or off setting the person saved", async () => {
     const t = setup();
     const hh = await householdOf("keep@hippo.test");
     const repo = createD1Repository(t.db);
@@ -400,7 +400,7 @@ describe("a new person's household", () => {
       createdAt: "2026-01-01T00:00:00.000Z",
     });
     await t.signIn("keep@hippo.test");
-    expect(await repo.getHousehold(hh)).toMatchObject({ email: "home@hippo.test", digestOn: false });
+    expect(await repo.getHousehold(hh)).toMatchObject({ email: "keep@hippo.test", digestOn: false });
   });
 });
 

@@ -83,17 +83,22 @@ describe("working through the households in slices", () => {
     const w = world(3, "5");
     await w.seed();
     let breakBatch = true;
+    // Only the write that records "done" fails, so the failure is in the marking step and not in the run itself.
     const flaky = {
       prepare: (sql: string) => w.db.prepare(sql),
       batch: (s: Parameters<typeof w.db.batch>[0]) => {
-        if (breakBatch) throw new TypeError("database busy");
+        const marking = (s as unknown as { sql: string }[]).some((x) => x.sql.startsWith("INSERT INTO daily_runs"));
+        if (breakBatch && marking) throw new TypeError("database busy");
         return w.db.batch(s);
       },
     };
-    await expect(runDailyJob({ DB: flaky } as never, () => NOW, quiet)).rejects.toThrow();
+    const env = { DB: flaky, HIPPO_DAILY_BATCH: "5" } as never;
+    await expect(runDailyJob(env, () => NOW, quiet)).rejects.toThrow("database busy");
+    expect(w.db.count("daily_runs")).toBe(0);
     breakBatch = false;
-    const again = await runDailyJob({ DB: flaky } as never, () => NOW + 60_000, quiet);
+    const again = await runDailyJob(env, () => NOW + 60_000, quiet);
     expect(again.households).toHaveLength(3);
+    expect(w.db.count("daily_runs")).toBe(3);
     vi.unstubAllGlobals();
   });
 });

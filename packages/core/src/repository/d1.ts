@@ -101,7 +101,7 @@ export function createD1ItemClient(db: D1Like): ItemClient {
  * primary key, in order. shortcut: all ids in memory, fine for thousands of households, page it beyond that.
  */
 export async function listD1HouseholdIds(db: D1Like): Promise<string[]> {
-  const res = await db.prepare("SELECT DISTINCT pk FROM items WHERE sk = ? ORDER BY pk").bind(HOUSEHOLD_SK).all();
+  const res = await db.prepare("SELECT DISTINCT pk FROM items WHERE sk = 'HOUSEHOLD' ORDER BY pk").all();
   return ((res.results ?? []) as { pk: string }[])
     .map((r) => r.pk)
     .filter((p) => p.startsWith("HH#"))
@@ -115,9 +115,9 @@ export async function listD1HouseholdIds(db: D1Like): Promise<string[]> {
 export async function nextD1HouseholdIds(db: D1Like, day: string, limit: number): Promise<string[]> {
   const res = await db
     .prepare(
-      "SELECT i.pk AS pk FROM items i LEFT JOIN daily_runs d ON d.pk = i.pk AND d.day = ? WHERE i.sk = ? AND d.pk IS NULL ORDER BY i.pk LIMIT ?",
+      "SELECT i.pk AS pk FROM items i LEFT JOIN daily_runs d ON d.pk = i.pk AND d.day = ? WHERE i.sk = 'HOUSEHOLD' AND d.pk IS NULL ORDER BY i.pk LIMIT ?",
     )
-    .bind(day, HOUSEHOLD_SK, limit)
+    .bind(day, limit)
     .all();
   return ((res.results ?? []) as { pk: string }[])
     .map((r) => r.pk)

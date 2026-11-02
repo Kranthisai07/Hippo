@@ -218,3 +218,30 @@ describe("the scheduled run", () => {
     expect(d.appUrl).toBe(ISSUER);
   });
 });
+
+describe("a failed marking after the mail went out", () => {
+  it("does not send the same alerts a second time when the household is taken again", async () => {
+    emptyRecalls();
+    const w = world();
+    await household(w, "hh_a", { email: "a@hippo.test" });
+    await addWarranty(w.repo, "hh_a", "sure", days(5), "confirmed");
+    let breakMark = true;
+    const flaky = {
+      prepare: (sql: string) => w.db.prepare(sql),
+      batch: (s: Parameters<typeof w.db.batch>[0]) => {
+        const marking = (s as unknown as { sql: string }[]).some((x) => x.sql.startsWith("INSERT INTO daily_runs"));
+        if (breakMark && marking) throw new TypeError("database busy");
+        return w.db.batch(s);
+      },
+    };
+    const env = { ...w.env, DB: flaky } as never;
+    await expect(runDailyJob(env, () => NOW, quiet)).rejects.toThrow("database busy");
+    expect(w.mails).toHaveLength(1);
+    breakMark = false;
+    const again = await runDailyJob(env, () => NOW + 900_000, quiet);
+    // Taken again, because it was not marked, but the alerts already carry the time they were mailed.
+    expect(again.households).toHaveLength(1);
+    expect(w.mails).toHaveLength(1);
+    vi.unstubAllGlobals();
+  });
+});

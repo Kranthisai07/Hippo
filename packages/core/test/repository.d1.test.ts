@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createD1ItemClient, createD1Repository, listD1HouseholdIds } from "../src/repository/d1";
+import { createD1ItemClient, createD1Repository, listD1HouseholdIds, nextD1HouseholdIds } from "../src/repository/d1";
 import type { Item } from "../src/repository/items";
 import { createSqliteD1 } from "./d1.sqlite";
 import { runRepositorySuite } from "./repository.suite";
@@ -139,6 +139,16 @@ describe("listing households for the daily job", () => {
     const repo = createD1Repository(db);
     await repo.putHousehold("a#b%c", hh("a#b%c"));
     expect(await listD1HouseholdIds(db)).toEqual(["a#b%c"]);
+  });
+
+  it("looks households up through the index made for it, not by reading every row", async () => {
+    const db = createSqliteD1();
+    await nextD1HouseholdIds(db, "2026-10-21", 5);
+    const sql = db.ran[db.ran.length - 1]!;
+    const plan = (await db.prepare(`EXPLAIN QUERY PLAN ${sql}`).bind("2026-10-21", 5).all()).results as {
+      detail: string;
+    }[];
+    expect(plan.map((p) => p.detail).join(" | ")).toContain("items_households");
   });
 
   it("is empty before anyone signs in", async () => {

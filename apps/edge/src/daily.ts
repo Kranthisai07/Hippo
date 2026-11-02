@@ -14,11 +14,13 @@ export interface DailyEnv {
   HIPPO_ISSUER?: string | undefined;
   HIPPO_SIGNING_KEY?: string | undefined;
   HIPPO_MAIL_FROM?: string | undefined;
-  /** Most households one run takes (default 5). The cron runs every 15 minutes and each household is done once a day. */
+  /** Most households one run takes (default 1; raise it on the paid plan). The cron runs every 15 minutes and each household is done once a day. */
   HIPPO_DAILY_BATCH?: string | undefined;
 }
 
-export const DEFAULT_DAILY_BATCH = 5;
+// One household per run is what fits the Workers free plan (about 3 ms of work each against 10 ms of CPU). On the paid plan
+// raise HIPPO_DAILY_BATCH.
+export const DEFAULT_DAILY_BATCH = 1;
 const MAX_DAILY_BATCH = 50;
 
 /** The setting as a whole number from 1 to 50, or the default for anything else. */

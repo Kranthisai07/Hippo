@@ -16,7 +16,7 @@ describe("ensureHousehold", () => {
     });
   });
 
-  it("never changes a record that is already there", async () => {
+  it("brings only the address of a record that is already there in line with the sign in address, and leaves the setting", async () => {
     const repo = createMemoryRepository();
     await repo.putHousehold("hh_a", {
       id: "hh_a",
@@ -25,7 +25,11 @@ describe("ensureHousehold", () => {
       createdAt: "2026-01-01T00:00:00.000Z",
     });
     await ensureHousehold(repo, { householdId: "hh_a", email: "a@example.com" }, now);
-    expect(await repo.getHousehold("hh_a")).toMatchObject({ email: "home@example.com", digestOn: false });
+    expect(await repo.getHousehold("hh_a")).toMatchObject({
+      email: "a@example.com",
+      digestOn: false,
+      createdAt: "2026-01-01T00:00:00.000Z",
+    });
   });
 
   it("keeps households apart", async () => {
