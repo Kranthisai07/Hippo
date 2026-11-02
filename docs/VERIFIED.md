@@ -601,7 +601,7 @@ Follow-up, same day (I fetched the zip myself):
 
 ### 10.19 Chrome Web Store listing assets and rules (2026-11-01)
 
-Read live (page fetch, summarised by a tool, not read raw): the developer.chrome.com pages named in the Source column. Our manifest (`apps/extension/public/manifest.json`) asks for `activeTab`, `scripting`, `identity`, `storage` and host permission `http://localhost:8787/*` (a dev value that must change for a store build).
+Read live (page fetch, summarised by a tool, not read raw): the developer.chrome.com pages named in the Source column. Our manifest (`apps/extension/manifest.template.json`) asks for `activeTab`, `scripting`, `identity`, `storage` and host permission `http://localhost:8787/*` (a dev value that must change for a store build).
 
 | Item | Observed | Status | Source |
 | :--- | :--- | :--- | :--- |

@@ -147,7 +147,7 @@ For this prototype there is no production deployment and no retention schedule. 
 | Delete one document / all data | `apps/api/src/api/routes.ts`, repository `deleteDocumentCascade` and `deleteHousehold` | `apps/api/test/webApi.review.test.ts` (sections "delete a document", "settings and delete all data"), repository suite |
 | Errors repeat no document text | `apps/api/src/api/routes.ts` `onError`, `http.ts` | `webApi.review.test.ts` ("an error never repeats document text") |
 | Extension: nothing alerts before review, household from token, no capture on a public host, no page kept without a subscription | `apps/api/src/api/extension.ts`, `apps/workers/src/ingest/capture.ts` | `apps/api/test/extension.test.ts` |
-| Extension: narrow permissions, nothing sent before Save, masked before sending | `apps/extension/public/manifest.json`, `apps/extension/src/page.ts` | `apps/extension/test/popup.test.tsx` |
+| Extension: narrow permissions, nothing sent before Save, masked before sending | `apps/extension/manifest.template.json`, `apps/extension/src/page.ts` | `apps/extension/test/popup.test.tsx` |
 | Upload type, size and magic number checks | `apps/api/src/api/routes.ts`, `storage.ts` | `apps/api/test/webApi.upload.test.ts` |
 | PKCE S256, resource, bare 401, throttling, token lifetimes | `packages/auth/src/auth.ts` | `packages/auth/test/*` |
 | Encryption at rest, no public bucket, TLS only | `infra/src/hippo-stack.ts` | `infra/test/hippo-stack.test.ts` (template only, not deployed) |
