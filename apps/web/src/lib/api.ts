@@ -6,6 +6,7 @@ import type {
   Doc,
   DocDetail,
   FieldView,
+  ImportView,
   Me,
   ObligationItem,
   ObligationRecord,
@@ -157,6 +158,13 @@ export const api = {
       "GET",
       `/api/assets/${id(assetId)}`,
     ),
+
+  // Gmail import (one scan, then disconnect). The consent itself is a full page visit to /oauth/google/import/start.
+  importLatest: () => json<{ import: ImportView | null }>("GET", "/api/import/latest"),
+  importStep: (jobId: string) => json<ImportView>("POST", `/api/import/${id(jobId)}/step`, {}),
+  importView: (jobId: string) => json<ImportView>("GET", `/api/import/${id(jobId)}`),
+  importCancel: (jobId: string) => json<ImportView>("POST", `/api/import/${id(jobId)}/cancel`, {}),
+  importDecline: () => json<{ gmail: "declined" }>("POST", "/api/import/decline", {}),
 
   // Settings and data
   putSettings: (s: { digestOn: boolean; email?: string }) =>

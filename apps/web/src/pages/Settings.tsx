@@ -1,4 +1,4 @@
-import { FileText, Mail, Mic, Trash2 } from "lucide-react";
+import { FileText, Inbox, Mail, Mic, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { ErrorState, Skeleton, useToast } from "../components/ui";
@@ -98,6 +98,27 @@ export function SettingsPage() {
           </div>
         </form>
       </section>
+
+      {me?.gmail && me.gmail !== "off" && (
+        <section className="card stack" aria-labelledby="gmail-h">
+          <h2 id="gmail-h" className="card-h">
+            <Inbox size={20} aria-hidden="true" /> Gmail
+          </h2>
+          <p className="muted" data-testid="gmail-status">
+            {me.gmail === "done"
+              ? "Hippo looked through your Gmail once and then ended its access. It cannot read your email now."
+              : me.gmail === "declined"
+                ? "You chose not to connect Gmail."
+                : "Gmail is not connected."}{" "}
+            What it found is in your documents below; delete any of them, or all your data, whenever you like.
+          </p>
+          <div>
+            <Link className="btn" to="/connect">
+              {me.gmail === "done" ? "Scan again" : "Find subscriptions in Gmail"}
+            </Link>
+          </div>
+        </section>
+      )}
 
       <section className="card stack" aria-labelledby="docs-h">
         <h2 id="docs-h" className="card-h">
