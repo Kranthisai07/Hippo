@@ -267,3 +267,6 @@ No decisions log exists on main (MEMORY.md is only in old worktrees), so this fi
 - **Mail then failed marking:** a test proves that if marking "done" fails after a digest was sent, the next run takes the household again but sends nothing, because alerts already carry the time they were mailed.
 - **Left as a note:** two overlapping runs could pick the same households (selection and marking are not one step). Cloudflare crons do not overlap and runs are short; the alert marking above is the backstop for the mail.
 - **Checked:** core 1348, api 806, edge 142 tests; mutation checks (no index migration, no address repair) fail named tests.
+
+## 2026-11-02: the first real scheduled run (+claude)
+- On the deployed beta the 15 minute cron ran: outcome ok, one household, no errors, cpuTime 10 ms, wallTime 1577 ms. That is exactly the free plan's CPU limit, so the default batch of 1 is the ceiling on the free plan, not a safe margin: on the paid plan raise `HIPPO_DAILY_BATCH`. Recorded in `docs/VERIFIED.md` 10.23.
