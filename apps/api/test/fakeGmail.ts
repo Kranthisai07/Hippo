@@ -42,6 +42,8 @@ export interface FakeGmailOptions {
   pageSize?: number;
   /** The first list call answers this status once. */
   listFailsOnce?: number;
+  /** Every list call answers this status. */
+  listFails?: number;
   /** A message id that answers this status every time. */
   getFails?: Record<string, number>;
   /** Make a list call never finish, to test the timeout. */
@@ -100,6 +102,7 @@ export function createFakeGmail(mails: FakeMail[], o: FakeGmailOptions = {}) {
     }
     if (url.pathname === "/gmail/v1/users/me/messages") {
       calls.list++;
+      if (o.listFails) return json({ error: { code: o.listFails } }, o.listFails);
       if (o.listFailsOnce && !listFailed) {
         listFailed = true;
         return json({ error: { code: o.listFailsOnce } }, o.listFailsOnce);
