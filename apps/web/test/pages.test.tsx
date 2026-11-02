@@ -7,6 +7,7 @@ import { ToastProvider } from "../src/components/ui";
 import { ApiError, api } from "../src/lib/api";
 import { ComingUp } from "../src/pages/ComingUp";
 import { Layout } from "../src/components/Layout";
+import { Legal } from "../src/pages/Legal";
 import { Review } from "../src/pages/Review";
 import { SettingsPage } from "../src/pages/Settings";
 import { SignIn } from "../src/pages/SignIn";
@@ -382,5 +383,17 @@ describe("a server with no emailed codes", () => {
     await waitFor(() => expect(screen.queryByLabelText("Email")).toBeNull());
     expect(screen.queryByRole("button", { name: "Send me a code" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Use the demo account" })).toBeNull();
+  });
+});
+
+describe("the legal pages", () => {
+  it.each(["privacy", "terms"] as const)("%s says who runs Hippo and gives a contact address", async (which) => {
+    wrap(<Legal which={which} />, "/", "/");
+    expect(await screen.findByRole("heading", { name: "Who runs Hippo" })).toBeInTheDocument();
+    expect(screen.getByText(/Kranthi Gadi/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "devnest007@gmail.com" })).toHaveAttribute(
+      "href",
+      "mailto:devnest007@gmail.com",
+    );
   });
 });

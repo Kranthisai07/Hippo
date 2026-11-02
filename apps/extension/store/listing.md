@@ -54,5 +54,5 @@ What it does not do
 1. **Nothing is deployed.** The Cloudflare backend saves per person and the store build exists (`pnpm --filter @hippo/extension build:store`), but until the Worker is deployed to a real address the listing would describe a product nobody can use. Deploy steps: `apps/edge/README.md`. Needs the owner's yes (account, R2, Google test users).
 2. **The extension id.** It is known only after a draft upload. Then set `HIPPO_EXTENSION_ID` on the Worker and redeploy (`apps/extension/README.md`). Whether the store wants the manifest `key` is unverified (10.19).
 3. **Public privacy policy** at the real address of the app (`/privacy`), the same text as the dashboard form. The text in the app must be re-read against this file when the address is known.
-4. **Owner decisions**: publisher name, support contact, and whether the privacy and terms text is reviewed by a lawyer.
+4. **Publisher and contact** (given by the owner 2026-11-02): publisher Kranthi Gadi, support contact devnest007@gmail.com. Both are on the privacy and terms pages. Still the owner's decision: whether the privacy and terms text is reviewed by a lawyer.
 5. **Landing copy**: the landing page says the extension saves to a server on your own computer. Change it when the beta is deployed.
