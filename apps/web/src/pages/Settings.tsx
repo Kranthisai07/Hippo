@@ -3,12 +3,13 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { ErrorState, Skeleton, useToast } from "../components/ui";
 import { api } from "../lib/api";
-import { useAuth } from "../lib/auth";
+import { useAuth, useUploads } from "../lib/auth";
 import { useLoad } from "../lib/useLoad";
 
 const PHRASE = "delete all my data";
 
 export function SettingsPage() {
+  const uploads = useUploads();
   const toast = useToast();
   const { me, refresh } = useAuth();
   const docs = useLoad(() => api.listDocs(), []);
@@ -123,7 +124,13 @@ export function SettingsPage() {
           <Skeleton variant="rows" lines={3} label="Loading your documents" />
         ) : docs.data.docs.length === 0 ? (
           <p className="muted">
-            You have no documents. <Link to="/upload">Upload one</Link> to get started.
+            {uploads ? (
+              <>
+                You have no documents. <Link to="/upload">Upload one</Link> to get started.
+              </>
+            ) : (
+              "You have no saved pages yet. Save one with the Hippo Chrome extension to get started."
+            )}
           </p>
         ) : (
           <ul className="list">

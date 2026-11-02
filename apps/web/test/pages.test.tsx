@@ -7,6 +7,7 @@ import { ToastProvider } from "../src/components/ui";
 import { ApiError, api } from "../src/lib/api";
 import { ComingUp } from "../src/pages/ComingUp";
 import { Layout } from "../src/components/Layout";
+import { Legal } from "../src/pages/Legal";
 import { Review } from "../src/pages/Review";
 import { SettingsPage } from "../src/pages/Settings";
 import { SignIn } from "../src/pages/SignIn";
@@ -382,5 +383,63 @@ describe("a server with no emailed codes", () => {
     await waitFor(() => expect(screen.queryByLabelText("Email")).toBeNull());
     expect(screen.queryByRole("button", { name: "Send me a code" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Use the demo account" })).toBeNull();
+  });
+});
+
+describe("the legal pages", () => {
+  it.each(["privacy", "terms"] as const)("%s says who runs Hippo and gives a contact address", async (which) => {
+    wrap(<Legal which={which} />, "/", "/");
+    expect(await screen.findByRole("heading", { name: "Who runs Hippo" })).toBeInTheDocument();
+    expect(screen.getByText(/Kranthi Gadi/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "devnest007@gmail.com" })).toHaveAttribute(
+      "href",
+      "mailto:devnest007@gmail.com",
+    );
+  });
+});
+
+describe("with no uploads on the server", () => {
+  const noUploads = () => vi.spyOn(api, "me").mockResolvedValue({ email: "a@b.co", digestOn: true, uploads: false });
+  const withUploads = () => vi.spyOn(api, "me").mockResolvedValue({ email: "a@b.co", digestOn: true, uploads: true });
+
+  it("Coming up asks for a saved page, and offers no link to the Upload page", async () => {
+    noUploads();
+    vi.spyOn(api, "listDocs").mockResolvedValue({ docs: [] });
+    vi.spyOn(api, "listAlerts").mockResolvedValue({ alerts: [] });
+    vi.spyOn(api, "listAssets").mockResolvedValue({ assets: [] });
+    vi.spyOn(api, "listObligations").mockResolvedValue({ items: [] });
+    wrap(
+      <AuthProvider>
+        <ComingUp />
+      </AuthProvider>,
+    );
+    expect(await screen.findByText(/Save a billing page with the Hippo Chrome extension/)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Upload a document/ })).toBeNull();
+  });
+
+  it("Coming up still offers the upload when the server reads uploads", async () => {
+    withUploads();
+    vi.spyOn(api, "listDocs").mockResolvedValue({ docs: [] });
+    vi.spyOn(api, "listAlerts").mockResolvedValue({ alerts: [] });
+    vi.spyOn(api, "listAssets").mockResolvedValue({ assets: [] });
+    vi.spyOn(api, "listObligations").mockResolvedValue({ items: [] });
+    wrap(
+      <AuthProvider>
+        <ComingUp />
+      </AuthProvider>,
+    );
+    expect(await screen.findByRole("link", { name: /Upload a document/ })).toBeInTheDocument();
+  });
+
+  it("Things does not point at an Upload page that is not there", async () => {
+    noUploads();
+    vi.spyOn(api, "listAssets").mockResolvedValue({ assets: [] });
+    wrap(
+      <AuthProvider>
+        <Things />
+      </AuthProvider>,
+    );
+    expect(await screen.findByText(/That is not available in this version yet/)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Upload a document/ })).toBeNull();
   });
 });

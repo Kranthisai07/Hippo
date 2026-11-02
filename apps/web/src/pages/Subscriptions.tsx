@@ -1,3 +1,4 @@
+import { useUploads } from "../lib/auth";
 import { CreditCard, Upload } from "lucide-react";
 import { Link } from "react-router";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui";
@@ -12,6 +13,7 @@ const price = (s: Subscription): string =>
     : `$${s.amount.toFixed(2)}${s.cycle ? ` ${humanize(s.cycle).toLowerCase()}` : ""}`;
 
 export function Subscriptions() {
+  const uploads = useUploads();
   const { data, error, loading, reload } = useLoad(() => api.listSubscriptions(), []);
   if (error) return <ErrorState message={error} onRetry={reload} />;
   if (loading || !data) {
@@ -38,13 +40,19 @@ export function Subscriptions() {
         <EmptyState
           icon={CreditCard}
           title="No subscriptions yet"
-          action={
-            <Link to="/upload" className="btn btn-primary">
-              <Upload size={18} aria-hidden="true" /> Upload a document
-            </Link>
-          }
+          {...(uploads
+            ? {
+                action: (
+                  <Link to="/upload" className="btn btn-primary">
+                    <Upload size={18} aria-hidden="true" /> Upload a document
+                  </Link>
+                ),
+              }
+            : {})}
         >
-          Upload a subscription confirmation and it shows up here, with its next charge.
+          {uploads
+            ? "Upload a subscription confirmation and it shows up here, with its next charge."
+            : "Save a billing page with the Hippo Chrome extension and it shows up here, with its next charge."}
         </EmptyState>
       ) : (
         <ul className="list">

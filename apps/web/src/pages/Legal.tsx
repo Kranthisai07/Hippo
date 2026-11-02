@@ -43,6 +43,10 @@ const TERMS: [string, string][] = [
   ["Your content", "Your documents stay yours. You can delete them at any time."],
 ];
 
+/** Who runs Hippo and where to write. */
+const PUBLISHER = "Kranthi Gadi";
+const CONTACT = "devnest007@gmail.com";
+
 export function Legal({ which }: { which: "privacy" | "terms" }) {
   const rows = which === "privacy" ? PRIVACY : TERMS;
   return (
@@ -55,6 +59,13 @@ export function Legal({ which }: { which: "privacy" | "terms" }) {
           <p>{t}</p>
         </section>
       ))}
+      <section className="stack">
+        <h2>Who runs Hippo</h2>
+        <p>
+          Hippo is run by {PUBLISHER}. For questions about your data, to ask for your data to be deleted, or for
+          anything else in this page, write to <a href={`mailto:${CONTACT}`}>{CONTACT}</a>.
+        </p>
+      </section>
       <p>
         <Link to="/">Back to Hippo</Link>
       </p>

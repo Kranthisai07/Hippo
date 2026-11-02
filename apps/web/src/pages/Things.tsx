@@ -1,3 +1,4 @@
+import { useUploads } from "../lib/auth";
 import { FileSignature, FileText, Package, Upload, Wrench } from "lucide-react";
 import { Link, useParams } from "react-router";
 import { StatusChip } from "../components/FieldRow";
@@ -7,6 +8,7 @@ import { humanize, readableDate, valueLines } from "../lib/format";
 import { useLoad } from "../lib/useLoad";
 
 export function Things() {
+  const uploads = useUploads();
   const { data, error, loading, reload } = useLoad(() => api.listAssets(), []);
   if (error) return <ErrorState message={error} onRetry={reload} />;
   if (loading || !data) {
@@ -25,13 +27,19 @@ export function Things() {
         <EmptyState
           icon={Package}
           title="No things yet"
-          action={
-            <Link to="/upload" className="btn btn-primary">
-              <Upload size={18} aria-hidden="true" /> Upload a document
-            </Link>
-          }
+          {...(uploads
+            ? {
+                action: (
+                  <Link to="/upload" className="btn btn-primary">
+                    <Upload size={18} aria-hidden="true" /> Upload a document
+                  </Link>
+                ),
+              }
+            : {})}
         >
-          Upload a warranty or an insurance policy and the item it covers shows up here.
+          {uploads
+            ? "Upload a warranty or an insurance policy and the item it covers shows up here."
+            : "Appliances, cars and other things appear here when their warranty or policy is added. That is not available in this version yet."}
         </EmptyState>
       ) : (
         <ul className="tiles">
@@ -57,6 +65,7 @@ export function Things() {
 }
 
 export function ThingDetail() {
+  const uploads = useUploads();
   const { assetId = "" } = useParams();
   const { data, error, loading, reload } = useLoad(() => api.getAsset(assetId), [assetId]);
   if (error) return <ErrorState message={error} onRetry={reload} />;
@@ -87,13 +96,19 @@ export function ThingDetail() {
             as="h3"
             icon={FileText}
             title="Nothing linked yet"
-            action={
-              <Link to="/upload" className="btn btn-sm">
-                <Upload size={16} aria-hidden="true" /> Upload a document
-              </Link>
-            }
+            {...(uploads
+              ? {
+                  action: (
+                    <Link to="/upload" className="btn btn-sm">
+                      <Upload size={16} aria-hidden="true" /> Upload a document
+                    </Link>
+                  ),
+                }
+              : {})}
           >
-            Upload a manual, receipt or warranty and it can be kept with this item.
+            {uploads
+              ? "Upload a manual, receipt or warranty and it can be kept with this item."
+              : "Nothing is linked to this item yet."}
           </EmptyState>
         ) : (
           <ul className="list">
