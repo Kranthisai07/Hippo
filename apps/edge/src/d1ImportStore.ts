@@ -79,34 +79,50 @@ export function createD1ImportStore(db: D1Like): ImportStore {
       const [r] = await rows("SELECT * FROM import_jobs WHERE id = ?", id);
       return r ? fromRow(r as unknown as Row) : null;
     },
-    async update(job) {
+    async update(job, owner) {
       const [id, , status, , finishedAt, cipher, expires, state] = toRow(job);
-      // Only while it is still running, in the one statement, so a step that was in flight cannot undo a cancel.
+      // Only while it is still running (and still the owner's), in the one statement, so a step that was in flight cannot
+      // undo a cancel or the step that took over from it.
       const written = await rows(
-        "UPDATE import_jobs SET status = ?, finished_at = ?, token_cipher = ?, token_expires_at = ?, state = ? WHERE id = ? AND status = 'running' RETURNING id",
+        `UPDATE import_jobs SET status = ?, finished_at = ?, token_cipher = ?, token_expires_at = ?, state = ? WHERE id = ? AND status = 'running'${owner === null ? "" : " AND lock_owner = ?"} RETURNING id`,
         status,
         finishedAt,
         cipher,
         expires,
         state,
         id,
+        ...(owner === null ? [] : [owner]),
       );
       return written.length === 1;
     },
     async deleteFor(householdId) {
       await rows("DELETE FROM import_jobs WHERE household = ?", householdId);
     },
-    async tryLock(id, nowMs, ttlMs) {
+    async tryLock(id, owner, nowMs, ttlMs) {
       const won = await rows(
-        "UPDATE import_jobs SET locked_until = ? WHERE id = ? AND locked_until <= ? RETURNING id",
+        "UPDATE import_jobs SET locked_until = ?, lock_owner = ? WHERE id = ? AND locked_until <= ? RETURNING id",
         nowMs + ttlMs,
+        owner,
         id,
         nowMs,
       );
       return won.length === 1;
     },
-    async unlock(id) {
-      await rows("UPDATE import_jobs SET locked_until = 0 WHERE id = ?", id);
+    async renew(id, owner, nowMs, ttlMs) {
+      const kept = await rows(
+        "UPDATE import_jobs SET locked_until = ? WHERE id = ? AND lock_owner = ? AND status = 'running' RETURNING id",
+        nowMs + ttlMs,
+        id,
+        owner,
+      );
+      return kept.length === 1;
+    },
+    async unlock(id, owner) {
+      await rows(
+        "UPDATE import_jobs SET locked_until = 0, lock_owner = NULL WHERE id = ? AND lock_owner = ?",
+        id,
+        owner,
+      );
     },
     async latestFor(householdId) {
       const [r] = await rows(

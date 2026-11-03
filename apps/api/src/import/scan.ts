@@ -103,7 +103,7 @@ export interface BatchResult {
   /** How many of the ids were dealt with, in order. The rest are left for the next step. */
   consumed: number;
   /** `auth`: Google refused the token (it ended). `cap`: the household holds the most saved pages it may. */
-  stopped?: "auth" | "cap";
+  stopped?: "auth" | "cap" | "lost";
 }
 
 /** Display names that say nothing about who the company is. */
@@ -132,11 +132,14 @@ export async function scanBatch(
   householdId: string,
   token: string,
   ids: string[],
+  /** Asked before each message is read and again before it is saved. False means the step no longer owns the job: stop. */
+  guard: () => Promise<boolean> = async () => true,
 ): Promise<BatchResult> {
   const counts = emptyCounts();
   let held = (await deps.repo.listDocs(householdId)).filter((d) => holds(d.s3Key)).length;
   let consumed = 0;
   for (const id of ids) {
+    if (!(await guard())) return { counts, consumed, stopped: "lost" };
     let m: MailMessage;
     try {
       m = await deps.gmail.getMessage(token, id);
@@ -169,6 +172,8 @@ export async function scanBatch(
       counts.duplicates++;
       continue;
     }
+    // The last moment to stop: after this the page is written. A cancel or a delete that came in meanwhile wins.
+    if (!(await guard())) return { counts, consumed, stopped: "lost" };
     const r = await deps.capture({ householdId, doc, text, host });
     if (r.status === "saved") {
       counts.found++;

@@ -35,9 +35,11 @@ async function setup() {
   const { createMemoryIndexSource } = await import("../src/mcp/indexCache");
   const objectStore = createMemoryObjectStore();
   const indexStore = createMemoryIndexSource();
+  const store = createMemoryImportStore();
   let n = 0;
   ref.svc = createImportService({
-    store: createMemoryImportStore(),
+    store,
+    sleep: async () => undefined,
     box: createTokenBox("route-test-key-route-test-key-route-test"),
     gmail: createGmailClient({ fetch: fake.fetch, sleep: async () => undefined }),
     repo: w.repo,
@@ -49,7 +51,7 @@ async function setup() {
     const r = await ref.svc!.start({ householdId, accessToken: fake.token, expiresInSec: 3599 });
     return (r as { id: string }).id;
   };
-  return { w, fake, start };
+  return { w, fake, start, store };
 }
 
 describe("the import routes", () => {
@@ -136,6 +138,21 @@ describe("the import routes", () => {
     expect(fake.revoked).toHaveLength(1);
     expect((await w.a.get(`/api/import/${id}`)).status).toBe(404);
     expect(await json(await w.a.get("/api/import/latest"))).toEqual({ import: null });
+  });
+
+  it("delete all data answers 503 and wipes nothing while a step still holds the scan, then works once it lets go", async () => {
+    const { w, fake, start, store } = await setup();
+    const id = await start();
+    expect(await store.tryLock(id, "stuck-step", w.clock.t, 3_600_000)).toBe(true);
+    const r = await w.a.call("/api/data", { method: "DELETE", json: { confirm: "delete all my data" } });
+    expect(r.status).toBe(503);
+    // The household's documents are all still there, and the scan itself has ended with its access revoked.
+    expect(((await json(await w.a.get("/api/docs"))) as { docs: unknown[] }).docs.length).toBeGreaterThan(0);
+    expect(fake.revoked).toHaveLength(1);
+    await store.unlock(id, "stuck-step");
+    expect((await w.a.call("/api/data", { method: "DELETE", json: { confirm: "delete all my data" } })).status).toBe(
+      204,
+    );
   });
 
   it("refuse a write from another origin", async () => {

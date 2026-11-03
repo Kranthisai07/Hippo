@@ -9,6 +9,8 @@ CREATE TABLE IF NOT EXISTS import_jobs (
   token_cipher TEXT,
   token_expires_at INTEGER NOT NULL,
   locked_until INTEGER NOT NULL DEFAULT 0,
+  -- Who holds the job: a step writes only while this is still its own mark, so a step that lost the lock cannot undo a newer one.
+  lock_owner TEXT,
   state TEXT NOT NULL
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS import_jobs_household ON import_jobs (household, created_at);

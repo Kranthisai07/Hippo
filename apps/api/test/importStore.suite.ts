@@ -44,6 +44,7 @@ export function runImportStoreSuite(name: string, make: () => ImportStore): void
       await s.create(job());
       await s.update(
         job({ status: "done", finishedAt: T0 + 5, tokenCipher: null, revoked: true, error: "cap", remaining: [] }),
+        null,
       );
       expect(await s.get("job-1")).toMatchObject({
         status: "done",
@@ -57,18 +58,18 @@ export function runImportStoreSuite(name: string, make: () => ImportStore): void
     it("lets one caller take the job, makes the others wait, and lets it go again", async () => {
       const s = make();
       await s.create(job());
-      expect(await s.tryLock("job-1", T0, 60_000)).toBe(true);
-      expect(await s.tryLock("job-1", T0 + 1000, 60_000)).toBe(false);
-      expect(await s.tryLock("job-1", T0 + 61_000, 60_000)).toBe(true);
-      await s.unlock("job-1");
-      expect(await s.tryLock("job-1", T0 + 62_000, 60_000)).toBe(true);
-      expect(await s.tryLock("unknown", T0, 1000)).toBe(false);
+      expect(await s.tryLock("job-1", "o1", T0, 60_000)).toBe(true);
+      expect(await s.tryLock("job-1", "o2", T0 + 1000, 60_000)).toBe(false);
+      expect(await s.tryLock("job-1", "o2", T0 + 61_000, 60_000)).toBe(true);
+      await s.unlock("job-1", "o2");
+      expect(await s.tryLock("job-1", "o3", T0 + 62_000, 60_000)).toBe(true);
+      expect(await s.tryLock("unknown", "o1", T0, 1000)).toBe(false);
     });
 
     it("has exactly one winner when many callers try at once", async () => {
       const s = make();
       await s.create(job());
-      const results = await Promise.all(Array.from({ length: 20 }, () => s.tryLock("job-1", T0, 60_000)));
+      const results = await Promise.all(Array.from({ length: 20 }, (_, i) => s.tryLock("job-1", `o${i}`, T0, 60_000)));
       expect(results.filter(Boolean)).toHaveLength(1);
     });
 
@@ -114,11 +115,11 @@ export function runImportStoreGuards(name: string, make: () => ImportStore): voi
     it("update writes only while the job is running, and says whether it did", async () => {
       const s = make();
       await s.create(job());
-      expect(await s.update(job({ status: "cancelled", finishedAt: T0, tokenCipher: null }))).toBe(true);
+      expect(await s.update(job({ status: "cancelled", finishedAt: T0, tokenCipher: null }), null)).toBe(true);
       // A step that was in flight tries to put it back to running with the token.
-      expect(await s.update(job())).toBe(false);
+      expect(await s.update(job(), null)).toBe(false);
       expect(await s.get("job-1")).toMatchObject({ status: "cancelled", tokenCipher: null });
-      expect(await s.update(job({ id: "nope" }))).toBe(false);
+      expect(await s.update(job({ id: "nope" }), null)).toBe(false);
     });
 
     it("deleteFor removes every job of one household and no other", async () => {
@@ -142,6 +143,33 @@ export function runImportStoreGuards(name: string, make: () => ImportStore): voi
         documentIds: [],
         tokenCipher: null,
       });
+    });
+
+    it("a lock has an owner: only the owner can renew it, write under it or let it go, and a taken over lock is not the old owner's", async () => {
+      const s = make();
+      await s.create(job());
+      expect(await s.tryLock("job-1", "a", T0, 60_000)).toBe(true);
+      expect(await s.renew("job-1", "b", T0 + 1, 60_000)).toBe(false);
+      expect(await s.renew("job-1", "a", T0 + 1, 60_000)).toBe(true);
+      expect(await s.update(job({ remaining: ["x"] }), "b")).toBe(false);
+      expect(await s.update(job({ remaining: ["x"] }), "a")).toBe(true);
+      await s.unlock("job-1", "b");
+      expect(await s.tryLock("job-1", "c", T0 + 2, 60_000)).toBe(false);
+      // The lease ran out and another step took over: the first can no longer renew, write, or release the new lock.
+      expect(await s.tryLock("job-1", "c", T0 + 200_000, 60_000)).toBe(true);
+      expect(await s.renew("job-1", "a", T0 + 200_001, 60_000)).toBe(false);
+      expect(await s.update(job({ remaining: ["old"] }), "a")).toBe(false);
+      await s.unlock("job-1", "a");
+      expect(await s.tryLock("job-1", "d", T0 + 200_002, 60_000)).toBe(false);
+      expect(await s.update(job({ remaining: ["new"] }), "c")).toBe(true);
+    });
+
+    it("renew refuses once the job has ended", async () => {
+      const s = make();
+      await s.create(job());
+      expect(await s.tryLock("job-1", "a", T0, 60_000)).toBe(true);
+      expect(await s.update(job({ status: "cancelled", finishedAt: T0, tokenCipher: null }), null)).toBe(true);
+      expect(await s.renew("job-1", "a", T0 + 1, 60_000)).toBe(false);
     });
   });
 }

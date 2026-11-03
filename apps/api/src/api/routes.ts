@@ -451,7 +451,8 @@ export function createWebApi(deps: WebApiDeps): Hono<{ Variables: { hh: string; 
     const hh = c.var.hh;
     await readJson(c, DeleteDataBody);
     // A running scan is ended (its access revoked) and its records deleted before anything else, so it cannot keep writing.
-    await deps.importService?.forget(hh);
+    if (deps.importService && !(await deps.importService.forget(hh)))
+      throw new ApiError(503, "A scan is still finishing. Please try again in a moment.");
     // Same order as deleting one document: files and index first, records last, so a failure can be retried.
     for (const doc of await repo.listDocs(hh)) {
       const chunkMeta = await repo.getChunkMeta(hh, doc.id);

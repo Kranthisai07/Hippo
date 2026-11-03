@@ -19,6 +19,9 @@ import type { TokenBox } from "./tokenBox";
 export const STEP_SIZE = 25;
 export const LOCK_MS = 60_000;
 /** One finished scan a day: a person who scanned today is told to come back tomorrow. */
+/** How long `forget` waits for a step that was already working (a Gmail read can take 10 s and be retried once). */
+export const DRAIN_MS = 30_000;
+const DRAIN_POLL_MS = 250;
 export const MIN_GAP_MS = 24 * 3600_000;
 const MAX_TOKEN_MS = 3600_000;
 
@@ -51,8 +54,12 @@ export interface ImportService {
   step(householdId: string, id: string, beforeWork?: () => Promise<void>): Promise<ImportView | null>;
   cancel(householdId: string, id: string): Promise<ImportView | null>;
   decline(householdId: string): Promise<void>;
-  /** "Delete all data": ends a running scan (revoking its access) and deletes every scan record of the household. */
-  forget(householdId: string): Promise<void>;
+  /**
+   * "Delete all data": ends a running scan (revoking its access), waits for a step that was already working to stop, then
+   * deletes every scan record of the household. False: a step was still working after the wait, and nothing was deleted
+   * (the scan itself is ended); the caller must not go on to wipe the household, and can try again.
+   */
+  forget(householdId: string): Promise<boolean>;
   /** The newest job of a household, for the page that resumes after a reload. */
   latest(householdId: string): Promise<ImportView | null>;
 }
@@ -66,6 +73,8 @@ export interface ImportServiceDeps {
   now: () => number;
   newId: () => string;
   stepSize?: number;
+  /** Test seam for the wait in `forget`. Default: a real timer. */
+  sleep?: (ms: number) => Promise<void>;
   log?: (line: string) => void;
 }
 
@@ -93,6 +102,7 @@ const viewOf = (j: ImportJob): ImportView => {
 export function createImportService(d: ImportServiceDeps): ImportService {
   const log = d.log ?? (() => undefined);
   const stepSize = d.stepSize ?? STEP_SIZE;
+  const sleep = d.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
 
   async function markHousehold(householdId: string, value: "done" | "declined"): Promise<void> {
     const h = await d.repo.getHousehold(householdId);
@@ -104,6 +114,8 @@ export function createImportService(d: ImportServiceDeps): ImportService {
     job: ImportJob,
     status: Exclude<ImportJob["status"], "running">,
     error: string | null,
+    /** The step ending its own job passes its lock mark; a cancel, a delete or a read of an expired job passes null. */
+    owner: string | null = null,
   ): Promise<ImportJob> {
     let revoked = false;
     const token = job.tokenCipher ? await d.box.open(job.tokenCipher) : null;
@@ -119,7 +131,7 @@ export function createImportService(d: ImportServiceDeps): ImportService {
       documentIds: [],
     };
     // Already ended by someone else (a cancel while this step was working): theirs stands, the revoke above was harmless.
-    if (!(await d.store.update(ended))) return (await d.store.get(job.id)) ?? ended;
+    if (!(await d.store.update(ended, owner))) return (await d.store.get(job.id)) ?? ended;
     if (status === "done") await markHousehold(job.householdId, "done");
     log(
       `[hippo-import] ${status}${error ? ` (${error})` : ""} scanned=${ended.counts.scanned} found=${ended.counts.found} revoked=${revoked}`,
@@ -190,7 +202,21 @@ export function createImportService(d: ImportServiceDeps): ImportService {
     async forget(householdId) {
       const j = await d.store.latestFor(householdId);
       if (j?.status === "running") await end(j, "cancelled", null);
+      if (j) {
+        // The step that was working sees the job ended at its next check and lets go of the lock. Holding the lock
+        // ourselves is the proof that no step is still saving a page.
+        const me = d.newId();
+        let drained = false;
+        for (let waited = 0; waited <= DRAIN_MS && !drained; waited += DRAIN_POLL_MS) {
+          if (await d.store.tryLock(j.id, me, d.now(), LOCK_MS)) {
+            await d.store.unlock(j.id, me);
+            drained = true;
+          } else await sleep(DRAIN_POLL_MS);
+        }
+        if (!drained) return false;
+      }
       await d.store.deleteFor(householdId);
+      return true;
     },
 
     async step(householdId, id, beforeWork) {
@@ -198,19 +224,23 @@ export function createImportService(d: ImportServiceDeps): ImportService {
       if (!first) return null;
       if (first.status !== "running") return viewOf(first);
       // Another call is already working on it (a double click, two tabs): answer with where it stands.
-      if (!(await d.store.tryLock(id, d.now(), LOCK_MS))) return { ...viewOf(first), busy: true };
+      // Every step has its own mark on the lock. It writes only while the mark is still its own, and asks again before
+      // each message (which also keeps the lease alive), so a step that took too long, or was cancelled or deleted
+      // meanwhile, stops instead of writing over the one that replaced it.
+      const owner = d.newId();
+      if (!(await d.store.tryLock(id, owner, d.now(), LOCK_MS))) return { ...viewOf(first), busy: true };
       try {
         await beforeWork?.();
       } catch (e) {
-        await d.store.unlock(id);
+        await d.store.unlock(id, owner);
         throw e;
       }
       try {
         let j = await d.store.get(id);
         if (!j || j.status !== "running") return viewOf(j ?? first);
-        if (d.now() >= j.tokenExpiresAt) return viewOf(await end(j, "failed", "expired"));
+        if (d.now() >= j.tokenExpiresAt) return viewOf(await end(j, "failed", "expired", owner));
         const token = j.tokenCipher ? await d.box.open(j.tokenCipher) : null;
-        if (!token) return viewOf(await end(j, "failed", "failed"));
+        if (!token) return viewOf(await end(j, "failed", "failed", owner));
 
         if (!j.listed) {
           let found: Awaited<ReturnType<typeof listCandidates>>;
@@ -218,7 +248,7 @@ export function createImportService(d: ImportServiceDeps): ImportService {
             found = await listCandidates(d.gmail, token);
           } catch (e) {
             const refused = e instanceof GmailError && (e.status === 401 || e.status === 403);
-            return viewOf(await end(j, "failed", refused ? "auth_ended" : "failed"));
+            return viewOf(await end(j, "failed", refused ? "auth_ended" : "failed", owner));
           }
           j = {
             ...j,
@@ -234,27 +264,30 @@ export function createImportService(d: ImportServiceDeps): ImportService {
           j.householdId,
           token,
           j.remaining.slice(0, stepSize),
+          () => d.store.renew(id, owner, d.now(), LOCK_MS),
         );
         j = {
           ...j,
           remaining: j.remaining.slice(batch.consumed),
           counts: { ...sum(j.counts, batch.counts), candidates: j.counts.candidates },
         };
-        if (batch.stopped === "auth") return viewOf(await end(j, "failed", "auth_ended"));
+        // No longer the owner (cancelled, deleted, or taken over): write nothing, end nothing, say where the job stands.
+        if (batch.stopped === "lost") return viewOf((await d.store.get(id)) ?? j);
+        if (batch.stopped === "auth") return viewOf(await end(j, "failed", "auth_ended", owner));
         if (batch.stopped === "cap" || j.remaining.length === 0) {
           const spotted = await spotDocuments(d.gmail, token, j.documentIds);
-          return viewOf(await end({ ...j, spotted }, "done", batch.stopped === "cap" ? "cap" : null));
+          return viewOf(await end({ ...j, spotted }, "done", batch.stopped === "cap" ? "cap" : null, owner));
         }
         // Cancelled while this step was working: say where the job stands now, and write nothing.
-        if (!(await d.store.update(j))) return viewOf((await d.store.get(id)) ?? j);
+        if (!(await d.store.update(j, owner))) return viewOf((await d.store.get(id)) ?? j);
         return viewOf(j);
       } catch (e) {
         // Whatever went wrong, the token is not left behind.
         log(`[hippo-import] step failed (${e instanceof Error ? e.name : "error"})`);
         const cur = (await d.store.get(id)) ?? first;
-        return viewOf(cur.status === "running" ? await end(cur, "failed", "failed") : cur);
+        return viewOf(cur.status === "running" ? await end(cur, "failed", "failed", owner) : cur);
       } finally {
-        await d.store.unlock(id);
+        await d.store.unlock(id, owner);
       }
     },
   };

@@ -68,6 +68,7 @@ function world(over: { mails?: FakeMail[]; gmail?: FakeGmailOptions; stepSize?: 
     now: () => clock.t,
     newId: () => `job-${++n}`,
     stepSize: over.stepSize ?? 25,
+    sleep: async () => new Promise<void>((r) => setTimeout(r, 1)),
     log: (l) => lines.push(l),
     capture:
       over.capture ?? createCaptureIngest({ repo, objectStore, indexStore, now: () => clock.t, log: () => undefined }),
@@ -253,7 +254,7 @@ describe("every way a job can end revokes the token and forgets it", () => {
     await w.hh();
     const { id } = (await w.svc.start(w.grant())) as { id: string };
     const j = (await w.store.get(id))!;
-    await w.store.update({ ...j, tokenCipher: "v1.garbage.garbage" });
+    await w.store.update({ ...j, tokenCipher: "v1.garbage.garbage" }, null);
     expect(await w.svc.step(HH, id)).toMatchObject({ status: "failed", error: "failed" });
     expect(w.fake.calls.list).toBe(0);
   });
@@ -302,7 +303,7 @@ describe("starting", () => {
     await w.hh();
     const { id } = (await w.svc.start(w.grant())) as { id: string };
     await w.svc.step(HH, id);
-    expect(await w.store.tryLock(id, T0, LOCK_MS)).toBe(true);
+    expect(await w.store.tryLock(id, "next", T0, LOCK_MS)).toBe(true);
   });
 });
 
@@ -392,7 +393,7 @@ describe("what the review found", () => {
     const w = world();
     await w.hh();
     const { id } = (await w.svc.start(w.grant())) as { id: string };
-    expect(await w.store.tryLock(id, w.clock.t, LOCK_MS)).toBe(true);
+    expect(await w.store.tryLock(id, "other-tab", w.clock.t, LOCK_MS)).toBe(true);
     let charged = 0;
     const v = await w.svc.step(HH, id, async () => void charged++);
     expect(v).toMatchObject({ busy: true, status: "running" });
@@ -460,6 +461,94 @@ describe("what the review found", () => {
     await w.run(id);
     expect((await w.store.get(id))?.spotted.length).toBeGreaterThan(0);
     await w.svc.forget(HH);
+    expect(await w.store.get(id)).toBeNull();
+  });
+});
+
+describe("what the second review found: a step must not outlive its lock or a delete", () => {
+  it("a step whose lock was taken over stops before the next message and writes nothing over the new owner", async () => {
+    let saved = 0;
+    let svcRef: ReturnType<typeof world>["svc"] | undefined;
+    let w!: ReturnType<typeof world>;
+    let jobId = "";
+    w = world({
+      stepSize: 25,
+      capture: async () => {
+        saved++;
+        if (saved === 1) {
+          // This step took so long that its lease ran out, and another tab took the job over.
+          w.clock.t += LOCK_MS + 1;
+          expect(await w.store.tryLock(jobId, "other-tab", w.clock.t, LOCK_MS)).toBe(true);
+        }
+        return { status: "none" };
+      },
+    });
+    svcRef = w.svc;
+    void svcRef;
+    await w.hh();
+    jobId = ((await w.svc.start(w.grant())) as { id: string }).id;
+    await w.svc.step(HH, jobId);
+    // One page was already being saved when it was taken over; no second one is started.
+    expect(saved).toBe(1);
+    const stored = await w.store.get(jobId);
+    expect(stored).toMatchObject({ status: "running", counts: { scanned: 0, found: 0 } });
+    expect(stored?.remaining.length).toBe(stored?.counts.candidates);
+    // The new owner still holds the lock: the old step's release did nothing.
+    expect(await w.store.tryLock(jobId, "third", w.clock.t, LOCK_MS)).toBe(false);
+  });
+
+  it("keeps the lease alive while a step works, so a long step is not taken over", async () => {
+    let w!: ReturnType<typeof world>;
+    let jobId = "";
+    let stolen: boolean | undefined;
+    w = world({
+      capture: async () => {
+        // 50 s into a step the lease is 60 s from the last renewal, not from the start.
+        w.clock.t += 50_000;
+        stolen = await w.store.tryLock(jobId, "other-tab", w.clock.t, LOCK_MS);
+        return { status: "none" };
+      },
+    });
+    await w.hh();
+    jobId = ((await w.svc.start(w.grant())) as { id: string }).id;
+    await w.svc.step(HH, jobId);
+    expect(stolen).toBe(false);
+  });
+
+  it("delete all data during a step: the step stops before saving another page, and the delete finishes after it", async () => {
+    let calls = 0;
+    let forgetting: Promise<boolean> | undefined;
+    let w!: ReturnType<typeof world>;
+    w = world({
+      capture: async () => {
+        calls++;
+        if (calls === 1) forgetting = w.svc.forget(HH);
+        // Let the delete reach its wait.
+        await new Promise((r) => setTimeout(r, 5));
+        return { status: "none" };
+      },
+    });
+    await w.hh();
+    const { id } = (await w.svc.start(w.grant())) as { id: string };
+    await w.svc.step(HH, id);
+    expect(await forgetting).toBe(true);
+    expect(calls).toBe(1);
+    expect(await w.store.latestFor(HH)).toBeNull();
+    expect((await w.repo.listDocs(HH)).length).toBe(0);
+    expect(w.fake.revoked.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("delete all data says no, and deletes nothing, while a step is still holding the job", async () => {
+    const w = world();
+    await w.hh();
+    const { id } = (await w.svc.start(w.grant())) as { id: string };
+    expect(await w.store.tryLock(id, "stuck-step", w.clock.t, 10 * LOCK_MS)).toBe(true);
+    expect(await w.svc.forget(HH)).toBe(false);
+    // The scan itself is ended and its access revoked, but its record is still there until the step lets go.
+    expect(await w.store.get(id)).toMatchObject({ status: "cancelled", tokenCipher: null });
+    expect(w.fake.revoked.length).toBe(1);
+    await w.store.unlock(id, "stuck-step");
+    expect(await w.svc.forget(HH)).toBe(true);
     expect(await w.store.get(id)).toBeNull();
   });
 });
