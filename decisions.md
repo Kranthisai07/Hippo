@@ -270,3 +270,8 @@ No decisions log exists on main (MEMORY.md is only in old worktrees), so this fi
 
 ## 2026-11-02: the first real scheduled run (+claude)
 - On the deployed beta the 15 minute cron ran: outcome ok, one household, no errors, cpuTime 10 ms, wallTime 1577 ms. That is exactly the free plan's CPU limit, so the default batch of 1 is the ceiling on the free plan, not a safe margin: on the paid plan raise `HIPPO_DAILY_BATCH`. Recorded in `docs/VERIFIED.md` 10.23.
+
+## 2026-11-02: the top bar shows a circle with the first letter, not the address (+claude)
+- **What:** `apps/web/src/components/Layout.tsx` replaces the printed address with `.bar-avatar`, a round accent badge with the first letter. The full address is its accessible name (`role="img"`, `aria-label="Signed in as ..."`) and its hover text. The old rules that hid the address below 1100 and 1440 px are gone, so the badge shows at every width, including on a phone.
+- **Why:** the owner did not want the address shown in the bar.
+- **Checked:** web 143 tests including the new one (letter shown, address not in the page, label and title present); all 8 Playwright specs with axe in light and dark; screenshots at desktop and phone looked at. Not checked: a letter that is not A to Z (an address starting with a digit or symbol shows that character).
