@@ -58,7 +58,12 @@ export function Layout() {
           ))}
         </nav>
         <div className="bar-end">
-          {me && <p className="small muted bar-email">{me.email}</p>}
+          {me && (
+            // The address is not printed in the bar. It is the label for assistive technology and the hover text.
+            <span className="bar-avatar" role="img" aria-label={`Signed in as ${me.email}`} title={me.email}>
+              {me.email.charAt(0)}
+            </span>
+          )}
           <button type="button" className="btn btn-quiet btn-sm" onClick={() => void signOut()}>
             <LogOut size={16} strokeWidth={1.75} aria-hidden="true" />
             Sign out
