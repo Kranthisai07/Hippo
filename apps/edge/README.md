@@ -67,4 +67,4 @@ Dark by default: with `HIPPO_GMAIL_IMPORT` unset (or any value but `1`) there is
 4. Set `HIPPO_GMAIL_IMPORT = "1"` in `[vars]` and `wrangler deploy`. The Worker refuses to start if it is on without the Google client id and secret.
 5. Check by hand with your own account: `/oauth/providers` answers `gmail: true`, sign in, Connect Gmail, watch the scan, then confirm in Google's account permissions that the access is gone.
 
-The daily cleanup (the 03:00 UTC run) also ends scans whose token has expired and deletes finished scan records after 30 days. A public launch (anyone, not just test users) needs Google's restricted scope verification and a security assessment, which are not done.
+Every cron run (every 15 minutes) also ends scans whose token has expired, which deletes the sealed token and the message lists; finished scan records are deleted after 30 days. A public launch (anyone, not just test users) needs Google's restricted scope verification and a security assessment, which are not done.

@@ -31,14 +31,19 @@ export interface ImportJob {
 export interface ImportStore {
   create(job: ImportJob): Promise<void>;
   get(id: string): Promise<ImportJob | null>;
-  /** Replaces the record. */
-  update(job: ImportJob): Promise<void>;
+  /**
+   * Replaces the record, but only while the stored job is still running. False means it had already ended (cancelled,
+   * for one) or is gone, and nothing was written: a step that was in flight cannot bring an ended job back to life.
+   */
+  update(job: ImportJob): Promise<boolean>;
+  /** Deletes every job of a household. */
+  deleteFor(householdId: string): Promise<void>;
   /** Takes the job for `ttlMs` unless another caller holds it. One winner, even when called at once. */
   tryLock(id: string, nowMs: number, ttlMs: number): Promise<boolean>;
   unlock(id: string): Promise<void>;
   /** The newest job of a household, or null. */
   latestFor(householdId: string): Promise<ImportJob | null>;
-  /** Ends running jobs whose token has expired (and drops the sealed token), and removes old finished jobs. */
+  /** Ends running jobs whose token has expired (dropping the sealed token and the message lists), and removes old finished jobs. */
   purge(nowMs: number): Promise<void>;
 }
 
@@ -57,7 +62,17 @@ export function createMemoryImportStore(): ImportStore {
       return j ? copy(j) : null;
     },
     async update(job) {
+      if (jobs.get(job.id)?.status !== "running") return false;
       jobs.set(job.id, copy(job));
+      return true;
+    },
+    async deleteFor(householdId) {
+      for (const [id, j] of jobs) {
+        if (j.householdId === householdId) {
+          jobs.delete(id);
+          locks.delete(id);
+        }
+      }
     },
     async tryLock(id, nowMs, ttlMs) {
       if (!jobs.has(id)) return false;
@@ -77,7 +92,15 @@ export function createMemoryImportStore(): ImportStore {
     async purge(nowMs) {
       for (const [id, j] of jobs) {
         if (j.status === "running" && j.tokenExpiresAt < nowMs) {
-          jobs.set(id, { ...j, status: "failed", error: "expired", tokenCipher: null, finishedAt: nowMs });
+          jobs.set(id, {
+            ...j,
+            status: "failed",
+            error: "expired",
+            tokenCipher: null,
+            remaining: [],
+            documentIds: [],
+            finishedAt: nowMs,
+          });
         } else if (j.finishedAt !== null && j.finishedAt < nowMs - FINISHED_KEEP_MS) {
           jobs.delete(id);
           locks.delete(id);

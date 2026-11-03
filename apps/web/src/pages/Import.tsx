@@ -4,6 +4,7 @@ import { Link, useSearchParams } from "react-router";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui";
 import { ApiError, api } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { BUSY_WAIT_MS } from "../lib/gmail";
 import { daysAwayText, humanize, plainAction, readableDate } from "../lib/format";
 import { GROUP_LABEL, GROUPS, prioritize, type Row } from "../lib/prioritize";
 import { inferToday } from "../lib/today";
@@ -39,6 +40,8 @@ export function ImportPage() {
       while (live && !v.finished) {
         v = await api.importStep(v.id);
         if (live) setView(v);
+        // Another step is already working on it: wait, instead of asking again at once.
+        if (v.busy) await new Promise((r) => setTimeout(r, BUSY_WAIT_MS));
       }
       if (live) await refresh();
     })().catch((e: unknown) => {
@@ -205,8 +208,8 @@ function AllSet({ view }: { view: ImportView }) {
             <FileSearch size={20} aria-hidden="true" /> Documents Hippo spotted but cannot read yet
           </h2>
           <p className="muted small">
-            These emails look like leases, warranties, manuals or policies. Hippo did not open them or their
-            attachments. Reading them is planned.
+            These emails look like leases, warranties, manuals or policies. Hippo kept only their subject, sender, date
+            and attachment names, and opened no attachment. Reading them is planned.
           </p>
           <ul className="list">
             {view.spotted.map((s, i) => (

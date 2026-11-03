@@ -128,6 +128,16 @@ describe("the import routes", () => {
     expect(await json(await w.b.get("/api/me"))).toMatchObject({ gmail: "declined" });
   });
 
+  it("delete all data ends a running scan, revokes its access and removes the scan records", async () => {
+    const { w, fake, start } = await setup();
+    const id = await start();
+    const r = await w.a.call("/api/data", { method: "DELETE", json: { confirm: "delete all my data" } });
+    expect(r.status).toBe(204);
+    expect(fake.revoked).toHaveLength(1);
+    expect((await w.a.get(`/api/import/${id}`)).status).toBe(404);
+    expect(await json(await w.a.get("/api/import/latest"))).toEqual({ import: null });
+  });
+
   it("refuse a write from another origin", async () => {
     const { w } = await setup();
     const r = await w.a.call("/api/import/decline", { method: "POST", json: {}, origin: "http://evil.example" });

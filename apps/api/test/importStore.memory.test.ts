@@ -1,4 +1,5 @@
 import { createMemoryImportStore } from "../src/import/store";
-import { runImportStoreSuite } from "./importStore.suite";
+import { runImportStoreGuards, runImportStoreSuite } from "./importStore.suite";
 
 runImportStoreSuite("memory", createMemoryImportStore);
+runImportStoreGuards("memory", createMemoryImportStore);

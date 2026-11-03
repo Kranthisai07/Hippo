@@ -108,3 +108,40 @@ export function runImportStoreSuite(name: string, make: () => ImportStore): void
     });
   });
 }
+
+export function runImportStoreGuards(name: string, make: () => ImportStore): void {
+  describe(`the import store guards: ${name}`, () => {
+    it("update writes only while the job is running, and says whether it did", async () => {
+      const s = make();
+      await s.create(job());
+      expect(await s.update(job({ status: "cancelled", finishedAt: T0, tokenCipher: null }))).toBe(true);
+      // A step that was in flight tries to put it back to running with the token.
+      expect(await s.update(job())).toBe(false);
+      expect(await s.get("job-1")).toMatchObject({ status: "cancelled", tokenCipher: null });
+      expect(await s.update(job({ id: "nope" }))).toBe(false);
+    });
+
+    it("deleteFor removes every job of one household and no other", async () => {
+      const s = make();
+      await s.create(job({ id: "a1" }));
+      await s.create(job({ id: "a2", status: "done", finishedAt: T0, tokenCipher: null }));
+      await s.create(job({ id: "b1", householdId: "hh_b" }));
+      await s.deleteFor("hh_a");
+      expect(await s.get("a1")).toBeNull();
+      expect(await s.get("a2")).toBeNull();
+      expect(await s.get("b1")).not.toBeNull();
+    });
+
+    it("purge of an expired running job also drops the lists of message ids", async () => {
+      const s = make();
+      await s.create(job({ id: "stale", tokenExpiresAt: T0 - 1, remaining: ["m1", "m2"], documentIds: ["d1"] }));
+      await s.purge(T0);
+      expect(await s.get("stale")).toMatchObject({
+        status: "failed",
+        remaining: [],
+        documentIds: [],
+        tokenCipher: null,
+      });
+    });
+  });
+}

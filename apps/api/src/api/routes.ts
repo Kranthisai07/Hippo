@@ -147,15 +147,10 @@ export function createWebApi(deps: WebApiDeps): Hono<{ Variables: { hh: string; 
   });
 
   api.post("/import/:id/step", async (c) => {
-    const svc = importing();
-    await enforce(
-      deps.limiter,
-      `imp:${c.var.hh}`,
-      3_600_000,
-      STEPS_PER_HOUR,
-      "Too many requests. Please try again later.",
+    // The limit is charged once the step holds the job, so an answer that only says "busy" costs nothing.
+    const view = await importing().step(c.var.hh, c.req.param("id"), () =>
+      enforce(deps.limiter, `imp:${c.var.hh}`, 3_600_000, STEPS_PER_HOUR, "Too many requests. Please try again later."),
     );
-    const view = await svc.step(c.var.hh, c.req.param("id"));
     if (!view) throw notFound();
     return c.json(view);
   });
@@ -455,6 +450,8 @@ export function createWebApi(deps: WebApiDeps): Hono<{ Variables: { hh: string; 
   api.delete("/data", async (c) => {
     const hh = c.var.hh;
     await readJson(c, DeleteDataBody);
+    // A running scan is ended (its access revoked) and its records deleted before anything else, so it cannot keep writing.
+    await deps.importService?.forget(hh);
     // Same order as deleting one document: files and index first, records last, so a failure can be retried.
     for (const doc of await repo.listDocs(hh)) {
       const chunkMeta = await repo.getChunkMeta(hh, doc.id);

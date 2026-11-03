@@ -73,7 +73,12 @@ function setup(
       .setIssuedAt(Math.floor(now() / 1000))
       .setExpirationTime(r.expSec ?? Math.floor(now() / 1000) + 3600)
       .sign(r.key ?? signer);
-  const fetchImpl = (async (_url: string, init: RequestInit) => {
+  const revoked: string[] = [];
+  const fetchImpl = (async (url: string, init: RequestInit) => {
+    if (String(url).endsWith("/revoke")) {
+      revoked.push((init.body as URLSearchParams).get("token") ?? "");
+      return new Response("{}", { status: 200 });
+    }
     if (over.tokenEndpoint === "http500") return new Response("{}", { status: 500 });
     if (over.tokenEndpoint === "html") return new Response("<html>x</html>", { status: 200 });
     if (over.tokenEndpoint === "hang") {
@@ -167,7 +172,7 @@ function setup(
       headers: pending === undefined ? {} : { cookie: `hippo_gpending=${pending}` },
     });
 
-  return { env, audit, codes, issue, clickGoogle, callback, mint };
+  return { env, audit, codes, issue, clickGoogle, callback, mint, revoked };
 }
 
 const FAILED_PAGE = "Google sign in did not work";
@@ -620,6 +625,8 @@ describe("Gmail import: the consent step", () => {
     const back = await cb(t, { code: g.code, state: g.state }, pending, cookie);
     expect(back.status).toBe(302);
     expect(back.headers.get("location")).toBe(`${WEB}/import?job=job-1`);
+    // A granted scan keeps its token: it is the service's to revoke when the scan ends.
+    expect(t.revoked).toEqual([]);
     expect(calls).toEqual([
       {
         email: "alice@example.com",
@@ -640,6 +647,8 @@ describe("Gmail import: the consent step", () => {
     const back = await cb(t, { code: g.code, state: g.state }, pending, cookie);
     expect(back.headers.get("location")).toBe(`${WEB}/connect?gmail=wrong_account`);
     expect(calls).toEqual([]);
+    // The grant on somebody else's mailbox is given back at once.
+    expect(t.revoked).toEqual(["ya29.fake-access-token"]);
   });
 
   it("refuses when the Gmail permission was unticked on Google's page, or no access token came back", async () => {
@@ -650,6 +659,8 @@ describe("Gmail import: the consent step", () => {
       const back = await cb(t, { code: g.code, state: g.state }, pending, cookie);
       expect(back.headers.get("location")).toBe(`${WEB}/connect?gmail=not_granted`);
       expect(calls).toEqual([]);
+      // A token that came back without the Gmail scope is still given back; with no token there is nothing to give back.
+      expect(t.revoked).toEqual(o.access === null ? [] : ["ya29.fake-access-token"]);
     }
   });
 
@@ -690,6 +701,7 @@ describe("Gmail import: the consent step", () => {
     const back = await cb(t, { code: g.code, state: g.state }, pending, cookie);
     expect(back.headers.get("location")).toBe(`${WEB}/connect?gmail=failed`);
     const log = t.env.logs.join("\n") + JSON.stringify(t.audit);
+    expect(t.revoked).toEqual(["ya29.fake-access-token"]);
     expect(log).toContain("import start failed (TypeError)");
     expect(log).not.toMatch(/ya29|alice@example\.com/);
   });

@@ -360,3 +360,106 @@ describe("saying no", () => {
     expect(w.fake.calls.list).toBe(0);
   });
 });
+
+describe("what the review found", () => {
+  it("a cancel while a step is working stays cancelled: the step writes nothing and the token is not brought back", async () => {
+    let cancelled = false;
+    let svcRef: ReturnType<typeof world>["svc"] | undefined;
+    let jobId = "";
+    const w = world({
+      stepSize: 25,
+      capture: async () => {
+        if (!cancelled) {
+          cancelled = true;
+          await svcRef!.cancel(HH, jobId);
+        }
+        return { status: "none" };
+      },
+    });
+    svcRef = w.svc;
+    await w.hh();
+    jobId = ((await w.svc.start(w.grant())) as { id: string }).id;
+    const seen = await w.svc.step(HH, jobId);
+    expect(seen).toMatchObject({ status: "cancelled", finished: true });
+    const stored = await w.store.get(jobId);
+    expect(stored).toMatchObject({ status: "cancelled", tokenCipher: null, remaining: [] });
+    // Revoking twice (the cancel, then the step finishing) is harmless: Google ignores a token it already revoked.
+    expect(w.fake.revoked.length).toBeGreaterThanOrEqual(1);
+    expect(new Set(w.fake.revoked).size).toBe(1);
+  });
+
+  it("a step that finds the job busy says so and does no work, and does not call beforeWork", async () => {
+    const w = world();
+    await w.hh();
+    const { id } = (await w.svc.start(w.grant())) as { id: string };
+    expect(await w.store.tryLock(id, w.clock.t, LOCK_MS)).toBe(true);
+    let charged = 0;
+    const v = await w.svc.step(HH, id, async () => void charged++);
+    expect(v).toMatchObject({ busy: true, status: "running" });
+    expect(charged).toBe(0);
+    expect(w.fake.calls.list).toBe(0);
+  });
+
+  it("beforeWork refusing stops the step without ending the job, and lets the next one run", async () => {
+    const w = world();
+    await w.hh();
+    const { id } = (await w.svc.start(w.grant())) as { id: string };
+    await expect(
+      w.svc.step(HH, id, async () => {
+        throw new Error("limit");
+      }),
+    ).rejects.toThrow("limit");
+    expect((await w.store.get(id))?.status).toBe("running");
+    expect(w.fake.calls.list).toBe(0);
+    expect((await w.svc.step(HH, id))?.busy).toBeUndefined();
+  });
+
+  it("a refused second scan gives the access back to Google at once", async () => {
+    const w = world();
+    await w.hh();
+    const { id } = (await w.svc.start(w.grant())) as { id: string };
+    await w.run(id);
+    const before = w.fake.revoked.length;
+    expect(await w.svc.start(w.grant())).toEqual({ refused: "too_soon" });
+    expect(w.fake.revoked.length).toBe(before + 1);
+  });
+
+  it("reading a job whose token has run out ends it and deletes the sealed copy, without waiting for the cleanup", async () => {
+    const w = world();
+    await w.hh();
+    const { id } = (await w.svc.start(w.grant())) as { id: string };
+    w.clock.t += 3600_000;
+    expect(await w.svc.view(HH, id)).toMatchObject({ status: "failed", error: "expired", finished: true });
+    expect((await w.store.get(id))?.tokenCipher).toBeNull();
+    const again = (await w.svc.start(w.grant())) as { id: string };
+    w.clock.t += 3600_000;
+    expect((await w.svc.latest(HH))?.error).toBe("expired");
+    expect((await w.store.get(again.id))?.tokenCipher).toBeNull();
+  });
+
+  it("delete all data ends a running scan, revokes it and deletes the records, and touches no other household", async () => {
+    const w = world();
+    await w.hh();
+    await w.hh(OTHER);
+    const { id } = (await w.svc.start(w.grant())) as { id: string };
+    const other = (await w.svc.start(w.grant(OTHER))) as { id: string };
+    await w.svc.step(HH, id);
+    await w.svc.forget(HH);
+    expect(await w.store.get(id)).toBeNull();
+    expect(await w.store.latestFor(HH)).toBeNull();
+    expect(w.fake.revoked).toHaveLength(1);
+    expect(await w.store.get(other.id)).toMatchObject({ status: "running" });
+    // A step that was in flight finds nothing and writes nothing.
+    expect(await w.svc.step(HH, id)).toBeNull();
+  });
+
+  it("delete all data also removes a finished scan's record, spotted list and all", async () => {
+    const w = world();
+    await w.hh();
+    const { id } = (await w.svc.start(w.grant())) as { id: string };
+    await w.run(id);
+    expect((await w.store.get(id))?.spotted.length).toBeGreaterThan(0);
+    await w.svc.forget(HH);
+    expect(await w.store.get(id)).toBeNull();
+  });
+});

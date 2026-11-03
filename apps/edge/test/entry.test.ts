@@ -484,8 +484,9 @@ describe("the Gmail import switch", () => {
     expect(() => setup({ HIPPO_GMAIL_IMPORT: "1" })).toThrow(/HIPPO_GMAIL_IMPORT needs HIPPO_GOOGLE_CLIENT_ID/);
   });
 
-  it("the daily cleanup ends a scan whose token expired, and only when the switch is on", async () => {
-    const day = Date.UTC(2026, 10, 2, 3, 5, 0);
+  it("the cron ends a scan whose token expired and clears its sealed token, only when the switch is on", async () => {
+    // Midday, not the 03:00 cleanup run: this cleanup runs on every cron run.
+    const day = Date.UTC(2026, 10, 2, 12, 5, 0);
     for (const [flag, cleared] of [
       ["1", true],
       [undefined, false],

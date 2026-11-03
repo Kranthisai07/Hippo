@@ -223,7 +223,7 @@ export async function purgeAuthStore(env: Env, now: () => number = () => Date.no
   }
 }
 
-/** Ends scans whose token has expired (clearing the sealed token) and drops finished ones after 30 days. */
+/** Ends scans whose token has expired (clearing the sealed token and message lists) and drops finished ones after 30 days. */
 export async function purgeImportJobs(env: Env, now: () => number = () => Date.now()): Promise<void> {
   try {
     await createD1ImportStore(env.DB).purge(now());
@@ -248,7 +248,8 @@ export async function runScheduled(env: Env, now: () => number = () => Date.now(
   const cleanup = isCleanupRun(now());
   const jobs = [
     ...(cleanup ? [() => purgeAuthStore(env, now)] : []),
-    ...(cleanup && env.HIPPO_GMAIL_IMPORT === "1" ? [() => purgeImportJobs(env, now)] : []),
+    // Every run, not once a day: one cheap statement, and a closed tab's sealed token should not wait for the night.
+    ...(env.HIPPO_GMAIL_IMPORT === "1" ? [() => purgeImportJobs(env, now)] : []),
     () => runDailyJob(env, now),
   ];
   for (const job of jobs) {

@@ -171,11 +171,11 @@ Off unless the server was given an import service (`HIPPO_GMAIL_IMPORT=1` on the
 | --- | --- |
 | `GET /api/import/latest` | `{ import: ImportView or null }`, the newest scan of the household, for the page that resumes after a reload. |
 | `GET /api/import/:id` | `ImportView`. |
-| `POST /api/import/:id/step` | Does up to 25 messages (the first call also searches), answers `ImportView`. Safe to repeat or to send twice at once: a step already running just answers where the scan stands. 200 an hour per household, then 429. |
+| `POST /api/import/:id/step` | Does up to 25 messages (the first call also searches), answers `ImportView`. Safe to repeat or to send twice at once: a step already running just answers where the scan stands. 200 working steps an hour per household, then 429. |
 | `POST /api/import/:id/cancel` | Ends the scan, asks Google to revoke the access, answers `ImportView`. |
 | `POST /api/import/decline` | Remembers "not now": `{ gmail: "declined" }`. |
 
-`ImportView` is `{ id, status: "running" | "done" | "failed" | "cancelled", finished, counts: { candidates, scanned, found, duplicates, skipped, failed }, error: "auth_ended" | "expired" | "cap" | "failed" | null, revoked, spotted: [{ kind, subject, sender, date, filename }] }`. `revoked` is whether Google confirmed that access ended; `spotted` (lease, warranty, manual and policy mail, listed and never opened) is filled only once the scan is finished. One finished scan a day per household. Whatever the way a scan ends, the sealed token is deleted and a revoke is sent.
+`ImportView` is `{ id, status: "running" | "done" | "failed" | "cancelled", finished, counts: { candidates, scanned, found, duplicates, skipped, failed }, error: "auth_ended" | "expired" | "cap" | "failed" | null, revoked, spotted: [{ kind, subject, sender, date, filename }] }`. `revoked` is whether Google confirmed that access ended; `spotted` (lease, warranty, manual and policy mail, listed and never opened) is filled only once the scan is finished. One finished scan a day per household. Whatever the way a scan ends (done, failed, cancelled, or `DELETE /api/data`), the sealed token is deleted and a revoke is sent. A scan whose page was closed just runs out with Google's token within the hour, and its sealed copy is deleted when it is next read or by the cron. A step that finds the scan already being worked on answers with `busy: true` and does no work; it is not counted against the hourly limit, which is charged only when a step does work.
 
 ## Sign in with Google
 

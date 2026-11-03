@@ -82,15 +82,54 @@ const ENTITIES: Record<string, string> = {
   mdash: "-",
 };
 
+const SKIPPED = new Set(["script", "style", "head", "title", "noscript", "svg"]);
+const BLOCK = new Set(["br", "p", "div", "tr", "li", "table", "ul", "ol", "section", "article", "blockquote"]);
+
+/** Tags removed from the html, one forward pass: every search starts where the last one ended, so hostile input (a body of
+ * unclosed `<script` or bare `<`) costs time in proportion to its size and no more. */
+function stripTags(src: string): string {
+  const lower = src.toLowerCase();
+  let out = "";
+  let i = 0;
+  while (i < src.length) {
+    const lt = src.indexOf("<", i);
+    if (lt === -1) return out + src.slice(i);
+    out += src.slice(i, lt);
+    if (src.startsWith("<!--", lt)) {
+      const end = src.indexOf("-->", lt + 4);
+      if (end === -1) return out;
+      out += " ";
+      i = end + 3;
+      continue;
+    }
+    const m = /^<(\/?)([a-z][a-z0-9]*)/i.exec(src.slice(lt, lt + 24));
+    if (!m) {
+      // Not a tag ("a < b"): the character stays.
+      out += "<";
+      i = lt + 1;
+      continue;
+    }
+    const gt = src.indexOf(">", lt);
+    if (gt === -1) return out;
+    const name = m[2]!.toLowerCase();
+    if (!m[1] && SKIPPED.has(name)) {
+      // Everything up to the closing tag goes. Never closed: the rest of the body goes.
+      const close = lower.indexOf(`</${name}`, gt);
+      if (close === -1) return out + " ";
+      const closeEnd = src.indexOf(">", close);
+      out += " ";
+      i = closeEnd === -1 ? src.length : closeEnd + 1;
+      continue;
+    }
+    out += BLOCK.has(name) || /^h[1-6]$/.test(name) ? "\n" : " ";
+    i = gt + 1;
+  }
+  return out;
+}
+
 /** The visible text of an html body. No script, style or head, no tag, no remote load, entities decoded, spaces collapsed. */
 export function htmlToText(html: string): string {
-  return html
-    .slice(0, MAX_BODY_CHARS * 2)
-    .replace(/<!--[\s\S]*?-->/g, " ")
-    .replace(/<(script|style|head|title|noscript|svg)\b[\s\S]*?<\/\1\s*>/gi, " ")
-    .replace(/<\/?(br|p|div|tr|li|h[1-6]|table|ul|ol|section|article|blockquote)\b[^>]*>/gi, "\n")
-    .replace(/<\/t[dh]\s*>/gi, " ")
-    .replace(/<[^>]*>/g, " ")
+  return stripTags(html.slice(0, MAX_BODY_CHARS * 2))
     .replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, e: string) => {
       if (e[0] === "#") {
         const n = e[1]!.toLowerCase() === "x" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);

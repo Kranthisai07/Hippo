@@ -10,6 +10,11 @@ import { ImportPage } from "../src/pages/Import";
 import { SettingsPage } from "../src/pages/Settings";
 import type { ImportView, Me, ObligationItem, Subscription } from "../src/lib/types";
 
+vi.mock("../src/lib/gmail", async (orig) => ({
+  ...(await orig<typeof import("../src/lib/gmail")>()),
+  BUSY_WAIT_MS: 30,
+}));
+
 afterEach(() => {
   vi.restoreAllMocks();
   sessionStorage.clear();
@@ -142,6 +147,22 @@ describe("the waiting page and the list", () => {
     expect(screen.getAllByRole("link", { name: "Review and confirm" })[0]).toHaveAttribute("href", "/review/d2");
   });
 
+  it("when another step is already running it waits before asking again, instead of asking at once", async () => {
+    vi.spyOn(api, "me").mockResolvedValue(me("offer"));
+    vi.spyOn(api, "importView").mockResolvedValue(view());
+    const times: number[] = [];
+    vi.spyOn(api, "importStep").mockImplementation(async () => {
+      times.push(performance.now());
+      return times.length < 3 ? view({ busy: true }) : done();
+    });
+    loadList([], []);
+    wrap(<ImportPage />, "/import?job=job-1", "/import");
+    expect(await screen.findByRole("heading", { name: "You are all set" })).toBeInTheDocument();
+    expect(times).toHaveLength(3);
+    expect(times[1]! - times[0]!).toBeGreaterThanOrEqual(25);
+    expect(times[2]! - times[1]!).toBeGreaterThanOrEqual(25);
+  });
+
   it("shows progress while it runs, in a polite live region", async () => {
     vi.spyOn(api, "me").mockResolvedValue(me("offer"));
     vi.spyOn(api, "importView").mockResolvedValue(
@@ -193,7 +214,7 @@ describe("the waiting page and the list", () => {
     expect(await screen.findByRole("heading", { name: "No scan yet" })).toBeInTheDocument();
   });
 
-  it("lists spotted documents as text, never as markup, and says they were not opened", async () => {
+  it("lists spotted documents as text, never as markup, and says no attachment was opened", async () => {
     vi.spyOn(api, "me").mockResolvedValue(me("offer"));
     vi.spyOn(api, "importView").mockResolvedValue(
       done({
@@ -213,7 +234,7 @@ describe("the waiting page and the list", () => {
     expect(await screen.findByText(/Documents Hippo spotted but cannot read yet/)).toBeInTheDocument();
     expect(screen.getByText(/<img src=x onerror=alert\(1\)>/)).toBeInTheDocument();
     expect(container.querySelector("img")).toBeNull();
-    expect(screen.getByText(/did not open them or their attachments/)).toBeInTheDocument();
+    expect(screen.getByText(/opened no attachment/)).toBeInTheDocument();
   });
 
   it("asks Google-ended access to be removed by hand when Google did not confirm", async () => {

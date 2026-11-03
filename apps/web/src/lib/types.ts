@@ -134,6 +134,8 @@ export interface ImportView {
   error: string | null;
   /** Whether Google confirmed that access was ended. */
   revoked: boolean;
+  /** Only on the answer to a step that did nothing because another step of the scan was running. */
+  busy?: true;
   /** Lease, warranty, manual and policy mail spotted, not read. Only once finished. */
   spotted: { kind: string; subject: string; sender: string; date: string | null; filename: string | null }[];
 }

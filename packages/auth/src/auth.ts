@@ -9,6 +9,7 @@ import {
   googleAuthUrl,
   googleKeys,
   readPending,
+  revokeAccess,
   safeReturnTo,
   signPending,
   verifyIdToken,
@@ -564,14 +565,21 @@ export function createAuth(opts: AuthOptions): Auth {
     if (typeof code !== "string" || code === "" || code.length > 2048) return back("failed");
     const tokens = await exchangeCodeFull(google, { code, redirectUri: googleCallback, verifier: pending.verifier });
     if (!tokens) return back("failed");
+    // Any way out below that does not start a scan gives the access straight back to Google. For the wrong account that
+    // is somebody else's mailbox: the grant must not stay on their Google account.
+    const refuse = async (reason: string): Promise<Response> => {
+      if (tokens.accessToken) await revokeAccess(google, tokens.accessToken);
+
+      return back(reason);
+    };
     const who = await verifyIdToken(google, idKeys!, tokens.idToken, { nonce: pending.nonce, nowMs: now() });
     const email = who ? normalizeEmail(who.email) : null;
-    if (!email) return back("failed");
+    if (!email) return refuse("failed");
     // Only for the person who is signed in here: someone who picked another Google account gets nothing.
     const session = await sessionFromId(getCookie(c, SESSION_COOKIE));
-    if (!session || session.email !== email) return back("wrong_account");
+    if (!session || session.email !== email) return refuse("wrong_account");
     // A person can untick the Gmail permission on Google's page and still continue.
-    if (!tokens.accessToken || !tokens.scope.split(" ").includes(GMAIL_READONLY)) return back("not_granted");
+    if (!tokens.accessToken || !tokens.scope.split(" ").includes(GMAIL_READONLY)) return refuse("not_granted");
     try {
       const path = await google.import.onGranted({
         email,
@@ -583,7 +591,7 @@ export function createAuth(opts: AuthOptions): Auth {
       return c.redirect(`${base}${path.startsWith("/") && !path.startsWith("//") ? path : "/connect"}`, 302);
     } catch (e) {
       opts.log(`[hippo-auth] import start failed (${e instanceof Error ? e.name : "error"})`);
-      return back("failed");
+      return refuse("failed");
     }
   };
 

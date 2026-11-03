@@ -81,8 +81,9 @@ export function createD1ImportStore(db: D1Like): ImportStore {
     },
     async update(job) {
       const [id, , status, , finishedAt, cipher, expires, state] = toRow(job);
-      await rows(
-        "UPDATE import_jobs SET status = ?, finished_at = ?, token_cipher = ?, token_expires_at = ?, state = ? WHERE id = ?",
+      // Only while it is still running, in the one statement, so a step that was in flight cannot undo a cancel.
+      const written = await rows(
+        "UPDATE import_jobs SET status = ?, finished_at = ?, token_cipher = ?, token_expires_at = ?, state = ? WHERE id = ? AND status = 'running' RETURNING id",
         status,
         finishedAt,
         cipher,
@@ -90,6 +91,10 @@ export function createD1ImportStore(db: D1Like): ImportStore {
         state,
         id,
       );
+      return written.length === 1;
+    },
+    async deleteFor(householdId) {
+      await rows("DELETE FROM import_jobs WHERE household = ?", householdId);
     },
     async tryLock(id, nowMs, ttlMs) {
       const won = await rows(
@@ -112,7 +117,7 @@ export function createD1ImportStore(db: D1Like): ImportStore {
     },
     async purge(nowMs) {
       await rows(
-        "UPDATE import_jobs SET status = 'failed', token_cipher = NULL, finished_at = ?, state = json_set(state, '$.error', 'expired') WHERE status = 'running' AND token_expires_at < ?",
+        "UPDATE import_jobs SET status = 'failed', token_cipher = NULL, finished_at = ?, state = json_set(state, '$.error', 'expired', '$.remaining', json('[]'), '$.documentIds', json('[]')) WHERE status = 'running' AND token_expires_at < ?",
         nowMs,
         nowMs,
       );

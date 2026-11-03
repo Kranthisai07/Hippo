@@ -8,9 +8,31 @@ import { safeEqual, sha256b64url } from "./crypto";
 export const GOOGLE = {
   auth: "https://accounts.google.com/o/oauth2/v2/auth",
   token: "https://oauth2.googleapis.com/token",
+  revoke: "https://oauth2.googleapis.com/revoke",
   jwks: "https://www.googleapis.com/oauth2/v3/certs",
   issuers: ["https://accounts.google.com", "accounts.google.com"],
 } as const;
+
+/**
+ * Asks Google to end an access token, for a grant that is not going to be used (the wrong account, a refused step). Best
+ * effort: it never throws and says nothing about why it failed, because the reason could hold the token.
+ */
+export async function revokeAccess(o: GoogleOptions, token: string): Promise<void> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), o.timeoutMs ?? 5000);
+  try {
+    await (o.fetch ?? fetch)(o.endpoints?.revoke ?? GOOGLE.revoke, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ token }),
+      signal: controller.signal,
+    });
+  } catch {
+    // Nothing more can be done; the token still runs out within the hour.
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 /** Read only access to the person's Gmail. A restricted scope: see docs/VERIFIED.md 10.24. */
 export const GMAIL_READONLY = "https://www.googleapis.com/auth/gmail.readonly";
@@ -28,7 +50,7 @@ export interface GoogleOptions {
   clientId: string;
   clientSecret: string;
   /** Test seams. A real run uses Google's own endpoints and keys. */
-  endpoints?: { auth?: string; token?: string; jwksUri?: string };
+  endpoints?: { auth?: string; token?: string; jwksUri?: string; revoke?: string };
   fetch?: typeof fetch;
   jwks?: JWTVerifyGetKey;
   /** How long Google's token endpoint gets. Default 5000. */

@@ -7,7 +7,11 @@ import type { TokenBox } from "./tokenBox";
 
 // One mailbox import, driven by the browser in small steps so no request runs long. The rules this file keeps:
 //  - The access token exists only sealed (tokenBox.ts), only for the job, and every way a job can end goes through `end`,
-//    which asks Google to revoke it and deletes the sealed copy. There is no path that finishes a job without that.
+//    which asks Google to revoke it and deletes the sealed copy. Two ends are left to Google and the cleanup: a person who
+//    closes the page (the token dies by itself within the hour, and the next read of the job or the cleanup deletes the
+//    sealed copy) and a household's own "delete all data" (`forget`, which does go through `end`).
+//  - A write only lands while the job is still running (`store.update`), so a step that was in flight when the person
+//    cancelled cannot bring the job back.
 //  - A job is read and changed only by the household it belongs to, and the household comes from the session, never from
 //    the request.
 //  - Nothing here logs an address, a subject, a message id or a token: counts and error names only.
@@ -27,6 +31,8 @@ export interface ImportView {
   error: string | null;
   /** Whether Google confirmed that access was ended (only once finished). */
   revoked: boolean;
+  /** Set only on an answer to a step that did no work because another step of the same job was running. */
+  busy?: true;
   /** The lease, warranty, manual and policy mail spotted, only once finished. */
   spotted: Spotted[];
 }
@@ -38,9 +44,15 @@ export interface ImportService {
     expiresInSec: number;
   }): Promise<{ id: string } | { refused: "too_soon" }>;
   view(householdId: string, id: string): Promise<ImportView | null>;
-  step(householdId: string, id: string): Promise<ImportView | null>;
+  /**
+   * Does the next small step. `beforeWork` runs once this call holds the job and is about to work (the route charges its
+   * rate limit there, so a call that only finds the job busy costs nothing); if it throws, nothing is done.
+   */
+  step(householdId: string, id: string, beforeWork?: () => Promise<void>): Promise<ImportView | null>;
   cancel(householdId: string, id: string): Promise<ImportView | null>;
   decline(householdId: string): Promise<void>;
+  /** "Delete all data": ends a running scan (revoking its access) and deletes every scan record of the household. */
+  forget(householdId: string): Promise<void>;
   /** The newest job of a household, for the page that resumes after a reload. */
   latest(householdId: string): Promise<ImportView | null>;
 }
@@ -106,7 +118,8 @@ export function createImportService(d: ImportServiceDeps): ImportService {
       remaining: [],
       documentIds: [],
     };
-    await d.store.update(ended);
+    // Already ended by someone else (a cancel while this step was working): theirs stands, the revoke above was harmless.
+    if (!(await d.store.update(ended))) return (await d.store.get(job.id)) ?? ended;
     if (status === "done") await markHousehold(job.householdId, "done");
     log(
       `[hippo-import] ${status}${error ? ` (${error})` : ""} scanned=${ended.counts.scanned} found=${ended.counts.found} revoked=${revoked}`,
@@ -114,16 +127,23 @@ export function createImportService(d: ImportServiceDeps): ImportService {
     return ended;
   }
 
+  /** A running job whose token has run out is ended here, so its sealed copy does not wait for the nightly cleanup. */
+  const fresh = async (j: ImportJob): Promise<ImportJob> =>
+    j.status === "running" && d.now() >= j.tokenExpiresAt ? end(j, "failed", "expired") : j;
+
   const mine = async (householdId: string, id: string): Promise<ImportJob | null> => {
     const j = await d.store.get(id);
-    return j && j.householdId === householdId ? j : null;
+    return j && j.householdId === householdId ? fresh(j) : null;
   };
 
   return {
     async start(who) {
       const last = await d.store.latestFor(who.householdId);
-      if (last?.status === "done" && d.now() - (last.finishedAt ?? last.createdAt) < MIN_GAP_MS)
+      if (last?.status === "done" && d.now() - (last.finishedAt ?? last.createdAt) < MIN_GAP_MS) {
+        // The person just granted access for nothing: give it back now.
+        await d.gmail.revoke(who.accessToken);
         return { refused: "too_soon" };
+      }
       // Someone who left a scan half way and came back gets a fresh one: the old token is revoked first.
       if (last?.status === "running") await end(last, "cancelled", null);
       const id = d.newId();
@@ -154,7 +174,7 @@ export function createImportService(d: ImportServiceDeps): ImportService {
 
     async latest(householdId) {
       const j = await d.store.latestFor(householdId);
-      return j ? viewOf(j) : null;
+      return j ? viewOf(await fresh(j)) : null;
     },
 
     async cancel(householdId, id) {
@@ -167,12 +187,24 @@ export function createImportService(d: ImportServiceDeps): ImportService {
       await markHousehold(householdId, "declined");
     },
 
-    async step(householdId, id) {
+    async forget(householdId) {
+      const j = await d.store.latestFor(householdId);
+      if (j?.status === "running") await end(j, "cancelled", null);
+      await d.store.deleteFor(householdId);
+    },
+
+    async step(householdId, id, beforeWork) {
       const first = await mine(householdId, id);
       if (!first) return null;
       if (first.status !== "running") return viewOf(first);
       // Another call is already working on it (a double click, two tabs): answer with where it stands.
-      if (!(await d.store.tryLock(id, d.now(), LOCK_MS))) return viewOf(first);
+      if (!(await d.store.tryLock(id, d.now(), LOCK_MS))) return { ...viewOf(first), busy: true };
+      try {
+        await beforeWork?.();
+      } catch (e) {
+        await d.store.unlock(id);
+        throw e;
+      }
       try {
         let j = await d.store.get(id);
         if (!j || j.status !== "running") return viewOf(j ?? first);
@@ -213,7 +245,8 @@ export function createImportService(d: ImportServiceDeps): ImportService {
           const spotted = await spotDocuments(d.gmail, token, j.documentIds);
           return viewOf(await end({ ...j, spotted }, "done", batch.stopped === "cap" ? "cap" : null));
         }
-        await d.store.update(j);
+        // Cancelled while this step was working: say where the job stands now, and write nothing.
+        if (!(await d.store.update(j))) return viewOf((await d.store.get(id)) ?? j);
         return viewOf(j);
       } catch (e) {
         // Whatever went wrong, the token is not left behind.
