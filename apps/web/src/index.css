@@ -288,16 +288,20 @@ main:focus {
   gap: var(--s2);
   min-width: 0;
 }
-.bar-email {
-  max-width: 220px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-@media (max-width: 1100px) {
-  .bar-email {
-    display: none;
-  }
+.bar-avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 650;
+  font-size: 0.95rem;
+  line-height: 1;
+  text-transform: uppercase;
+  user-select: none;
 }
 .bar-end .btn {
   white-space: nowrap;
@@ -1367,13 +1371,6 @@ mark {
 
 .grow {
   flex: 1;
-}
-
-/* Six nav links leave no room for the address beside them until the bar is wide. */
-@media (max-width: 1440px) {
-  .bar-email {
-    display: none;
-  }
 }
 
 /* Section cards: an icon beside the heading, rows inside a card read as rows, not nested cards. */

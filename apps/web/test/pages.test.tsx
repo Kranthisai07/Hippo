@@ -474,3 +474,24 @@ describe("Settings: where the daily email goes", () => {
     await waitFor(() => expect(put).toHaveBeenCalledWith({ digestOn: false }));
   });
 });
+
+describe("the top bar", () => {
+  it("shows a circle with the first letter, not the address, and keeps the address for assistive technology", async () => {
+    vi.spyOn(api, "me").mockResolvedValue({ email: "kranthi@example.com", digestOn: true, uploads: true });
+    wrap(
+      <AuthProvider>
+        <Routes>
+          <Route element={<Layout />}>
+            <Route path="/upload" element={<UploadPage />} />
+          </Route>
+        </Routes>
+      </AuthProvider>,
+      "/upload",
+      "/*",
+    );
+    const avatar = await screen.findByRole("img", { name: "Signed in as kranthi@example.com" });
+    expect(avatar).toHaveTextContent("k");
+    expect(avatar).toHaveAttribute("title", "kranthi@example.com");
+    expect(screen.queryByText("kranthi@example.com")).toBeNull();
+  });
+});
