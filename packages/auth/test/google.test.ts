@@ -1,6 +1,6 @@
 import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair, type JWK } from "jose";
 import { beforeAll, describe, expect, it } from "vitest";
-import type { AuditEvent } from "../src";
+import { GMAIL_READONLY, type AuditEvent, type ImportOptions } from "../src";
 import { sha256b64url } from "../src/crypto";
 import {
   REDIRECT,
@@ -47,9 +47,19 @@ interface Issued {
   key?: CryptoKey;
   expSec?: number;
   aud?: string;
+  /** What Google says was granted, and the access token it hands over (null: none). */
+  scope?: string;
+  access?: string | null;
 }
 
-function setup(over: { google?: false; tokenEndpoint?: "ok" | "http500" | "html" | "hang"; timeoutMs?: number } = {}) {
+function setup(
+  over: {
+    google?: false;
+    tokenEndpoint?: "ok" | "http500" | "html" | "hang";
+    timeoutMs?: number;
+    import?: ImportOptions;
+  } = {},
+) {
   const codes = new Map<string, Issued>();
   const audit: AuditEvent[] = [];
   let n = 0;
@@ -63,7 +73,12 @@ function setup(over: { google?: false; tokenEndpoint?: "ok" | "http500" | "html"
       .setIssuedAt(Math.floor(now() / 1000))
       .setExpirationTime(r.expSec ?? Math.floor(now() / 1000) + 3600)
       .sign(r.key ?? signer);
-  const fetchImpl = (async (_url: string, init: RequestInit) => {
+  const revoked: string[] = [];
+  const fetchImpl = (async (url: string, init: RequestInit) => {
+    if (String(url).endsWith("/revoke")) {
+      revoked.push((init.body as URLSearchParams).get("token") ?? "");
+      return new Response("{}", { status: 200 });
+    }
     if (over.tokenEndpoint === "http500") return new Response("{}", { status: 500 });
     if (over.tokenEndpoint === "html") return new Response("<html>x</html>", { status: 200 });
     if (over.tokenEndpoint === "hang") {
@@ -86,7 +101,14 @@ function setup(over: { google?: false; tokenEndpoint?: "ok" | "http500" | "html"
       return new Response(JSON.stringify({ error: "invalid_grant" }), { status: 400 });
     }
     rec.used = true;
-    return new Response(JSON.stringify({ id_token: await mint(rec) }), { status: 200 });
+    return new Response(
+      JSON.stringify({
+        id_token: await mint(rec),
+        ...(rec.access === null ? {} : { access_token: rec.access ?? "ya29.fake-access-token", expires_in: 3599 }),
+        scope: rec.scope ?? "openid email",
+      }),
+      { status: 200 },
+    );
   }) as unknown as typeof fetch;
 
   const env: Env = makeEnv({
@@ -102,6 +124,7 @@ function setup(over: { google?: false; tokenEndpoint?: "ok" | "http500" | "html"
             jwks: keys,
             fetch: fetchImpl,
             ...(over.timeoutMs ? { timeoutMs: over.timeoutMs } : {}),
+            ...(over.import ? { import: over.import } : {}),
           },
         }),
   });
@@ -116,6 +139,8 @@ function setup(over: { google?: false; tokenEndpoint?: "ok" | "http500" | "html"
       expSec?: number;
       nonce?: string;
       aud?: string;
+      scope?: string;
+      access?: string | null;
     } = {},
   ) {
     const u = new URL(location);
@@ -130,6 +155,8 @@ function setup(over: { google?: false; tokenEndpoint?: "ok" | "http500" | "html"
       ...(o.key ? { key: o.key } : {}),
       ...(o.expSec ? { expSec: o.expSec } : {}),
       ...(o.aud ? { aud: o.aud } : {}),
+      ...(o.scope !== undefined ? { scope: o.scope } : {}),
+      ...(o.access !== undefined ? { access: o.access } : {}),
     });
     return { code, state: u.searchParams.get("state")! };
   }
@@ -145,7 +172,7 @@ function setup(over: { google?: false; tokenEndpoint?: "ok" | "http500" | "html"
       headers: pending === undefined ? {} : { cookie: `hippo_gpending=${pending}` },
     });
 
-  return { env, audit, codes, issue, clickGoogle, callback, mint };
+  return { env, audit, codes, issue, clickGoogle, callback, mint, revoked };
 }
 
 const FAILED_PAGE = "Google sign in did not work";
@@ -162,8 +189,18 @@ describe("the button", () => {
     expect(
       await (await off.env.req("/oauth/authorize?" + new URLSearchParams(p as Record<string, string>))).text(),
     ).not.toContain("Google");
-    expect(await (await on.env.req("/oauth/providers")).json()).toEqual({ google: true, demo: true, email: false });
-    expect(await (await off.env.req("/oauth/providers")).json()).toEqual({ google: false, demo: true, email: false });
+    expect(await (await on.env.req("/oauth/providers")).json()).toEqual({
+      google: true,
+      demo: true,
+      email: false,
+      gmail: false,
+    });
+    expect(await (await off.env.req("/oauth/providers")).json()).toEqual({
+      google: false,
+      demo: true,
+      email: false,
+      gmail: false,
+    });
   });
   it("does not run the email check first: the button works with an empty email box", async () => {
     const t = setup();
@@ -504,5 +541,194 @@ describe("logs and audit", () => {
     expect(t.audit.find((e) => e.event === "login_ok")).toMatchObject({ reason: "google" });
     expect(t.audit.find((e) => e.event === "login_ok")!.sub).toMatch(/^u_[\w-]{22}$/);
     expect(t.audit.some((e) => e.event === "login_failed" && e.reason === "google_state")).toBe(true);
+  });
+});
+
+describe("Gmail import: the consent step", () => {
+  type Who = { email: string; householdId: string; accessToken: string; expiresInSec: number };
+  const GRANTED = `openid email ${GMAIL_READONLY}`;
+
+  /** A person signs in to the web app with Google, then asks to connect Gmail. */
+  async function start(t: ReturnType<typeof setup>, ret: string | undefined = `${WEB}/connect`) {
+    const signin = await t.env.req("/oauth/google/start");
+    const g = t.issue(signin.headers.get("location")!);
+    const back = await t.callback({ code: g.code, state: g.state }, cookiesOf(signin).hippo_gpending);
+    const cookie = cookieHeader(
+      Object.fromEntries(Object.entries(cookiesOf(back)).filter(([k]) => k === "hippo_session")),
+    );
+    const res = await t.env.req(
+      `/oauth/google/import/start${ret === undefined ? "" : "?" + new URLSearchParams({ return: ret })}`,
+      { headers: { cookie } },
+    );
+    return { res, cookie, pending: cookiesOf(res).hippo_gpending };
+  }
+  /** The way back from Google: the browser sends the attempt cookie and the session cookie. */
+  const cb = (
+    t: ReturnType<typeof setup>,
+    query: Record<string, string>,
+    pending: string | undefined,
+    cookie: string,
+  ) =>
+    t.env.req(`/oauth/google/callback?${new URLSearchParams(query)}`, {
+      headers: {
+        cookie: [pending === undefined ? "" : `hippo_gpending=${pending}`, cookie].filter(Boolean).join("; "),
+      },
+    });
+  const setupImport = (granted: Who[] = [], path = "/import?job=job-1") => {
+    const calls = granted;
+    const t = setup({
+      import: {
+        async onGranted(who) {
+          calls.push(who);
+          return path;
+        },
+      },
+    });
+    return { t, calls };
+  };
+
+  it("/oauth/providers says gmail only when the import is configured", async () => {
+    expect(await (await setup().env.req("/oauth/providers")).json()).toMatchObject({ gmail: false });
+    expect(await (await setupImport().t.env.req("/oauth/providers")).json()).toMatchObject({ gmail: true });
+  });
+
+  it("the routes do not exist when the import is not configured", async () => {
+    const t = setup();
+    expect((await t.env.req("/oauth/google/import/start")).status).toBe(404);
+  });
+
+  it("needs a session: nobody signed in is sent to the sign in page, and no attempt starts", async () => {
+    const { t } = setupImport();
+    const res = await t.env.req("/oauth/google/import/start");
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe(`${ISSUER}/signin`);
+    expect(cookiesOf(res).hippo_gpending).toBeUndefined();
+  });
+
+  it("asks Google for read only Gmail with the person's own address as a hint, and for no refresh token", async () => {
+    const { t } = setupImport();
+    const { res, pending, cookie } = await start(t);
+    expect(res.status).toBe(302);
+    const u = new URL(res.headers.get("location")!);
+    expect(u.searchParams.get("scope")).toBe(GRANTED);
+    expect(u.searchParams.get("login_hint")).toBe("alice@example.com");
+    expect(u.searchParams.get("prompt")).toBe("consent");
+    expect(u.searchParams.get("access_type")).toBeNull();
+    expect(u.searchParams.get("code_challenge_method")).toBe("S256");
+    expect(pending).toBeTruthy();
+  });
+
+  it("hands the hook exactly the verified person, their household and the short lived token, then goes to the page it names", async () => {
+    const { t, calls } = setupImport();
+    const { res, pending, cookie } = await start(t, `${WEB}/connect`);
+    const g = t.issue(res.headers.get("location")!, { scope: GRANTED });
+    const back = await cb(t, { code: g.code, state: g.state }, pending, cookie);
+    expect(back.status).toBe(302);
+    expect(back.headers.get("location")).toBe(`${WEB}/import?job=job-1`);
+    // A granted scan keeps its token: it is the service's to revoke when the scan ends.
+    expect(t.revoked).toEqual([]);
+    expect(calls).toEqual([
+      {
+        email: "alice@example.com",
+        householdId: "hh_alice",
+        accessToken: "ya29.fake-access-token",
+        expiresInSec: 3599,
+      },
+    ]);
+    expect(back.headers.get("cache-control")).toBe("no-store");
+    expect(back.headers.get("location")).not.toContain("ya29");
+    expect(JSON.stringify(cookiesOf(back))).not.toContain("ya29");
+  });
+
+  it("refuses another Google account than the one signed in here, and the hook is not called", async () => {
+    const { t, calls } = setupImport();
+    const { res, pending, cookie } = await start(t);
+    const g = t.issue(res.headers.get("location")!, { scope: GRANTED, email: "mallory@example.com" });
+    const back = await cb(t, { code: g.code, state: g.state }, pending, cookie);
+    expect(back.headers.get("location")).toBe(`${WEB}/connect?gmail=wrong_account`);
+    expect(calls).toEqual([]);
+    // The grant on somebody else's mailbox is given back at once.
+    expect(t.revoked).toEqual(["ya29.fake-access-token"]);
+  });
+
+  it("refuses when the Gmail permission was unticked on Google's page, or no access token came back", async () => {
+    for (const o of [{ scope: "openid email" }, { scope: GRANTED, access: null }]) {
+      const { t, calls } = setupImport();
+      const { res, pending, cookie } = await start(t);
+      const g = t.issue(res.headers.get("location")!, o);
+      const back = await cb(t, { code: g.code, state: g.state }, pending, cookie);
+      expect(back.headers.get("location")).toBe(`${WEB}/connect?gmail=not_granted`);
+      expect(calls).toEqual([]);
+      // A token that came back without the Gmail scope is still given back; with no token there is nothing to give back.
+      expect(t.revoked).toEqual(o.access === null ? [] : ["ya29.fake-access-token"]);
+    }
+  });
+
+  it("says declined when the person said no, with the hook left alone", async () => {
+    const { t, calls } = setupImport();
+    const { res, pending, cookie } = await start(t);
+    const state = new URL(res.headers.get("location")!).searchParams.get("state")!;
+    const back = await cb(t, { error: "access_denied", state }, pending, cookie);
+    expect(back.headers.get("location")).toBe(`${WEB}/connect?gmail=declined`);
+    expect(calls).toEqual([]);
+  });
+
+  it("a wrong state, a missing cookie and a used code all fail, and the hook is called only once", async () => {
+    const { t, calls } = setupImport();
+    const a = await start(t);
+    const g = t.issue(a.res.headers.get("location")!, { scope: GRANTED });
+    expect((await cb(t, { code: g.code, state: "not-the-state" }, a.pending, a.cookie)).status).toBe(400);
+    expect((await cb(t, { code: g.code, state: g.state }, undefined, a.cookie)).status).toBe(400);
+    const b = await start(t);
+    const g2 = t.issue(b.res.headers.get("location")!, { scope: GRANTED });
+    expect((await cb(t, { code: g2.code, state: g2.state }, b.pending, b.cookie)).status).toBe(302);
+    // The same code again (a replay, with the attempt cookie sent again): Google refuses it, and the person is told it failed.
+    const replay = await cb(t, { code: g2.code, state: g2.state }, b.pending, b.cookie);
+    expect(replay.headers.get("location")).toBe(`${WEB}/connect?gmail=failed`);
+    expect(calls).toHaveLength(1);
+  });
+
+  it("a hook that fails sends the person back with 'failed', and nothing but the error name is logged", async () => {
+    const t = setup({
+      import: {
+        async onGranted() {
+          throw new TypeError("could not store ya29.fake-access-token for alice@example.com");
+        },
+      },
+    });
+    const { res, pending, cookie } = await start(t);
+    const g = t.issue(res.headers.get("location")!, { scope: GRANTED });
+    const back = await cb(t, { code: g.code, state: g.state }, pending, cookie);
+    expect(back.headers.get("location")).toBe(`${WEB}/connect?gmail=failed`);
+    const log = t.env.logs.join("\n") + JSON.stringify(t.audit);
+    expect(t.revoked).toEqual(["ya29.fake-access-token"]);
+    expect(log).toContain("import start failed (TypeError)");
+    expect(log).not.toMatch(/ya29|alice@example\.com/);
+  });
+
+  it("the token is in no log and no audit event, and the audit says who by hashed id", async () => {
+    const { t } = setupImport();
+    const { res, pending, cookie } = await start(t);
+    const g = t.issue(res.headers.get("location")!, { scope: GRANTED });
+    await cb(t, { code: g.code, state: g.state }, pending, cookie);
+    const all = t.env.logs.join("\n") + JSON.stringify(t.audit);
+    expect(all).not.toMatch(/ya29|alice@example\.com/);
+    expect(t.audit.map((e) => e.event)).toContain("import_granted");
+  });
+
+  it("a return address on another origin falls back to the app's own connect page", async () => {
+    const { t } = setupImport();
+    const { res, pending, cookie } = await start(t, "https://evil.example/connect");
+    const g = t.issue(res.headers.get("location")!, { scope: GRANTED });
+    const back = await cb(t, { code: g.code, state: g.state }, pending, cookie);
+    expect(back.headers.get("location")).toBe(`${ISSUER}/import?job=job-1`);
+  });
+
+  it("a hook that names a path on another site is not followed", async () => {
+    const { t } = setupImport([], "//evil.example/x");
+    const { res, pending, cookie } = await start(t);
+    const g = t.issue(res.headers.get("location")!, { scope: GRANTED });
+    const back = await cb(t, { code: g.code, state: g.state }, pending, cookie);
+    expect(back.headers.get("location")).toBe(`${WEB}/connect`);
   });
 });

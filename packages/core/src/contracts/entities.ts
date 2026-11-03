@@ -18,6 +18,8 @@ export interface Household {
   email?: string;
   /** Daily digest on or off. */
   digestOn: boolean;
+  /** The person's answer to "look for my subscriptions in Gmail": scanned once (`done`) or said no (`declined`). Unset: not asked yet. */
+  gmail?: "declined" | "done";
   createdAt: string;
 }
 

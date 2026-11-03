@@ -8,30 +8,67 @@ import { safeEqual, sha256b64url } from "./crypto";
 export const GOOGLE = {
   auth: "https://accounts.google.com/o/oauth2/v2/auth",
   token: "https://oauth2.googleapis.com/token",
+  revoke: "https://oauth2.googleapis.com/revoke",
   jwks: "https://www.googleapis.com/oauth2/v3/certs",
   issuers: ["https://accounts.google.com", "accounts.google.com"],
 } as const;
+
+/**
+ * Asks Google to end an access token, for a grant that is not going to be used (the wrong account, a refused step). Best
+ * effort: it never throws and says nothing about why it failed, because the reason could hold the token.
+ */
+export async function revokeAccess(o: GoogleOptions, token: string): Promise<void> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), o.timeoutMs ?? 5000);
+  try {
+    await (o.fetch ?? fetch)(o.endpoints?.revoke ?? GOOGLE.revoke, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ token }),
+      signal: controller.signal,
+    });
+  } catch {
+    // Nothing more can be done; the token still runs out within the hour.
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Read only access to the person's Gmail. A restricted scope: see docs/VERIFIED.md 10.24. */
+export const GMAIL_READONLY = "https://www.googleapis.com/auth/gmail.readonly";
+
+export interface ImportOptions {
+  /**
+   * Called once the signed in person has allowed read only Gmail access, with the verified address, their household and the
+   * short lived access token. Returns the path on the web app to send them to (for example `/import?job=...`). The token
+   * must never be logged and must not outlive the scan.
+   */
+  onGranted(who: { email: string; householdId: string; accessToken: string; expiresInSec: number }): Promise<string>;
+}
 
 export interface GoogleOptions {
   clientId: string;
   clientSecret: string;
   /** Test seams. A real run uses Google's own endpoints and keys. */
-  endpoints?: { auth?: string; token?: string; jwksUri?: string };
+  endpoints?: { auth?: string; token?: string; jwksUri?: string; revoke?: string };
   fetch?: typeof fetch;
   jwks?: JWTVerifyGetKey;
   /** How long Google's token endpoint gets. Default 5000. */
   timeoutMs?: number;
+  /** Gmail import (one scan, then disconnect). Left out, the feature is off and none of its routes exist. */
+  import?: ImportOptions;
 }
 
 const enc = new TextEncoder();
 const MAX_TOKEN_RESPONSE = 20_000;
 const MAX_ID_TOKEN = 8_000;
+const MAX_ACCESS_TOKEN = 4_096;
 const CLOCK_TOLERANCE_SEC = 30;
 
 // What the pending cookie carries between our redirect to Google and Google's redirect back.
 export interface Pending {
   /** `authorize`: finish an OAuth authorization of one of our clients. `session`: sign in to the web app. */
-  mode: "authorize" | "session";
+  mode: "authorize" | "session" | "import";
   /** The checked authorize parameters (mode authorize). */
   params?: Record<string, string>;
   /** Where to send the browser afterwards (mode session). */
@@ -82,7 +119,8 @@ export async function readPending(key: Uint8Array, jwt: string | undefined, nowM
       requiredClaims: ["exp", "iat", "s", "n", "v", "m"],
     });
     const { m, p, r, s, n, v } = payload as Record<string, unknown>;
-    if ((m !== "authorize" && m !== "session") || typeof s !== "string" || typeof n !== "string") return null;
+    if ((m !== "authorize" && m !== "session" && m !== "import") || typeof s !== "string" || typeof n !== "string")
+      return null;
     if (typeof v !== "string") return null;
     if (p !== undefined && (typeof p !== "object" || p === null)) return null;
     if (r !== undefined && typeof r !== "string") return null;
@@ -102,13 +140,25 @@ export async function readPending(key: Uint8Array, jwt: string | undefined, nowM
 /** The address of Google's sign in page for this attempt. `scope` is `openid email`, the least that names the person. */
 export async function googleAuthUrl(
   o: GoogleOptions,
-  a: { redirectUri: string; gstate: string; nonce: string; verifier: string },
+  a: {
+    redirectUri: string;
+    gstate: string;
+    nonce: string;
+    verifier: string;
+    /** Space separated. Default `openid email`, the least that names the person. */
+    scope?: string;
+    loginHint?: string;
+    prompt?: "consent";
+  },
 ): Promise<string> {
   const u = new URL(o.endpoints?.auth ?? GOOGLE.auth);
   u.searchParams.set("client_id", o.clientId);
   u.searchParams.set("redirect_uri", a.redirectUri);
   u.searchParams.set("response_type", "code");
-  u.searchParams.set("scope", "openid email");
+  u.searchParams.set("scope", a.scope ?? "openid email");
+  // No access_type=offline anywhere: without it Google gives no refresh token, so access ends with the short lived token.
+  if (a.loginHint) u.searchParams.set("login_hint", a.loginHint);
+  if (a.prompt) u.searchParams.set("prompt", a.prompt);
   u.searchParams.set("state", a.gstate);
   u.searchParams.set("nonce", a.nonce);
   u.searchParams.set("code_challenge", await sha256b64url(a.verifier));
@@ -116,15 +166,24 @@ export async function googleAuthUrl(
   return u.toString();
 }
 
+export interface GoogleTokens {
+  idToken: string;
+  /** Present when the request asked for an API scope. Short lived. */
+  accessToken: string | null;
+  expiresInSec: number;
+  /** The scopes Google says were granted. A person can untick one on the consent screen. */
+  scope: string;
+}
+
 /**
- * Trades the code for an ID token. The client secret, the PKCE verifier and the redirect address all go together:
+ * Trades the code for the tokens. The client secret, the PKCE verifier and the redirect address all go together:
  * Google's documents for web clients do not settle whether PKCE is accepted, and the secret is required (VERIFIED 10.9).
  * Returns null for anything unexpected, with nothing about why: the reason could hold a secret.
  */
-export async function exchangeCode(
+export async function exchangeCodeFull(
   o: GoogleOptions,
   a: { code: string; redirectUri: string; verifier: string },
-): Promise<string | null> {
+): Promise<GoogleTokens | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), o.timeoutMs ?? 5000);
   try {
@@ -144,13 +203,32 @@ export async function exchangeCode(
     if (!res.ok) return null;
     const text = await res.text();
     if (text.length > MAX_TOKEN_RESPONSE) return null;
-    const idToken = (JSON.parse(text) as { id_token?: unknown }).id_token;
-    return typeof idToken === "string" && idToken.length > 0 && idToken.length <= MAX_ID_TOKEN ? idToken : null;
+    const j = JSON.parse(text) as { id_token?: unknown; access_token?: unknown; expires_in?: unknown; scope?: unknown };
+    if (typeof j.id_token !== "string" || j.id_token.length === 0 || j.id_token.length > MAX_ID_TOKEN) return null;
+    const access =
+      typeof j.access_token === "string" && j.access_token.length > 0 && j.access_token.length <= MAX_ACCESS_TOKEN
+        ? j.access_token
+        : null;
+    return {
+      idToken: j.id_token,
+      accessToken: access,
+      expiresInSec:
+        typeof j.expires_in === "number" && j.expires_in > 0 && j.expires_in <= 86_400 ? j.expires_in : 3600,
+      scope: typeof j.scope === "string" ? j.scope.slice(0, 1000) : "",
+    };
   } catch {
     return null;
   } finally {
     clearTimeout(timer);
   }
+}
+
+/** The ID token only, for the sign in flows that ask for nothing else. */
+export async function exchangeCode(
+  o: GoogleOptions,
+  a: { code: string; redirectUri: string; verifier: string },
+): Promise<string | null> {
+  return (await exchangeCodeFull(o, a))?.idToken ?? null;
 }
 
 /** Builds the check of Google's signing keys once, so the keys are cached for the life of the process. */

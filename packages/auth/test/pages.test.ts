@@ -138,8 +138,18 @@ describe("what the server says it offers", () => {
   it("/oauth/providers reports the demo login only when it is on", async () => {
     const on = makeEnv();
     const off = makeEnv({ demoUser: undefined });
-    expect(await (await on.req("/oauth/providers")).json()).toEqual({ google: false, demo: true, email: true });
-    expect(await (await off.req("/oauth/providers")).json()).toEqual({ google: false, demo: false, email: true });
+    expect(await (await on.req("/oauth/providers")).json()).toEqual({
+      google: false,
+      demo: true,
+      email: true,
+      gmail: false,
+    });
+    expect(await (await off.req("/oauth/providers")).json()).toEqual({
+      google: false,
+      demo: false,
+      email: true,
+      gmail: false,
+    });
   });
 });
 
@@ -148,7 +158,12 @@ describe("a server with no way to send a code", () => {
   const noMail = () => makeEnv({ logMagicCodes: false, demoUser: undefined, google });
 
   it("says so in /oauth/providers", async () => {
-    expect(await (await noMail().req("/oauth/providers")).json()).toEqual({ google: true, demo: false, email: false });
+    expect(await (await noMail().req("/oauth/providers")).json()).toEqual({
+      google: true,
+      demo: false,
+      email: false,
+      gmail: false,
+    });
   });
 
   it("the sign in page offers Google and no email form", async () => {

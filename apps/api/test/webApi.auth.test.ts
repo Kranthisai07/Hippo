@@ -32,7 +32,7 @@ describe("session", () => {
   it("the cookie from POST /oauth/session authenticates /api/me", async () => {
     const r = await w.a.get("/api/me");
     expect(r.status).toBe(200);
-    expect(await json(r)).toEqual({ email: "demo@hippo.test", digestOn: true, uploads: true });
+    expect(await json(r)).toEqual({ email: "demo@hippo.test", digestOn: true, uploads: true, gmail: "off" });
   });
 
   it("the cookie from the magic code login authenticates too, for its own household", async () => {
@@ -64,6 +64,7 @@ describe("session", () => {
       email: "demo@hippo.test",
       digestOn: false,
       uploads: true,
+      gmail: "off",
     });
     await w.a.send("PUT", "/api/settings", { digestOn: true });
   });

@@ -3,8 +3,11 @@ import { Navigate, Route, Routes, useLocation } from "react-router";
 import { Layout } from "./components/Layout";
 import { Skeleton, ToastProvider } from "./components/ui";
 import { AuthProvider, useAuth } from "./lib/auth";
+import { ASKED } from "./lib/gmail";
 import { HOSTED } from "./lib/hosted";
 import { ComingUp } from "./pages/ComingUp";
+import { Connect } from "./pages/Connect";
+import { ImportPage } from "./pages/Import";
 import { Legal } from "./pages/Legal";
 import { Review } from "./pages/Review";
 import { SettingsPage } from "./pages/Settings";
@@ -17,7 +20,7 @@ const AskPage = lazy(() => import("./ask/AskPage"));
 const Landing = lazy(() => import("./pages/Landing"));
 
 function Protected() {
-  const { status } = useAuth();
+  const { status, me } = useAuth();
   const here = useLocation();
   if (status === "loading") {
     return (
@@ -27,6 +30,9 @@ function Protected() {
     );
   }
   if (status === "out") return <Navigate to="/signin" replace state={{ from: here.pathname }} />;
+  // Asked on the first visit to the home page of a browser session; declining or finishing a scan is remembered for good.
+  if (me?.gmail === "offer" && here.pathname === "/" && !sessionStorage.getItem(ASKED))
+    return <Navigate to="/connect" replace />;
   return <Layout />;
 }
 
@@ -81,6 +87,8 @@ export function App() {
           />
           <Route element={<Protected />}>
             <Route index element={<ComingUp />} />
+            <Route path="/connect" element={<Connect />} />
+            <Route path="/import" element={<ImportPage />} />
             <Route path="/upload" element={<UploadPage />} />
             <Route path="/review/:docId" element={<Review />} />
             <Route path="/subscriptions" element={<Subscriptions />} />

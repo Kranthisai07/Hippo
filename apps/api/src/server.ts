@@ -5,6 +5,10 @@ import { serve, type ServerType } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { createMemoryRepository } from "core/src/repository";
 import { createApp } from "./app";
+import { createGmailClient } from "./import/gmail";
+import { createImportService } from "./import/service";
+import { createMemoryImportStore } from "./import/store";
+import { createTokenBox } from "./import/tokenBox";
 import { ensureHousehold } from "./household";
 import { createFixtureIngest } from "./api/demoIngest";
 import { DEV_EXTENSION_ID, productionProblems } from "./config";
@@ -122,6 +126,27 @@ export async function startServer(opts: ServerOptions = {}): Promise<Running> {
   const serviceSecret = env.HIPPO_SERVICE_CLIENT_SECRET;
 
   const allowedOrigins = list(env.HIPPO_ALLOWED_ORIGINS, ["http://localhost:5173", "http://localhost:3000"]);
+  const googleOn = Boolean(env.HIPPO_GOOGLE_CLIENT_ID && env.HIPPO_GOOGLE_CLIENT_SECRET);
+  // The one time Gmail scan, on a local run only and only when asked for (the hosted one is apps/edge). Jobs live in memory.
+  const importService =
+    localOnly && googleOn && env.HIPPO_GMAIL_IMPORT === "1"
+      ? createImportService({
+          store: createMemoryImportStore(),
+          box: createTokenBox(signingKey),
+          gmail: createGmailClient({}),
+          capture: (await import("../../workers/src/ingest/capture")).createCaptureIngest({
+            repo,
+            objectStore,
+            indexStore: indexSource,
+            now: clock,
+            log,
+          }),
+          repo,
+          now: clock,
+          newId: () => crypto.randomUUID(),
+          log,
+        })
+      : undefined;
   const auth = createAuth({
     onLogin: ({ email, householdId }) => ensureHousehold(repo, { householdId, email }, clock),
     // The web dev server sends the cookie session calls (/oauth/session) from its own origin.
@@ -141,7 +166,22 @@ export async function startServer(opts: ServerOptions = {}): Promise<Running> {
     // Without the demo there is no mailer, so a printed code would only leak into a shared log.
     logMagicCodes: demoOn,
     ...(env.HIPPO_GOOGLE_CLIENT_ID && env.HIPPO_GOOGLE_CLIENT_SECRET
-      ? { google: { clientId: env.HIPPO_GOOGLE_CLIENT_ID, clientSecret: env.HIPPO_GOOGLE_CLIENT_SECRET } }
+      ? {
+          google: {
+            clientId: env.HIPPO_GOOGLE_CLIENT_ID,
+            clientSecret: env.HIPPO_GOOGLE_CLIENT_SECRET,
+            ...(importService
+              ? {
+                  import: {
+                    onGranted: async (who) => {
+                      const r = await importService.start(who);
+                      return "id" in r ? `/import?job=${encodeURIComponent(r.id)}` : "/connect?gmail=too_soon";
+                    },
+                  },
+                }
+              : {}),
+          },
+        }
       : {}),
     ...(serviceId && serviceSecret ? { serviceClient: { clientId: serviceId, clientSecret: serviceSecret } } : {}),
     now: clock,
@@ -191,6 +231,7 @@ export async function startServer(opts: ServerOptions = {}): Promise<Running> {
             }),
           }
         : {}),
+      ...(importService ? { importService } : {}),
       uploader: createLocalUploader({ now: clock }),
       origins: [new URL(issuer).origin, ...allowedOrigins],
     },

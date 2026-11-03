@@ -26,7 +26,7 @@ Run it locally: `pnpm --filter @hippo/api dev` (port 8787). Everything is in mem
 | `POST /oauth/session` | Body `{ email, code }` or `{ demo: true }`. Sets the cookie. Implemented by `@hippo/auth`, not by this API. |
 | `POST /oauth/magic-code` | Body `{ email }`. The demo prints the code in the server log. |
 | `POST /oauth/logout` | Clears the cookie. |
-| `GET /api/me` | `{ email, digestOn, uploads }`. `email` is the digest address if one is saved, otherwise the login email. `uploads` is false when this server cannot read uploaded files (the Cloudflare backend today), and the web app then leaves the Upload page out. |
+| `GET /api/me` | `{ email, digestOn, uploads }`. `email` is the digest address if one is saved, otherwise the login email. `uploads` is false when this server cannot read uploaded files (the Cloudflare backend today), and the web app then leaves the Upload page out. `gmail` is `"off"` when the Gmail import is not switched on here (its routes answer 404), otherwise `"offer"` (never asked), `"declined"` or `"done"`. |
 
 ## Upload and documents
 
@@ -108,7 +108,7 @@ The real worker plugs in by passing its own `onUploaded` (or by running outside 
 | :--- | :--- | :--- |
 | `PUT /api/settings` | `{ digestOn: boolean, email?: string }` | `{ digestOn, email }`. The daily email always goes to the address the person signed in with. An `email` in the body is trimmed, lower cased and validated, and must equal that address, otherwise 400 "The daily email goes to the address you signed in with." Leaving it out is the same. The response holds the sign in address. |
 | `GET /api/export` | none | One JSON download (`hippo-export.json`): settings, documents, agreements with their quotes, assets and alerts for the household, masked like every other read. At most 5 a hour (429 with `Retry-After`). |
-| `DELETE /api/data` | `{ confirm: "delete all my data" }` (exactly) | `204`. Deletes everything for the household, its files and its clause index. The session stays valid. |
+| `DELETE /api/data` | `{ confirm: "delete all my data" }` (exactly) | `204`. Deletes everything for the household, its files and its clause index. The session stays valid. A running Gmail scan is ended first (its access revoked) and waited for, so it cannot save another page after the delete; if a step is still working after 30 seconds the answer is `503` "A scan is still finishing" and nothing is deleted, and the call can be repeated. |
 
 ## Dev walkthrough (the lease demo)
 
@@ -162,6 +162,20 @@ For the browser extension, under `/ext`, not `/api`. Auth is `Authorization: Bea
 - `POST /oauth/revoke` (RFC 7009, form body `token`, `client_id`): ends a refresh token and its whole family, including the token a rotation handed out last. Always 200, so a caller learns nothing about the token. Advertised as `revocation_endpoint`. The extension calls it on Sign out.
 - `POST /oauth/logout-all` (JSON, cookie session): ends every web session and every refresh token of the person. Access tokens already issued end by themselves within 15 minutes.
 - Every response carries `X-Request-Id`. The server logs one JSON line per request: `{ ts, id, method, path, status, ms }`, and security events as `{ ts, audit, sub, reason }` with a hashed `sub`. Query strings, headers, bodies, emails, codes and tokens are never logged.
+
+## Gmail import (one scan, then disconnect)
+
+Off unless the server was given an import service (`HIPPO_GMAIL_IMPORT=1` on the Worker, a local run only on the Node server). Every route needs the web session, writes need the same origin like the rest of `/api`, and the household is always the session's. A job of another household is a 404, the same as a missing one. No answer holds a token, a message id or a sender address. The consent itself is a full page visit to `GET /oauth/google/import/start` (needs the session; asks Google for `openid email gmail.readonly`, no refresh token; refusals land on `/connect?gmail=declined|not_granted|wrong_account|failed|unavailable|too_soon`, a granted scan on `/import?job=<id>`).
+
+| Route | Answer |
+| --- | --- |
+| `GET /api/import/latest` | `{ import: ImportView or null }`, the newest scan of the household, for the page that resumes after a reload. |
+| `GET /api/import/:id` | `ImportView`. |
+| `POST /api/import/:id/step` | Does up to 25 messages (the first call also searches), answers `ImportView`. Safe to repeat or to send twice at once: a step already running just answers where the scan stands. 200 working steps an hour per household, then 429. |
+| `POST /api/import/:id/cancel` | Ends the scan, asks Google to revoke the access, answers `ImportView`. |
+| `POST /api/import/decline` | Remembers "not now": `{ gmail: "declined" }`. |
+
+`ImportView` is `{ id, status: "running" | "done" | "failed" | "cancelled", finished, counts: { candidates, scanned, found, duplicates, skipped, failed }, error: "auth_ended" | "expired" | "cap" | "failed" | null, revoked, spotted: [{ kind, subject, sender, date, filename }] }`. `revoked` is whether Google confirmed that access ended; `spotted` (lease, warranty, manual and policy mail, listed and never opened) is filled only once the scan is finished. One finished scan a day per household. Whatever the way a scan ends (done, failed, cancelled, or `DELETE /api/data`), the sealed token is deleted and a revoke is sent. A scan whose page was closed just runs out with Google's token within the hour, and its sealed copy is deleted when it is next read or by the cron. A step that finds the scan already being worked on answers with `busy: true` and does no work; it is not counted against the hourly limit, which is charged only when a step does work. Each step holds the scan under its own mark, renewed before every message; a step that lost the scan (cancelled, deleted, or taken over after a stall) stops and writes nothing.
 
 ## Sign in with Google
 

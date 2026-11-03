@@ -6,6 +6,7 @@ import type {
   Doc,
   DocDetail,
   FieldView,
+  ImportView,
   Me,
   ObligationItem,
   ObligationRecord,
@@ -96,7 +97,7 @@ export const api = {
   // Session
   demoSession: () => json<{ email: string }>("POST", "/oauth/session", { demo: true }),
   /** Which extra sign in methods this server offers, so the page shows only buttons that work. */
-  providers: () => json<{ google: boolean; demo: boolean; email: boolean }>("GET", "/oauth/providers"),
+  providers: () => json<{ google: boolean; demo: boolean; email: boolean; gmail: boolean }>("GET", "/oauth/providers"),
   magicCode: (email: string) => json<{ ok: true }>("POST", "/oauth/magic-code", { email }),
   session: (email: string, code: string) => json<{ email: string }>("POST", "/oauth/session", { email, code }),
   logout: () => json<{ ok: true }>("POST", "/oauth/logout", {}),
@@ -157,6 +158,13 @@ export const api = {
       "GET",
       `/api/assets/${id(assetId)}`,
     ),
+
+  // Gmail import (one scan, then disconnect). The consent itself is a full page visit to /oauth/google/import/start.
+  importLatest: () => json<{ import: ImportView | null }>("GET", "/api/import/latest"),
+  importStep: (jobId: string) => json<ImportView>("POST", `/api/import/${id(jobId)}/step`, {}),
+  importView: (jobId: string) => json<ImportView>("GET", `/api/import/${id(jobId)}`),
+  importCancel: (jobId: string) => json<ImportView>("POST", `/api/import/${id(jobId)}/cancel`, {}),
+  importDecline: () => json<{ gmail: "declined" }>("POST", "/api/import/decline", {}),
 
   // Settings and data
   putSettings: (s: { digestOn: boolean; email?: string }) =>

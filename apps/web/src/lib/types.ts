@@ -119,6 +119,23 @@ export interface Me {
   digestOn: boolean;
   /** Whether this server reads uploaded files. False means the Upload page and its nav link are left out. */
   uploads?: boolean;
+  /** The one time Gmail scan: "off" (not switched on here), "offer" (never asked), "declined" or "done". */
+  gmail?: "off" | "offer" | "declined" | "done";
   /** Not sent by the API today. Used when it is (docs/WEB_API.md has no server date). */
   today?: string;
+}
+
+export interface ImportView {
+  id: string;
+  status: "running" | "done" | "failed" | "cancelled";
+  finished: boolean;
+  counts: { scanned: number; found: number; duplicates: number; skipped: number; failed: number; candidates: number };
+  /** `auth_ended`, `expired`, `cap`, `failed`, or null. */
+  error: string | null;
+  /** Whether Google confirmed that access was ended. */
+  revoked: boolean;
+  /** Only on the answer to a step that did nothing because another step of the scan was running. */
+  busy?: true;
+  /** Lease, warranty, manual and policy mail spotted, not read. Only once finished. */
+  spotted: { kind: string; subject: string; sender: string; date: string | null; filename: string | null }[];
 }

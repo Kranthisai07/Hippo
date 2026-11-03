@@ -10,6 +10,7 @@ import { clientAddress, createMemoryLimiter, type RateLimiter } from "./api/limi
 import { createWebApi } from "./api/routes";
 import { createLocalUploader, createMemoryObjectStore, type ObjectStore, type Uploader } from "./api/storage";
 import { createIndexCache, type IndexSource } from "./mcp/indexCache";
+import type { ImportService } from "./import/service";
 import { createMcpServer } from "./mcp/server";
 import type { ToolContext } from "./mcp/context";
 
@@ -47,6 +48,8 @@ export interface WebDeps {
   onUploaded?: OnUploaded;
   /** Saves a page sent by the browser extension. Left out, captures are refused (every public host). */
   onCaptured?: OnCaptured;
+  /** The one time Gmail scan (import/service.ts). Left out, the import is off: /api/me says so and its routes answer 404. */
+  importService?: ImportService;
   /** Where the clause index is written. Default: indexSource when it can be written to. */
   indexStore?: IndexStore;
   /** Browser origins other than the server's own that may send writes with the session cookie (the web dev server). */
@@ -165,6 +168,7 @@ export function createApp(deps: AppDeps): Hono {
       objectStore,
       uploader: web.uploader ?? createLocalUploader(),
       ...(web.onUploaded ? { onUploaded: web.onUploaded } : {}),
+      ...(web.importService ? { importService: web.importService } : {}),
       indexStore,
       indexes,
       now,

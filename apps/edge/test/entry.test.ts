@@ -325,12 +325,27 @@ describe("Continue with Google on the Worker", () => {
 
   it("is offered only when both the client id and the secret are set", async () => {
     const off = setup();
-    expect(await (await off.req("/oauth/providers")).json()).toEqual({ google: false, demo: false, email: true });
+    expect(await (await off.req("/oauth/providers")).json()).toEqual({
+      google: false,
+      demo: false,
+      email: true,
+      gmail: false,
+    });
     const on = setup({ HIPPO_GOOGLE_CLIENT_ID: ID, HIPPO_GOOGLE_CLIENT_SECRET: "secret" });
-    expect(await (await on.req("/oauth/providers")).json()).toEqual({ google: true, demo: false, email: true });
+    expect(await (await on.req("/oauth/providers")).json()).toEqual({
+      google: true,
+      demo: false,
+      email: true,
+      gmail: false,
+    });
     // One without the other is not enough, and in the relaxed mode it simply stays off.
     const half = setup({ HIPPO_GOOGLE_CLIENT_ID: ID });
-    expect(await (await half.req("/oauth/providers")).json()).toEqual({ google: false, demo: false, email: true });
+    expect(await (await half.req("/oauth/providers")).json()).toEqual({
+      google: false,
+      demo: false,
+      email: true,
+      gmail: false,
+    });
   });
   it("starts a web sign in by sending the browser to Google with the Worker's own callback address", async () => {
     const t = setup({ HIPPO_GOOGLE_CLIENT_ID: ID, HIPPO_GOOGLE_CLIENT_SECRET: "secret" });
@@ -415,7 +430,12 @@ describe("a free beta: Google sign in and no email binding", () => {
 
   it("starts in production, and says email codes are off and Google is on", async () => {
     const t = setup(beta);
-    expect(await (await t.req("/oauth/providers")).json()).toEqual({ google: true, demo: false, email: false });
+    expect(await (await t.req("/oauth/providers")).json()).toEqual({
+      google: true,
+      demo: false,
+      email: false,
+      gmail: false,
+    });
   });
 
   it("refuses to send a code, and no code or address reaches the log", async () => {
@@ -432,5 +452,57 @@ describe("a free beta: Google sign in and no email binding", () => {
 
   it("still refuses to start with neither a mailer nor Google", () => {
     expect(() => setup({ ...GOOD_PRODUCTION, EMAIL: undefined })).toThrow(/No way to sign in/);
+  });
+});
+
+describe("the Gmail import switch", () => {
+  const GOOGLE = {
+    HIPPO_GOOGLE_CLIENT_ID: "client-id.apps.googleusercontent.com",
+    HIPPO_GOOGLE_CLIENT_SECRET: "secret",
+  };
+
+  it("is off by default: no gmail in the providers, the import routes answer 404", async () => {
+    const t = setup(GOOGLE);
+    expect(((await (await t.req("/oauth/providers")).json()) as { gmail: boolean }).gmail).toBe(false);
+    const r = await t.req("/oauth/google/import/start");
+    expect(r.status).toBe(404);
+  });
+
+  it("is on only when switched on, and then the consent step exists (it still needs a session)", async () => {
+    const t = setup({ ...GOOGLE, HIPPO_GMAIL_IMPORT: "1" });
+    expect(((await (await t.req("/oauth/providers")).json()) as { gmail: boolean }).gmail).toBe(true);
+    expect((await t.req("/oauth/google/import/start")).status).not.toBe(404);
+    expect((await t.req("/api/import/latest")).status).toBe(401);
+  });
+
+  it("any other value leaves it off", async () => {
+    const t = setup({ ...GOOGLE, HIPPO_GMAIL_IMPORT: "true" });
+    expect(((await (await t.req("/oauth/providers")).json()) as { gmail: boolean }).gmail).toBe(false);
+  });
+
+  it("refuses to start without the Google settings, naming settings and no values", () => {
+    expect(() => setup({ HIPPO_GMAIL_IMPORT: "1" })).toThrow(/HIPPO_GMAIL_IMPORT needs HIPPO_GOOGLE_CLIENT_ID/);
+  });
+
+  it("the cron ends a scan whose token expired and clears its sealed token, only when the switch is on", async () => {
+    // Midday, not the 03:00 cleanup run: this cleanup runs on every cron run.
+    const day = Date.UTC(2026, 10, 2, 12, 5, 0);
+    for (const [flag, cleared] of [
+      ["1", true],
+      [undefined, false],
+    ] as const) {
+      const { env, db } = makeEnv({ ...GOOGLE, ...(flag ? { HIPPO_GMAIL_IMPORT: flag } : {}) });
+      await db
+        .prepare(
+          "INSERT INTO import_jobs (id, household, status, created_at, finished_at, token_cipher, token_expires_at, state) VALUES ('j', 'hh', 'running', ?, NULL, 'v1.a.b', ?, '{}')",
+        )
+        .bind(day - 7200_000, day - 1000)
+        .all();
+      await runScheduled(env, () => day);
+      const row = (await db.prepare("SELECT status, token_cipher FROM import_jobs WHERE id = 'j'").all())
+        .results![0] as { status: string; token_cipher: string | null };
+      expect(row.token_cipher === null, `switch ${flag}`).toBe(cleared);
+      expect(row.status).toBe(cleared ? "failed" : "running");
+    }
   });
 });

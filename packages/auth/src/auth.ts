@@ -4,9 +4,12 @@ import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import {
   derivePendingKey,
   exchangeCode,
+  exchangeCodeFull,
+  GMAIL_READONLY,
   googleAuthUrl,
   googleKeys,
   readPending,
+  revokeAccess,
   safeReturnTo,
   signPending,
   verifyIdToken,
@@ -89,6 +92,8 @@ export interface AuditEvent {
     | "code_replay"
     | "logout"
     | "logout_all"
+    | "import_granted"
+    | "import_refused"
     | "revoke";
   sub?: string;
   reason?: string;
@@ -502,17 +507,40 @@ export function createAuth(opts: AuthOptions): Auth {
     return c.html(errorPage("Google sign in did not work. Try again or use an email code."), 400);
   };
 
-  const startGoogle = async (c: Context, p: Pick<Pending, "mode" | "params" | "returnTo">): Promise<Response> => {
+  const startGoogle = async (
+    c: Context,
+    p: Pick<Pending, "mode" | "params" | "returnTo">,
+    extra: { scope?: string; loginHint?: string; prompt?: "consent" } = {},
+  ): Promise<Response> => {
     const attempt = { gstate: token(random), nonce: token(random), verifier: token(random) };
     const jwt = await signPending(await pendingKey!, { ...p, ...attempt }, now());
     setCookie(c, PENDING_COOKIE, jwt, cookieOpts(GOOGLE_PATH, 600));
-    return c.redirect(await googleAuthUrl(google!, { redirectUri: googleCallback, ...attempt }), 302);
+    return c.redirect(await googleAuthUrl(google!, { redirectUri: googleCallback, ...attempt, ...extra }), 302);
   };
 
   // Which sign in methods this server offers (Google, and the demo login), so the web app shows only buttons that work.
   app.get("/oauth/providers", (c) =>
-    c.json({ google: Boolean(google), demo: Boolean(opts.demoUser), email: emailCodes }, 200, noStore),
+    c.json(
+      { google: Boolean(google), demo: Boolean(opts.demoUser), email: emailCodes, gmail: Boolean(google?.import) },
+      200,
+      noStore,
+    ),
   );
+
+  // Gmail import, step one: someone who is already signed in is sent to Google to allow read only access to their mail,
+  // once. No refresh token is asked for, so access ends with the short lived token. Needs the web session.
+  app.get(`${GOOGLE_PATH}/import/start`, limit, async (c) => {
+    if (!google?.import) return c.json({ error: "not_found" }, 404, noStore);
+    const back =
+      safeReturnTo(single(new URL(c.req.url).searchParams, "return"), ownOrigin, origins) ?? `${ownOrigin}/connect`;
+    const session = await sessionFromId(getCookie(c, SESSION_COOKIE));
+    if (!session) return c.redirect(`${new URL(back).origin}/signin`, 302);
+    return startGoogle(
+      c,
+      { mode: "import", returnTo: back },
+      { scope: `openid email ${GMAIL_READONLY}`, loginHint: session.email, prompt: "consent" },
+    );
+  });
 
   // Sign in to the web app with Google: ends with the cookie session and a redirect back to the web app.
   app.get(`${GOOGLE_PATH}/start`, async (c) => {
@@ -521,6 +549,51 @@ export function createAuth(opts: AuthOptions): Auth {
       safeReturnTo(single(new URL(c.req.url).searchParams, "return"), ownOrigin, origins) ?? `${ownOrigin}/`;
     return startGoogle(c, { mode: "session", returnTo });
   });
+
+  // Gmail import, step two. Every outcome is a redirect to a page of the web app, never an error page of ours, so the person
+  // lands somewhere that can explain it. The access token is handed to the hook and goes nowhere else: not a log, not a
+  // cookie, not a redirect address.
+  const importCallback = async (c: Context, pending: Pending, sp: URLSearchParams): Promise<Response> => {
+    const base = new URL(pending.returnTo ?? `${ownOrigin}/connect`).origin;
+    const back = (reason: string): Response => {
+      opts.audit?.({ event: "import_refused", reason });
+      return c.redirect(`${base}/connect?gmail=${reason}`, 302);
+    };
+    if (!google?.import) return back("unavailable");
+    if (single(sp, "error") !== undefined) return back("declined");
+    const code = single(sp, "code");
+    if (typeof code !== "string" || code === "" || code.length > 2048) return back("failed");
+    const tokens = await exchangeCodeFull(google, { code, redirectUri: googleCallback, verifier: pending.verifier });
+    if (!tokens) return back("failed");
+    // Any way out below that does not start a scan gives the access straight back to Google. For the wrong account that
+    // is somebody else's mailbox: the grant must not stay on their Google account.
+    const refuse = async (reason: string): Promise<Response> => {
+      if (tokens.accessToken) await revokeAccess(google, tokens.accessToken);
+
+      return back(reason);
+    };
+    const who = await verifyIdToken(google, idKeys!, tokens.idToken, { nonce: pending.nonce, nowMs: now() });
+    const email = who ? normalizeEmail(who.email) : null;
+    if (!email) return refuse("failed");
+    // Only for the person who is signed in here: someone who picked another Google account gets nothing.
+    const session = await sessionFromId(getCookie(c, SESSION_COOKIE));
+    if (!session || session.email !== email) return refuse("wrong_account");
+    // A person can untick the Gmail permission on Google's page and still continue.
+    if (!tokens.accessToken || !tokens.scope.split(" ").includes(GMAIL_READONLY)) return refuse("not_granted");
+    try {
+      const path = await google.import.onGranted({
+        email,
+        householdId: session.householdId,
+        accessToken: tokens.accessToken,
+        expiresInSec: tokens.expiresInSec,
+      });
+      opts.audit?.({ event: "import_granted", sub: session.sub });
+      return c.redirect(`${base}${path.startsWith("/") && !path.startsWith("//") ? path : "/connect"}`, 302);
+    } catch (e) {
+      opts.log(`[hippo-auth] import start failed (${e instanceof Error ? e.name : "error"})`);
+      return refuse("failed");
+    }
+  };
 
   app.get(`${GOOGLE_PATH}/callback`, async (c) => {
     if (!google) return c.json({ error: "not_found" }, 404, noStore);
@@ -534,6 +607,8 @@ export function createAuth(opts: AuthOptions): Auth {
     const gstate = single(sp, "state");
     if (typeof gstate !== "string" || !(await safeEqual(gstate, pending.gstate)))
       return googleFailed(c, "google_state");
+
+    if (pending.mode === "import") return importCallback(c, pending, sp);
 
     const chk = pending.mode === "authorize" ? checkAuthorize(new URLSearchParams(pending.params ?? {})) : undefined;
     if (pending.mode === "authorize" && (!chk || !chk.ok)) return googleFailed(c, "google_state");

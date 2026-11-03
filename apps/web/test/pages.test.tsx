@@ -225,7 +225,7 @@ describe("Sign in with Google", () => {
 
   it("shows a Continue with Google link only when the server offers it, and sends the person back to where they were", async () => {
     vi.spyOn(api, "me").mockRejectedValue(new ApiError(401, "unauthenticated", "Please sign in again."));
-    vi.spyOn(api, "providers").mockResolvedValue({ google: true, demo: true, email: true });
+    vi.spyOn(api, "providers").mockResolvedValue({ google: true, demo: true, email: true, gmail: false });
     open();
     const link = await screen.findByRole("link", { name: "Continue with Google" });
     const href = new URL(link.getAttribute("href")!, window.location.origin);
@@ -235,7 +235,9 @@ describe("Sign in with Google", () => {
 
   it("shows no Google link when the server does not offer it, or does not answer", async () => {
     vi.spyOn(api, "me").mockRejectedValue(new ApiError(401, "unauthenticated", "Please sign in again."));
-    const providers = vi.spyOn(api, "providers").mockResolvedValue({ google: false, demo: false, email: true });
+    const providers = vi
+      .spyOn(api, "providers")
+      .mockResolvedValue({ google: false, demo: false, email: true, gmail: false });
     open();
     await screen.findByLabelText("Email");
     await waitFor(() => expect(providers).toHaveBeenCalled());
@@ -256,7 +258,7 @@ describe("Sign in", () => {
         new ApiError(429, "rate_limited", "Too many tries. Please wait 30 seconds and try again.", 30),
       );
     vi.spyOn(api, "me").mockRejectedValue(new ApiError(401, "unauthenticated", "Please sign in again."));
-    vi.spyOn(api, "providers").mockResolvedValue({ google: false, demo: true, email: true });
+    vi.spyOn(api, "providers").mockResolvedValue({ google: false, demo: true, email: true, gmail: false });
     wrap(
       <AuthProvider>
         <SignIn />
@@ -275,7 +277,7 @@ describe("Sign in", () => {
 
   it("moves to a code step after the email, and a different email goes back", async () => {
     vi.spyOn(api, "me").mockRejectedValue(new ApiError(401, "unauthenticated", "Please sign in again."));
-    vi.spyOn(api, "providers").mockResolvedValue({ google: true, demo: true, email: true });
+    vi.spyOn(api, "providers").mockResolvedValue({ google: true, demo: true, email: true, gmail: false });
     const send = vi.spyOn(api, "magicCode").mockResolvedValue(undefined as never);
     wrap(
       <AuthProvider>
@@ -319,7 +321,9 @@ describe("Settings", () => {
 describe("what the server can do", () => {
   it("offers the demo account only when the server says the demo is on", async () => {
     vi.spyOn(api, "me").mockRejectedValue(new ApiError(401, "unauthenticated", "Please sign in again."));
-    const providers = vi.spyOn(api, "providers").mockResolvedValue({ google: false, demo: false, email: true });
+    const providers = vi
+      .spyOn(api, "providers")
+      .mockResolvedValue({ google: false, demo: false, email: true, gmail: false });
     wrap(
       <AuthProvider>
         <SignIn />
@@ -371,7 +375,7 @@ describe("what the server can do", () => {
 describe("a server with no emailed codes", () => {
   it("shows Google and no email form, so nobody waits for a code that is never sent", async () => {
     vi.spyOn(api, "me").mockRejectedValue(new ApiError(401, "unauthenticated", "Please sign in again."));
-    vi.spyOn(api, "providers").mockResolvedValue({ google: true, demo: false, email: false });
+    vi.spyOn(api, "providers").mockResolvedValue({ google: true, demo: false, email: false, gmail: false });
     wrap(
       <AuthProvider>
         <SignIn />

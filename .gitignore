@@ -27,3 +27,5 @@ apps/extension/dist-store/
 apps/extension/release/
 
 apps/edge/wrangler.release.toml
+
+tail.out
