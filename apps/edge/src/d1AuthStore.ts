@@ -165,6 +165,8 @@ export function createD1AuthStore(
       await run("DELETE FROM auth_magic WHERE expires_at <= ?", nowMs);
       await run("DELETE FROM auth_revoked_families WHERE at <= ?", nowMs - TTL.refreshMs);
       await run("DELETE FROM auth_hits WHERE ts <= ?", nowMs - hitTtlMs);
+      // Rows for days long past (the job only ever reads today's).
+      await run("DELETE FROM daily_runs WHERE day < ?", new Date(nowMs - 3 * 86_400_000).toISOString().slice(0, 10));
     },
   };
 }

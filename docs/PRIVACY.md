@@ -14,7 +14,7 @@ When you use the app, Hippo keeps these things for your household:
 | The clause index used to answer questions | The object store, plus an in-memory copy while the server runs |
 | Obligations and alerts computed from confirmed fields, and recall alerts | The database |
 | Assets (your dishwasher, your car), service history, "not mine" choices | The database |
-| Settings: digest on or off, and the digest email address | The database |
+| Settings: digest on or off, and the digest email address (always the address you signed in with) | The database |
 | Your login email, session and token records | The auth store (memory only today) |
 
 Today "the database" and "the object store" are both in memory when you run the demo, and are gone when the server stops. A DynamoDB version of the database is written and tested on DynamoDB Local. An S3 version of the object store is not written.
@@ -118,7 +118,7 @@ Code is in `packages/auth`.
 - Every write to the web API must carry an `Origin` equal to the server's own (or an allowed dev origin). A missing Origin is refused. There are no CORS headers on `/api`.
 - Your household comes from the verified token or session only. No route or tool takes a household id from the request.
 - The demo login ("sign in as demo") is on only for a loopback host or when `HIPPO_DEMO=1`, with a random code per start. If you expose a local server through a tunnel, set `HIPPO_DEMO=0`.
-- Settings gap: `PUT /api/settings` changes the digest address without verifying that you own it.
+- The daily email goes only to the address you signed in with. `PUT /api/settings` refuses any other address, because an address typed into a form has been proved by nobody.
 
 ## Third parties
 

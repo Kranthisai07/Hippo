@@ -248,6 +248,29 @@ No decisions log exists on main (MEMORY.md is only in old worktrees), so this fi
 - **Owner details added:** publisher Kranthi Gadi and contact devnest007@gmail.com on the privacy and terms pages and in the listing.
 - **Not checked:** the extension against this address (next), a real scheduled run, the Chrome Web Store.
 
+## 2026-11-02: the daily email goes only to the address the person signed in with (+claude)
+- **What:** `PUT /api/settings` answers 400 for any `email` that is not the session address and always saves the session address (which also repairs a stale record). The Settings page shows "Sent to <address>" and no input.
+- **Why:** gate found in review of the hosted path. With the email on by default, a typed address that nobody had proved could aim a digest at a stranger, and the turn off link only turns off the sender's own household.
+- **Why this way:** the sign in address is already proved (Google or an emailed code), so no new verification flow is needed and none of the beta's tiers needs one. A "send the digest elsewhere" feature would need a code sent to the new address, which needs a mailer; it is not built.
+- **Checked:** api 806 and web 144 tests; mutation check (the refusal removed) fails two named tests.
+
+## 2026-11-02: the cron does a few households per run, each once a day (+claude)
+- **What:** migration `0003_daily.sql` (`daily_runs`), `nextD1HouseholdIds` and `markD1HouseholdsDone` in core, `runDailyJob` takes at most `HIPPO_DAILY_BATCH` (default 5) households not yet done today and marks them after the run. The cron is `*/15 * * * *`. The cleanup of expired sign in records is part of the first run after 03:00 UTC only. Old `daily_runs` rows are dropped by the cleanup.
+- **Why:** gate from the review of the hosted path: all households in one run would hit Cloudflare's per run limits as people sign up. Slices keep every run small and bounded, and need no queue.
+- **Why this way:** a table of "done today" rows instead of a cursor, so a household that signs in later the same day is still picked up, a failed run retries without bookkeeping, and nothing depends on household ids sorting stably. A household that crashes inside `runDaily` is isolated there (counted, and marked done with the rest), so one bad record cannot hold up the others. Marking happens only after the run, so an infrastructure failure retries the slice.
+- **Checked:** edge 141 tests (each household once a day over several runs, the day rollover, a household added later, idle runs, a failed run retried, batch size parsing, the cleanup window); mutation checks (marking removed, cleanup window always open) fail named tests; about 3 ms of work per household measured on Node. **Not checked:** a real scheduled run on Cloudflare (next, after deploy).
+
+## 2026-11-02: review fixes for the two gates (+claude)
+- **Index:** `0004_household_index.sql` adds a partial index on household records, and the lookups use the literal `sk = 'HOUSEHOLD'` so SQLite can use it (a bound parameter would not). Before, every 15 minute run read every row of the table. A test reads the query plan and fails if the index is not used. It is a new migration because 0003 was already applied to the deployed database.
+- **Default batch is 1,** not 5: about 3 ms of work per household against the free plan's 10 ms of CPU, and the beta is on the free plan. 96 runs a day still finish 96 households a day; raise `HIPPO_DAILY_BATCH` on the paid plan.
+- **Old records:** `ensureHousehold` now also brings the stored address of an existing record in line with the sign in address, leaving the on or off choice alone. A record written before the gate could otherwise keep an unverified address until its owner saved Settings. Until a person next signs in, an old address could still be mailed; the beta has one real account and no mail binding, and this closes it for everyone at their next sign in.
+- **Mail then failed marking:** a test proves that if marking "done" fails after a digest was sent, the next run takes the household again but sends nothing, because alerts already carry the time they were mailed.
+- **Left as a note:** two overlapping runs could pick the same households (selection and marking are not one step). Cloudflare crons do not overlap and runs are short; the alert marking above is the backstop for the mail.
+- **Checked:** core 1348, api 806, edge 142 tests; mutation checks (no index migration, no address repair) fail named tests.
+
+## 2026-11-02: the first real scheduled run (+claude)
+- On the deployed beta the 15 minute cron ran: outcome ok, one household, no errors, cpuTime 10 ms, wallTime 1577 ms. That is exactly the free plan's CPU limit, so the default batch of 1 is the ceiling on the free plan, not a safe margin: on the paid plan raise `HIPPO_DAILY_BATCH`. Recorded in `docs/VERIFIED.md` 10.23.
+
 ## 2026-11-02: the top bar shows a circle with the first letter, not the address (+claude)
 - **What:** `apps/web/src/components/Layout.tsx` replaces the printed address with `.bar-avatar`, a round accent badge with the first letter. The full address is its accessible name (`role="img"`, `aria-label="Signed in as ..."`) and its hover text. The old rules that hid the address below 1100 and 1440 px are gone, so the badge shows at every width, including on a phone.
 - **Why:** the owner did not want the address shown in the bar.

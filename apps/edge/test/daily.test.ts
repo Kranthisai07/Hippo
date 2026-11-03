@@ -200,7 +200,10 @@ describe("the scheduled run", () => {
     };
     const err = vi.spyOn(console, "error").mockImplementation(quiet);
     vi.spyOn(console, "log").mockImplementation(quiet);
-    await expect(runScheduled({ ...w.env, DB: failing } as unknown as Env, () => NOW)).rejects.toThrow();
+    // 03:05 UTC on the day of NOW: the run that also does the cleanup.
+    await expect(
+      runScheduled({ ...w.env, DB: failing } as unknown as Env, () => Date.UTC(2026, 9, 21, 3, 5)),
+    ).rejects.toThrow();
     expect((await w.repo.listAlerts("hh_a")).length).toBeGreaterThan(0);
     expect(JSON.stringify(err.mock.calls)).not.toContain("secret detail");
     vi.restoreAllMocks();
@@ -209,9 +212,36 @@ describe("the scheduled run", () => {
 
   it("builds the deps without any network or app", () => {
     const w = world();
-    const d = dailyDeps(w.env, () => NOW);
+    const d = dailyDeps(w.env, () => NOW, []);
     expect(d.sender).toBeDefined();
     expect(d.unsubscribeUrl).toBeDefined();
     expect(d.appUrl).toBe(ISSUER);
+  });
+});
+
+describe("a failed marking after the mail went out", () => {
+  it("does not send the same alerts a second time when the household is taken again", async () => {
+    emptyRecalls();
+    const w = world();
+    await household(w, "hh_a", { email: "a@hippo.test" });
+    await addWarranty(w.repo, "hh_a", "sure", days(5), "confirmed");
+    let breakMark = true;
+    const flaky = {
+      prepare: (sql: string) => w.db.prepare(sql),
+      batch: (s: Parameters<typeof w.db.batch>[0]) => {
+        const marking = (s as unknown as { sql: string }[]).some((x) => x.sql.startsWith("INSERT INTO daily_runs"));
+        if (breakMark && marking) throw new TypeError("database busy");
+        return w.db.batch(s);
+      },
+    };
+    const env = { ...w.env, DB: flaky } as never;
+    await expect(runDailyJob(env, () => NOW, quiet)).rejects.toThrow("database busy");
+    expect(w.mails).toHaveLength(1);
+    breakMark = false;
+    const again = await runDailyJob(env, () => NOW + 900_000, quiet);
+    // Taken again, because it was not marked, but the alerts already carry the time they were mailed.
+    expect(again.households).toHaveLength(1);
+    expect(w.mails).toHaveLength(1);
+    vi.unstubAllGlobals();
   });
 });

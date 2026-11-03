@@ -13,7 +13,7 @@ import {
 } from "../../../packages/auth/test/helpers";
 import { createSqliteD1 } from "../../../packages/core/test/d1.sqlite";
 import { createHash } from "node:crypto";
-import worker, { buildApp, householdOf, purgeAuthStore, StartupError, type Env } from "../src/index";
+import worker, { buildApp, householdOf, purgeAuthStore, runScheduled, StartupError, type Env } from "../src/index";
 import { createD1AuthStore } from "../src/d1AuthStore";
 import { createD1Repository } from "core/src/repository/d1";
 import { fakeBucket } from "./fakes";
@@ -358,7 +358,10 @@ describe("the daily cleanup", () => {
     await store.putSession("sold", { email: "a@x.example", sub: "u", householdId: "h", expiresAt: T0 - 1000 });
     const env = { DB: db } as unknown as Env;
     expect(typeof worker.scheduled).toBe("function");
-    await worker.scheduled({}, env);
+    // The cleanup is part of the first run after 03:00 UTC, so the run is given a time inside that window.
+    vi.spyOn(console, "log").mockImplementation(() => undefined);
+    await runScheduled(env, () => Date.UTC(2026, 10, 1, 3, 5));
+    vi.restoreAllMocks();
     expect(db.count("auth_refresh")).toBe(1);
     expect(db.count("auth_sessions")).toBe(0);
   });
@@ -386,7 +389,7 @@ describe("a new person's household", () => {
     expect(await repo.getHousehold(hh)).toMatchObject({ id: hh, email: "new@hippo.test", digestOn: true });
   });
 
-  it("signing in does not undo a setting the person already saved", async () => {
+  it("signing in repairs an address that is not the sign in address, and keeps the on or off setting the person saved", async () => {
     const t = setup();
     const hh = await householdOf("keep@hippo.test");
     const repo = createD1Repository(t.db);
@@ -397,7 +400,7 @@ describe("a new person's household", () => {
       createdAt: "2026-01-01T00:00:00.000Z",
     });
     await t.signIn("keep@hippo.test");
-    expect(await repo.getHousehold(hh)).toMatchObject({ email: "home@hippo.test", digestOn: false });
+    expect(await repo.getHousehold(hh)).toMatchObject({ email: "keep@hippo.test", digestOn: false });
   });
 });
 

@@ -444,6 +444,33 @@ describe("with no uploads on the server", () => {
   });
 });
 
+describe("Settings: where the daily email goes", () => {
+  const open = () =>
+    wrap(
+      <AuthProvider>
+        <SettingsPage />
+      </AuthProvider>,
+    );
+
+  it("says it goes to the sign in address and offers no box to type another", async () => {
+    vi.spyOn(api, "me").mockResolvedValue({ email: "kranthi@example.com", digestOn: true, uploads: true });
+    vi.spyOn(api, "listDocs").mockResolvedValue({ docs: [] });
+    open();
+    expect(await screen.findByTestId("digest-to")).toHaveTextContent("kranthi@example.com");
+    expect(screen.queryByLabelText("Send it to")).toBeNull();
+  });
+
+  it("saves only the on or off choice", async () => {
+    vi.spyOn(api, "me").mockResolvedValue({ email: "kranthi@example.com", digestOn: true, uploads: true });
+    vi.spyOn(api, "listDocs").mockResolvedValue({ docs: [] });
+    const put = vi.spyOn(api, "putSettings").mockResolvedValue({ digestOn: false } as never);
+    open();
+    await userEvent.click(await screen.findByLabelText("Send me a short email when something is due soon"));
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(put).toHaveBeenCalledWith({ digestOn: false }));
+  });
+});
+
 describe("the top bar", () => {
   it("shows a circle with the first letter, not the address, and keeps the address for assistive technology", async () => {
     vi.spyOn(api, "me").mockResolvedValue({ email: "kranthi@example.com", digestOn: true, uploads: true });

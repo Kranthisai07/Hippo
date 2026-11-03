@@ -373,8 +373,14 @@ export function createWebApi(deps: WebApiDeps): Hono<{ Variables: { hh: string; 
   api.put("/settings", async (c) => {
     const hh = c.var.hh;
     const body = await readJson(c, SettingsBody);
+    // The daily email goes only to the address the person proved they control by signing in. An address typed here has been
+    // proved by nobody, and with the email on by default it could point someone's digest at a stranger.
+    if (body.email !== undefined && body.email !== c.var.email) {
+      throw new ApiError(400, "The daily email goes to the address you signed in with.");
+    }
     const household = (await repo.getHousehold(hh)) ?? { id: hh, digestOn: true, createdAt: nowIso() };
-    const next = { ...household, digestOn: body.digestOn, ...(body.email !== undefined ? { email: body.email } : {}) };
+    // Always the session address, which also repairs a record that holds another one.
+    const next = { ...household, digestOn: body.digestOn, email: c.var.email };
     await repo.putHousehold(hh, next);
     return c.json({ digestOn: next.digestOn, email: next.email ?? c.var.email });
   });

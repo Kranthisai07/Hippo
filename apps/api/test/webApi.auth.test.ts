@@ -58,10 +58,10 @@ describe("session", () => {
     Object.assign(w.a, w.clientFor(w.a.cookie));
   });
 
-  it("GET /api/me returns the digest address once it is set", async () => {
-    await w.a.send("PUT", "/api/settings", { digestOn: false, email: "Home@Example.com" });
+  it("GET /api/me returns the address the daily email goes to, which is the sign in address", async () => {
+    await w.a.send("PUT", "/api/settings", { digestOn: false, email: "Demo@Hippo.test" });
     expect(await json(await w.a.get("/api/me"))).toEqual({
-      email: "home@example.com",
+      email: "demo@hippo.test",
       digestOn: false,
       uploads: true,
     });

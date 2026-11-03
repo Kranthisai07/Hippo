@@ -678,3 +678,12 @@ Deployed with the owner's approval on the free plan: Worker `hippo` at `https://
 | The store build in real Chromium | Built with `VITE_HIPPO_PUBLIC_KEY` set to the development key, so the id stays `gcanedelajoahpaoeeonbdlieoepcobc`; loaded unpacked in headless Chromium, its `launchWebAuthFlow` window opened the deployed sign in page with Google only (no email form, no demo) | VERIFIED |
 | Free plan limits on the real build | The deploy of the 1.6 MB, 29 file app and a 1 MB class Worker was accepted | VERIFIED for this size |
 | The popup in real Chrome, the Chrome Web Store, a real scheduled run, Email Sending, other Google users | Not run | UNVERIFIED |
+
+### 10.23 The daily job in slices (2026-11-02)
+
+| Item | Observed | Status |
+| :--- | :--- | :--- |
+| Work per household | `runDaily` for the demo household (documents, 7 alerts, recorded recall answers, a dry run digest) on Node with the SQLite stand in for D1: median 3.2 ms wall time over 30 runs, one 29 ms warm up run. Node, not workerd, and no network, so this is an estimate of the CPU work only | MEASURED on Node, UNVERIFIED on Cloudflare |
+| Workers limits that decide the batch | Free: 10 ms CPU per request and per cron run, 50 subrequests per run with D1 queries counted; Paid: 30 s CPU for a cron under one hour, 10,000 subrequests (https://developers.cloudflare.com/workers/platform/limits/, read through a summarising tool) | VERIFIED from the page |
+| What the slicing guarantees | Each household with a record is processed once per UTC day, one at a time by default (`HIPPO_DAILY_BATCH`), in key order, by a 15 minute cron; a household that signs in later the same day is picked up by a later run; a run that fails as a whole marks nobody done (tested on the SQLite stand in) | VERIFIED in tests |
+| A real scheduled run on Cloudflare | The deployed beta's 15 minute cron (scheduled 2026-11-02 20:45 UTC, read with `wrangler tail`): outcome `ok`, one household processed (`households: 1`, `errors: 0`, no mail because there is no email binding), **cpuTime 10 ms and wallTime 1577 ms** (the wall time is the recall lookups). 10 ms is the Workers free plan's whole CPU limit, so one household per run is the most the free plan can take and the default batch of 1 is right; the run did not fail | VERIFIED on Cloudflare (one run)|
